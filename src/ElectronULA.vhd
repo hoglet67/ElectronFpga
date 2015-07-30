@@ -13,6 +13,13 @@
 --
 --Design Name: ElectronFpga_core
 
+
+-- TODO:
+-- Implement Cassette
+-- Implement 50Hz VGA
+-- Implement 15.875KHz RGB Video Output
+-- Fix display interrupt to be once per field
+
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.std_logic_unsigned.all;
@@ -79,18 +86,56 @@ architecture behavioral of ElectronULA is
   signal counter        : std_logic_vector(7 downto 0);
   signal display_mode   : std_logic_vector(2 downto 0);
   signal comms_mode     : std_logic_vector(1 downto 0);
+  
+  type palette_type is array (0 to 7) of std_logic_vector (7 downto 0);  
+  signal palette        : palette_type;
 
   signal svga_hcount    : std_logic_vector(10 downto 0);
+  signal svga_hcount1   : std_logic_vector(10 downto 0);
   signal svga_vcount    : std_logic_vector(9 downto 0);
-  signal count10        : std_logic_vector(3 downto 0);
+  signal char_row       : std_logic_vector(3 downto 0);
   signal row_offset     : std_logic_vector(14 downto 0);
-  signal col_offset     : std_logic_vector(8 downto 0);
+  signal col_offset     : std_logic_vector(9 downto 0);
   signal screen_addr    : std_logic_vector(14 downto 0);
   signal screen_data    : std_logic_vector(7 downto 0);
   
-  signal display_end    : std_logic;
+  -- Screen Mode Registers
+
+  -- the 256 byte page that the mode starts at
+  signal mode_base      : std_logic_vector(7 downto 0);
+  
+  -- the number of bits per pixel (0 = 1BPP, 1 = 2BPP, 2=4BPP)
+  signal mode_bpp       : std_logic_vector(1 downto 0);
+  
+   -- a '1' indicates a text mode (modes 3 and 6)
+  signal mode_text      : std_logic;
+  
+  -- a '1' indicates a 40-col mode (modes 4, 5 and 6)
+  signal mode_40        : std_logic;
+  
+  -- the number of bytes to increment row_offset when moving from one char row to the next
+  signal mode_rowstep   : std_logic_vector(9 downto 0);
+  
+  signal display_field   : std_logic;
+  signal display_end     : std_logic;
   signal display_end1    : std_logic;
   signal display_end2    : std_logic;
+
+-- Helper function to cast an std_logic value to an integer
+function sl2int (x: std_logic) return integer is
+begin
+    if x = '1' then
+        return 1;
+    else
+        return 0;
+    end if;
+end;
+
+-- Helper function to cast an std_logic_vector value to an integer
+function slv2int (x: std_logic_vector) return integer is
+begin
+    return to_integer(unsigned(x));
+end;
   
 begin
 
@@ -199,6 +244,7 @@ begin
                         case addr(3 downto 0) is
                         when x"0" =>
                             ier(6 downto 2) <= data_in(6 downto 2);
+                        when x"1" =>
                         when x"2" =>
                             screen_base(8 downto 6) <= data_in(7 downto 5);
                         when x"3" =>
@@ -242,16 +288,66 @@ begin
                             caps         <= data_in(7);
                             motor        <= data_in(6);
                             display_mode <= data_in(5 downto 3);
+                            case (data_in(5 downto 3)) is
+                            when "000" =>
+                                mode_base    <= x"30";
+                                mode_bpp     <= "00";
+                                mode_40      <= '0';
+                                mode_text    <= '0';
+                                mode_rowstep <= std_logic_vector(to_unsigned(633, 10)); -- 640 - 7
+                            when "001" =>
+                                mode_base    <= x"30";
+                                mode_bpp     <= "01";
+                                mode_40      <= '0';
+                                mode_text    <= '0';
+                                mode_rowstep <= std_logic_vector(to_unsigned(633, 10)); -- 640 - 7
+                            when "010" =>
+                                mode_base    <= x"30";
+                                mode_bpp     <= "10";
+                                mode_40      <= '0';
+                                mode_text    <= '0';
+                                mode_rowstep <= std_logic_vector(to_unsigned(633, 10)); -- 640 - 7
+                            when "011" =>
+                                mode_base    <= x"40";
+                                mode_bpp     <= "00";
+                                mode_40      <= '0';
+                                mode_text    <= '1';
+                                mode_rowstep <= std_logic_vector(to_unsigned(631, 10)); -- 640 - 9
+                            when "100" =>
+                                mode_base    <= x"58";
+                                mode_bpp     <= "00";
+                                mode_40      <= '1';
+                                mode_text    <= '0';
+                                mode_rowstep <= std_logic_vector(to_unsigned(313, 10)); -- 320 - 7
+                            when "101" =>
+                                mode_base    <= x"60";
+                                mode_bpp     <= "01";
+                                mode_40      <= '1';
+                                mode_text    <= '0';
+                                mode_rowstep <= std_logic_vector(to_unsigned(313, 10)); -- 320 - 7
+                            when "110" =>
+                                mode_base    <= x"60";
+                                mode_bpp     <= "00";
+                                mode_40      <= '1';
+                                mode_text    <= '1';
+                                mode_rowstep <= std_logic_vector(to_unsigned(311, 10)); -- 320 - 9
+                            when "111" =>
+                                -- mode 7 seems to default to mode 4
+                                mode_base    <= x"58";
+                                mode_bpp     <= "00";
+                                mode_40      <= '1';
+                                mode_text    <= '0';
+                                mode_rowstep <= std_logic_vector(to_unsigned(313, 10)); -- 320 - 7
+                            when others =>
+                            end case;                            
                             comms_mode   <= data_in(2 downto 1);
-                        -- TODO Implement Palette
                         when others =>
-                      
+                            -- A '1' in the palatte data means disable the colour
+                            -- Invert the stored palette, to make the palette logic simpler
+                            palette(slv2int(addr(2 downto 0))) <= data_in xor "11111111";
                         end case;
                     end if;
                 end if;          
-                -- TODO Implement RD and TD Shifting
-                -- TODO Implement Cassette
-                -- TODO Implement interrupts
             end if;
         end if;
     end process;
@@ -266,60 +362,154 @@ begin
     -- Vertical   512 + (44 +  1) +   4 + (23 + 44) = total 628
     
     process (clk_svga)
-    variable pixel : std_logic;
+    variable pixel : std_logic_vector(3 downto 0);
     begin
         if rising_edge(clk_svga) then
+            -- pipeline svga_hcount by one cycle to compensate the register in the RAM
+            svga_hcount1 <= svga_hcount;
             if (svga_hcount = 1055) then
                 svga_hcount <= (others => '0');
                 col_offset <= (others => '0');
                 if (svga_vcount = 627) then
                     svga_vcount <= (others => '0');
-                    count10 <= (others => '0');
-                    row_offset <= (others => '0'); 
+                    char_row <= (others => '0');
+                    row_offset <= (others => '0');
+                    display_field <= not display_field;                    
                 else
                     svga_vcount <= svga_vcount + 1;
                     if (svga_vcount(0) = '1') then
-                        if (count10 = 9) then
-                            count10 <= (others => '0');
-                            row_offset <= row_offset + 311;  -- 0x140 - 9
+                        if ((mode_text = '0' and char_row = 7) or (mode_text = '1' and char_row = 9)) then
+                            char_row <= (others => '0');
+                            row_offset <= row_offset + mode_rowstep;
                         else
-                            count10 <= count10 + 1;
+                            char_row <= char_row + 1;
                             row_offset <= row_offset + 1;
                         end if;
                     end if;
                 end if;
             else
                 svga_hcount <= svga_hcount + 1;
-                if (svga_hcount(3 downto 0) = "1111") then
+                if ((mode_40 = '0' and svga_hcount(2 downto 0) = "111") or
+                    (mode_40 = '1' and svga_hcount(3 downto 0) = "1111")) then
                     col_offset <= col_offset + 8;
                 end if;
             end if;
             -- RGB Data
             if (svga_vcount >= 512) then
-                display_end <= '1';
+                display_end <= display_field;
             else
                 display_end <= '0';
             end if;
-            if ((svga_hcount >= 720 and svga_hcount < 976) or (svga_vcount >= 556 and svga_vcount < 584)) then
-                -- blanking
+            if ((svga_hcount1 >= 720 and svga_hcount1 < 976) or (svga_vcount >= 556 and svga_vcount < 584)) then
+                -- blanking is always black
                 red   <= (others => '0');
                 green <= (others => '0');
                 blue  <= (others => '0');
-            elsif (svga_hcount >= 640 or svga_vcount >= 500 or count10 >= 8) then
-                -- border
+            elsif (svga_hcount1 >= 640 or (mode_text = '0' and svga_vcount >= 512) or (mode_text = '1' and svga_vcount >= 500) or char_row >= 8) then
+                -- border is always black (TODO, as some point fold this into the previous condition)
                 red   <= (others => '0');
                 green <= (others => '0');
-                blue  <= (others => '1');
-            elsif (screen_data(7 - to_integer(unsigned(svga_hcount(3 downto 1)))) = '1') then
-                -- white pixel
-                red   <= (others => '1');
-                green <= (others => '1');
-                blue  <= (others => '1');
+                blue  <= (others => '0');
             else
-                -- black pixel
-                red   <= (others => '0');
-                green <= (others => '0');
-                blue  <= (others => '0');
+                -- rendering an actual pixel
+                if (mode_bpp = 0) then
+                    -- 1 bit per pixel, map to colours 0 and 8 for the palette lookup
+                    if (mode_40 = '1') then
+                        pixel := screen_data(7 - slv2int(svga_hcount1(3 downto 1))) & "000";
+                    else
+                        pixel := screen_data(7 - slv2int(svga_hcount1(2 downto 0))) & "000";
+                    end if;
+                elsif (mode_bpp = 1) then
+                    -- 2 bits per pixel, map to colours 0, 2, 8, 10 for the palette lookup
+                    if (mode_40 = '1') then
+                        pixel := screen_data(7 - slv2int(svga_hcount1(3 downto 2))) & "0" &
+                                 screen_data(3 - slv2int(svga_hcount1(3 downto 2))) & "0";
+                    else
+                        pixel := screen_data(7 - slv2int(svga_hcount1(2 downto 1))) & "0" &
+                                 screen_data(3 - slv2int(svga_hcount1(2 downto 1))) & "0";
+                    end if;
+                else
+                    -- 4 bits per pixel, map directly for the palette lookup
+                    if (mode_40 = '1') then
+                        pixel := screen_data(7 - sl2int(svga_hcount1(3))) &
+                                 screen_data(5 - sl2int(svga_hcount1(3))) &
+                                 screen_data(3 - sl2int(svga_hcount1(3))) &
+                                 screen_data(1 - sl2int(svga_hcount1(3)));
+                    else
+                        pixel := screen_data(7 - sl2int(svga_hcount1(2))) &
+                                 screen_data(5 - sl2int(svga_hcount1(2))) &
+                                 screen_data(3 - sl2int(svga_hcount1(2))) &
+                                 screen_data(1 - sl2int(svga_hcount1(2)));
+                    end if;
+                end if;
+                -- Implement Color Palette
+                case (pixel) is
+                when "0000" =>
+                    red   <= (others => palette(1)(0));
+                    green <= (others => palette(1)(4));
+                    blue  <= (others => palette(0)(4));
+                when "0001" =>
+                    red   <= (others => palette(7)(0));
+                    green <= (others => palette(7)(4));
+                    blue  <= (others => palette(6)(4));
+                when "0010" =>
+                    red   <= (others => palette(1)(1));
+                    green <= (others => palette(1)(5));
+                    blue  <= (others => palette(0)(5));
+                when "0011" =>
+                    red   <= (others => palette(7)(1));
+                    green <= (others => palette(7)(5));
+                    blue  <= (others => palette(6)(5));
+                when "0100" =>
+                    red   <= (others => palette(3)(0));
+                    green <= (others => palette(3)(4));
+                    blue  <= (others => palette(2)(4));
+                when "0101" =>
+                    red   <= (others => palette(5)(0));
+                    green <= (others => palette(5)(4));
+                    blue  <= (others => palette(4)(4));
+                when "0110" =>
+                    red   <= (others => palette(3)(1));
+                    green <= (others => palette(3)(5));
+                    blue  <= (others => palette(2)(5));
+                when "0111" =>
+                    red   <= (others => palette(5)(1));
+                    green <= (others => palette(5)(5));
+                    blue  <= (others => palette(4)(5));
+                when "1000" =>
+                    red   <= (others => palette(1)(2));
+                    green <= (others => palette(0)(2));
+                    blue  <= (others => palette(0)(6));
+                when "1001" =>
+                    red   <= (others => palette(7)(2));
+                    green <= (others => palette(6)(2));
+                    blue  <= (others => palette(6)(6));
+                when "1010" =>
+                    red   <= (others => palette(1)(3));
+                    green <= (others => palette(0)(3));
+                    blue  <= (others => palette(0)(7));
+                when "1011" =>
+                    red   <= (others => palette(7)(3));
+                    green <= (others => palette(6)(3));
+                    blue  <= (others => palette(6)(7));
+                when "1100" =>
+                    red   <= (others => palette(3)(2));
+                    green <= (others => palette(2)(2));
+                    blue  <= (others => palette(2)(6));
+                when "1101" =>
+                    red   <= (others => palette(5)(2));
+                    green <= (others => palette(4)(2));
+                    blue  <= (others => palette(4)(6));
+                when "1110" =>
+                    red   <= (others => palette(3)(3));
+                    green <= (others => palette(2)(3));
+                    blue  <= (others => palette(2)(7));
+                when "1111" =>
+                    red   <= (others => palette(5)(3));
+                    green <= (others => palette(4)(3));
+                    blue  <= (others => palette(4)(7));
+                when others =>
+                end case;
             end if;              
             -- Vertical Sync
             if (svga_vcount = 556) then
@@ -328,9 +518,9 @@ begin
                 vsync <= '1';
             end if;
             -- Horizontal Sync
-            if (svga_hcount = 759) then
+            if (svga_hcount1 = 759) then
                 hsync <= '0';
-            elsif (svga_hcount = 887) then
+            elsif (svga_hcount1 = 887) then
                 hsync <= '1';
             end if;
                     
@@ -342,7 +532,7 @@ begin
     begin
         tmp := ("0" & screen_base & "000000") + row_offset + col_offset;
         if (tmp(15) = '1') then
-            tmp := tmp + x"6000";
+            tmp := tmp + (mode_base & "00000000");
         end if;
         screen_addr <= tmp(14 downto 0);
     end process;
