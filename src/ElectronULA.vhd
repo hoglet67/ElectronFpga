@@ -58,7 +58,9 @@ entity ElectronULA is
 
         -- MISC
         caps      : out std_logic;
-        motor     : out std_logic
+        motor     : out std_logic;
+        
+        rom_latch : out std_logic_vector(3 downto 0)
         );
 end;
 
@@ -184,6 +186,8 @@ begin
     IRQ_n      <= not master_irq; 
     NMI_n      <= not master_nmi;
     isr_data   <= '0' & isr(6 downto 2) & power_on_reset & master_irq;
+    
+    rom_latch  <= page_enable & page;
    
     -- ULA Writes
     process (clk_16M00, RST_n)
@@ -198,7 +202,6 @@ begin
            page_enable  <= '0';
            page         <= (others => '0');
            counter      <= (others => '0');
-           display_mode <= (others => '0');
            comms_mode   <= (others => '0');
 
            rtc_counter   <= (others => '0');
@@ -287,7 +290,6 @@ begin
                         when x"7" =>
                             caps         <= data_in(7);
                             motor        <= data_in(6);
-                            display_mode <= data_in(5 downto 3);
                             case (data_in(5 downto 3)) is
                             when "000" =>
                                 mode_base    <= x"30";
@@ -527,7 +529,7 @@ begin
         end if;        
     end process;
     
-    process (screen_base, row_offset, col_offset)
+    process (screen_base, mode_base, row_offset, col_offset)
         variable tmp: std_logic_vector(15 downto 0);
     begin
         tmp := ("0" & screen_base & "000000") + row_offset + col_offset;

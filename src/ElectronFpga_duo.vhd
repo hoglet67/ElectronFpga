@@ -35,7 +35,11 @@ entity ElectronFpga_duo is
         LED1           : out   std_logic;
         LED2           : out   std_logic;
         ARDUINO_RESET  : out   std_logic;
-        SW1            : in    std_logic
+        SW1            : in    std_logic;
+        SDMISO         : in    std_logic;
+        SDSS           : out   std_logic;
+        SDCLK          : out   std_logic;
+        SDMOSI         : out   std_logic
      );
 end;
 
@@ -78,7 +82,11 @@ begin
         audiol            => audiol,
         audioR            => audioR,
         LED1              => LED1,
-        LED2              => LED2
+        LED2              => LED2,
+        SDMISO            => SDMISO,
+        SDSS              => SDSS,
+        SDCLK             => SDCLK,
+        SDMOSI            => SDMOSI
     );  
     
     ERSTn      <= pwrup_RSTn and not ERST;
