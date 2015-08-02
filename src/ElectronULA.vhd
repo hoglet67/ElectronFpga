@@ -39,7 +39,7 @@ entity ElectronULA is
         R_W_n     : in  std_logic;
         RST_n     : in  std_logic;
         IRQ_n     : out std_logic;
-        NMI_n     : out std_logic;
+        NMI_n     : in  std_logic;
 
         -- Rom Enable
         ROM_n     : out std_logic;
@@ -63,7 +63,7 @@ entity ElectronULA is
         
         rom_latch : out std_logic_vector(3 downto 0);
 
-        mode      : in std_logic_vector(1 downto 0)
+        mode_init : in std_logic_vector(1 downto 0)
         );
 end;
 
@@ -76,7 +76,6 @@ architecture behavioral of ElectronULA is
   signal ram_data       : std_logic_vector(7 downto 0);
 
   signal master_irq     : std_logic;
-  signal master_nmi     : std_logic;
 
   signal power_on_reset : std_logic := '1';
   signal rtc_counter    : std_logic_vector(18 downto 0);
@@ -120,6 +119,8 @@ architecture behavioral of ElectronULA is
   
   -- Screen Mode Registers
 
+  signal mode           : std_logic_vector(1 downto 0);
+
   -- the 256 byte page that the mode starts at
   signal mode_base      : std_logic_vector(7 downto 0);
   
@@ -142,6 +143,8 @@ architecture behavioral of ElectronULA is
 
   signal clk_video      : std_logic;
   
+  signal ctrl_caps      : std_logic;
+
 -- Helper function to cast an std_logic value to an integer
 function sl2int (x: std_logic) return integer is
 begin
@@ -249,7 +252,6 @@ begin
     -- Bit 0 is the OR of bits 6..2
     master_irq <= isr(6) or isr(5) or isr(4) or isr(3) or isr(2);
     IRQ_n      <= not master_irq; 
-    NMI_n      <= not master_nmi;
     isr_data   <= '0' & isr(6 downto 2) & power_on_reset & master_irq;
     
     rom_latch  <= page_enable & page;
@@ -258,22 +260,41 @@ begin
     process (clk_16M00, RST_n)
     begin
         if (RST_n = '0') then
-           master_nmi   <= '0';
-
-           isr          <= (others => '0');
-           ier          <= (others => '0');
-           screen_base  <= (others => '0');
-           data_shift   <= (others => '0');
-           page_enable  <= '0';
-           page         <= (others => '0');
-           counter      <= (others => '0');
-           comms_mode   <= (others => '0');
-
+           isr           <= (others => '0');
+           ier           <= (others => '0');
+           screen_base   <= (others => '0');
+           data_shift    <= (others => '0');
+           page_enable   <= '0';
+           page          <= (others => '0');
+           counter       <= (others => '0');
+           comms_mode    <= (others => '0');
            rtc_counter   <= (others => '0');
            sound_counter <= (others => '0');
-           sound_bit     <= '0';
+           sound_bit     <= '0';           
+           mode          <= mode_init;
+           ctrl_caps     <= '0';
                             
         elsif rising_edge(clk_16M00) then
+            -- Detect control+shift 1...4 and change video format
+            if (addr = x"9fff" and page_enable = '1' and page(2 downto 1) = "00") then
+                if (kbd(2 downto 1) = "11") then
+                    ctrl_caps <= '1';
+                else
+                    ctrl_caps <= '0';
+                end if;
+            end if;
+            -- Delect "1" being pressed
+            if (addr = x"afff" and page_enable = '1' and page(2 downto 1) = "00" and ctrl_caps = '1' and kbd(0) = '1') then
+                mode <= "00";
+            end if;
+            -- Delect "2" being pressed
+            if (addr = x"b7ff" and page_enable = '1' and page(2 downto 1) = "00" and ctrl_caps = '1' and kbd(0) = '1') then
+                mode <= "10";
+            end if;
+            -- Delect "3" being pressed
+            if (addr = x"bbff" and page_enable = '1' and page(2 downto 1) = "00" and ctrl_caps = '1' and kbd(0) = '1') then
+                mode <= "11";
+            end if;            
             -- Synchronize the display end signal from the VGA clock domain
             display_end1 <= display_end;
             display_end2 <= display_end1;
@@ -323,10 +344,6 @@ begin
                             -- data_shift register
                             isr(5) <= '0';
                         when x"5" =>
-                            if (data_in(7) = '1') then
-                                -- Clear NMI
-                                master_nmi <= '0';
-                            end if;
                             if (data_in(6) = '1') then
                                 -- Clear High Tone Detect IRQ
                                 isr(6) <= '0';

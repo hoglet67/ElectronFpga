@@ -122,11 +122,11 @@ begin
         data    => rom_os_data
     );
 
---    rom_mmc : entity work.RomSmelk3006 port map(
---        clk     => clk_16M00,
---        addr    => cpu_addr(13 downto 0),
---        data    => rom_mmc_data
---    );
+    rom_mmc : entity work.RomSmelk3006 port map(
+        clk     => clk_16M00,
+        addr    => cpu_addr(13 downto 0),
+        data    => rom_mmc_data
+    );
      
     via : entity work.M6522 port map(
         I_RS       => cpu_addr(3 downto 0),
@@ -211,7 +211,7 @@ begin
         
         rom_latch => rom_latch,
         
-        mode      => DIP
+        mode_init => DIP
     );
         
     input : entity work.keyboard port map(
@@ -227,13 +227,14 @@ begin
 
     mc6522_enable  <= '1' when cpu_addr(15 downto 4) = x"fcb" else '0';
     cpu_IRQ_n      <= mc6522_irq_n AND ula_irq_n;
+    cpu_NMI_n      <= '1';
   
     RSTn    <= ERSTn and key_break;
     audiol  <= sound;
     audior  <= sound;
     cpu_din <= rom_basic_data when ROM_n = '0' and cpu_addr(14) = '0' else
                rom_os_data    when ROM_n = '0' and cpu_addr(14) = '1' else
-               -- rom_mmc_data   when cpu_addr(15 downto 14) = "10" and rom_latch = "0111" else
+               rom_mmc_data   when cpu_addr(15 downto 14) = "10" and rom_latch = "0111" else
                mc6522_data    when mc6522_enable = '1' else
                ula_data;
     
