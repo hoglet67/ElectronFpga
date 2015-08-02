@@ -27,8 +27,9 @@ use ieee.numeric_std.all;
 
 entity ElectronULA is
     port (
-        clk_svga  : in  std_logic;
         clk_16M00 : in  std_logic;
+        clk_33M33 : in  std_logic;
+        clk_40M00 : in  std_logic;
         
         -- CPU Interface
         cpu_clken : in  std_logic;
@@ -43,7 +44,7 @@ entity ElectronULA is
         -- Rom Enable
         ROM_n     : out std_logic;
         
-        -- SVGA
+        -- Video
         red       : out std_logic_vector(3 downto 0);
         green     : out std_logic_vector(3 downto 0);
         blue      : out std_logic_vector(3 downto 0);
@@ -60,11 +61,16 @@ entity ElectronULA is
         caps      : out std_logic;
         motor     : out std_logic;
         
-        rom_latch : out std_logic_vector(3 downto 0)
+        rom_latch : out std_logic_vector(3 downto 0);
+
+        mode      : in std_logic_vector(1 downto 0)
         );
 end;
 
 architecture behavioral of ElectronULA is
+
+  signal hsync_int      : std_logic;
+  signal vsync_int      : std_logic;
 
   signal ram_we         : std_logic;
   signal ram_data       : std_logic_vector(7 downto 0);
@@ -92,9 +98,20 @@ architecture behavioral of ElectronULA is
   type palette_type is array (0 to 7) of std_logic_vector (7 downto 0);  
   signal palette        : palette_type;
 
-  signal svga_hcount    : std_logic_vector(10 downto 0);
-  signal svga_hcount1   : std_logic_vector(10 downto 0);
-  signal svga_vcount    : std_logic_vector(9 downto 0);
+  signal hsync_start    : std_logic_vector(10 downto 0);
+  signal hsync_end      : std_logic_vector(10 downto 0);
+  signal h_active       : std_logic_vector(10 downto 0);
+  signal h_total        : std_logic_vector(10 downto 0);
+  signal h_count        : std_logic_vector(10 downto 0);
+  signal h_count1       : std_logic_vector(10 downto 0);
+
+  signal vsync_start    : std_logic_vector(9 downto 0);
+  signal vsync_end      : std_logic_vector(9 downto 0);
+  signal v_active_gph   : std_logic_vector(9 downto 0);
+  signal v_active_txt   : std_logic_vector(9 downto 0);
+  signal v_total        : std_logic_vector(9 downto 0);
+  signal v_count        : std_logic_vector(9 downto 0);
+  
   signal char_row       : std_logic_vector(3 downto 0);
   signal row_offset     : std_logic_vector(14 downto 0);
   signal col_offset     : std_logic_vector(9 downto 0);
@@ -118,11 +135,13 @@ architecture behavioral of ElectronULA is
   -- the number of bytes to increment row_offset when moving from one char row to the next
   signal mode_rowstep   : std_logic_vector(9 downto 0);
   
-  signal display_field   : std_logic;
-  signal display_end     : std_logic;
-  signal display_end1    : std_logic;
-  signal display_end2    : std_logic;
+  signal display_field  : std_logic;
+  signal display_end    : std_logic;
+  signal display_end1   : std_logic;
+  signal display_end2   : std_logic;
 
+  signal clk_video      : std_logic;
+  
 -- Helper function to cast an std_logic value to an integer
 function sl2int (x: std_logic) return integer is
 begin
@@ -138,9 +157,55 @@ function slv2int (x: std_logic_vector) return integer is
 begin
     return to_integer(unsigned(x));
 end;
-  
+    
 begin
 
+    -- video timing constants
+    -- mode 00 - RGB/s @ 50Hz
+    -- mode 01 - RGB/s @ 50Hz
+    -- mode 10 - SVGA @ 50Hz
+    -- mode 11 - SVGA @ 60Hz
+    
+    clk_video    <= clk_40M00 when mode = "11" else
+                    clk_33M33 when mode = "10" else
+                    clk_16M00;
+
+    hsync_start  <= std_logic_vector(to_unsigned(759, 11)) when mode = "11" else
+                    std_logic_vector(to_unsigned(759, 11)) when mode = "10" else
+                    std_logic_vector(to_unsigned(762, 11));    
+
+    hsync_end    <= std_logic_vector(to_unsigned(887, 11)) when mode = "11" else
+                    std_logic_vector(to_unsigned(887, 11)) when mode = "10" else
+                    std_logic_vector(to_unsigned(837, 11));    
+    
+    h_total      <= std_logic_vector(to_unsigned(1055, 11)) when mode = "11" else
+                    std_logic_vector(to_unsigned(1055, 11)) when mode = "10" else
+                    std_logic_vector(to_unsigned(1023, 11));    
+    
+    h_active     <= std_logic_vector(to_unsigned(640, 11));
+
+    vsync_start  <= std_logic_vector(to_unsigned(556, 10)) when mode = "11" else
+                    std_logic_vector(to_unsigned(556, 10)) when mode = "10" else
+                    std_logic_vector(to_unsigned(274, 10));    
+
+    vsync_end    <= std_logic_vector(to_unsigned(560, 10)) when mode = "11" else
+                    std_logic_vector(to_unsigned(560, 10)) when mode = "10" else
+                    std_logic_vector(to_unsigned(277, 10));    
+
+    v_total      <= std_logic_vector(to_unsigned(627, 10)) when mode = "11" else
+                    std_logic_vector(to_unsigned(627, 10)) when mode = "10" else
+                    std_logic_vector(to_unsigned(311, 10));
+
+    v_active_gph <= std_logic_vector(to_unsigned(512, 10)) when mode = "11" else
+                    std_logic_vector(to_unsigned(512, 10)) when mode = "10" else
+                    std_logic_vector(to_unsigned(256, 10));
+
+    v_active_txt <= std_logic_vector(to_unsigned(500, 10)) when mode = "11" else
+                    std_logic_vector(to_unsigned(500, 10)) when mode = "10" else
+                    std_logic_vector(to_unsigned(250, 10));
+
+
+     
     ram : entity work.RAM_32K_DualPort port map(
 
       -- Port A is the 6502 port
@@ -151,7 +216,7 @@ begin
         douta => ram_data,
 
         -- Port B is the VGA Port
-        clkb  => clk_svga,
+        clkb  => clk_video,
         web   => '0',
         addrb => screen_addr,
         dinb  => x"00",
@@ -354,32 +419,34 @@ begin
         end if;
     end process;
 
-    -- Hard coded for mode 6 at the moment
-    -- All modes output SGVA at 60Hz with a 40.000MHz Pixel Clock
+    -- SGVA timing at 60Hz with a 40.000MHz Pixel Clock
     -- Horizontal 800 + 40 + 128 + 88 = total 1056
     -- Vertical   600 +  1 +   4 + 23 = total 628
     -- Within the the 640x512 is centred so starts at 80,44
-
     -- Horizontal 640 + (80 + 40) + 128 + (88 + 80) = total 1056
     -- Vertical   512 + (44 +  1) +   4 + (23 + 44) = total 628
-    
-    process (clk_svga)
+
+    -- RGBs timing at 50Hz with a 16.000MHz Pixel Clock
+    -- Horizontal 640 + (96 + 26) +  75 + (91 + 96) = total 1024
+    -- Vertical   256 + (16 +  2) +   3 + (19 + 16) = total 312
+     
+    process (clk_video)
     variable pixel : std_logic_vector(3 downto 0);
     begin
-        if rising_edge(clk_svga) then
-            -- pipeline svga_hcount by one cycle to compensate the register in the RAM
-            svga_hcount1 <= svga_hcount;
-            if (svga_hcount = 1055) then
-                svga_hcount <= (others => '0');
+        if rising_edge(clk_video) then
+            -- pipeline h_count by one cycle to compensate the register in the RAM
+            h_count1 <= h_count;
+            if (h_count = h_total) then
+                h_count <= (others => '0');
                 col_offset <= (others => '0');
-                if (svga_vcount = 627) then
-                    svga_vcount <= (others => '0');
+                if (v_count = v_total) then
+                    v_count <= (others => '0');
                     char_row <= (others => '0');
                     row_offset <= (others => '0');
                     display_field <= not display_field;                    
                 else
-                    svga_vcount <= svga_vcount + 1;
-                    if (svga_vcount(0) = '1') then
+                    v_count <= v_count + 1;
+                    if (v_count(0) = '1' or mode(1) = '0') then
                         if ((mode_text = '0' and char_row = 7) or (mode_text = '1' and char_row = 9)) then
                             char_row <= (others => '0');
                             row_offset <= row_offset + mode_rowstep;
@@ -390,25 +457,20 @@ begin
                     end if;
                 end if;
             else
-                svga_hcount <= svga_hcount + 1;
-                if ((mode_40 = '0' and svga_hcount(2 downto 0) = "111") or
-                    (mode_40 = '1' and svga_hcount(3 downto 0) = "1111")) then
+                h_count <= h_count + 1;
+                if ((mode_40 = '0' and h_count(2 downto 0) = "111") or
+                    (mode_40 = '1' and h_count(3 downto 0) = "1111")) then
                     col_offset <= col_offset + 8;
                 end if;
             end if;
             -- RGB Data
-            if (svga_vcount >= 512) then
+            if (v_count >= v_active_gph) then
                 display_end <= display_field;
             else
                 display_end <= '0';
             end if;
-            if ((svga_hcount1 >= 720 and svga_hcount1 < 976) or (svga_vcount >= 556 and svga_vcount < 584)) then
-                -- blanking is always black
-                red   <= (others => '0');
-                green <= (others => '0');
-                blue  <= (others => '0');
-            elsif (svga_hcount1 >= 640 or (mode_text = '0' and svga_vcount >= 512) or (mode_text = '1' and svga_vcount >= 500) or char_row >= 8) then
-                -- border is always black (TODO, as some point fold this into the previous condition)
+            if (h_count1 >= h_active or (mode_text = '0' and v_count >= v_active_gph) or (mode_text = '1' and v_count >= v_active_txt) or char_row >= 8) then
+                -- blanking and border are always black
                 red   <= (others => '0');
                 green <= (others => '0');
                 blue  <= (others => '0');
@@ -417,31 +479,31 @@ begin
                 if (mode_bpp = 0) then
                     -- 1 bit per pixel, map to colours 0 and 8 for the palette lookup
                     if (mode_40 = '1') then
-                        pixel := screen_data(7 - slv2int(svga_hcount1(3 downto 1))) & "000";
+                        pixel := screen_data(7 - slv2int(h_count1(3 downto 1))) & "000";
                     else
-                        pixel := screen_data(7 - slv2int(svga_hcount1(2 downto 0))) & "000";
+                        pixel := screen_data(7 - slv2int(h_count1(2 downto 0))) & "000";
                     end if;
                 elsif (mode_bpp = 1) then
                     -- 2 bits per pixel, map to colours 0, 2, 8, 10 for the palette lookup
                     if (mode_40 = '1') then
-                        pixel := screen_data(7 - slv2int(svga_hcount1(3 downto 2))) & "0" &
-                                 screen_data(3 - slv2int(svga_hcount1(3 downto 2))) & "0";
+                        pixel := screen_data(7 - slv2int(h_count1(3 downto 2))) & "0" &
+                                 screen_data(3 - slv2int(h_count1(3 downto 2))) & "0";
                     else
-                        pixel := screen_data(7 - slv2int(svga_hcount1(2 downto 1))) & "0" &
-                                 screen_data(3 - slv2int(svga_hcount1(2 downto 1))) & "0";
+                        pixel := screen_data(7 - slv2int(h_count1(2 downto 1))) & "0" &
+                                 screen_data(3 - slv2int(h_count1(2 downto 1))) & "0";
                     end if;
                 else
                     -- 4 bits per pixel, map directly for the palette lookup
                     if (mode_40 = '1') then
-                        pixel := screen_data(7 - sl2int(svga_hcount1(3))) &
-                                 screen_data(5 - sl2int(svga_hcount1(3))) &
-                                 screen_data(3 - sl2int(svga_hcount1(3))) &
-                                 screen_data(1 - sl2int(svga_hcount1(3)));
+                        pixel := screen_data(7 - sl2int(h_count1(3))) &
+                                 screen_data(5 - sl2int(h_count1(3))) &
+                                 screen_data(3 - sl2int(h_count1(3))) &
+                                 screen_data(1 - sl2int(h_count1(3)));
                     else
-                        pixel := screen_data(7 - sl2int(svga_hcount1(2))) &
-                                 screen_data(5 - sl2int(svga_hcount1(2))) &
-                                 screen_data(3 - sl2int(svga_hcount1(2))) &
-                                 screen_data(1 - sl2int(svga_hcount1(2)));
+                        pixel := screen_data(7 - sl2int(h_count1(2))) &
+                                 screen_data(5 - sl2int(h_count1(2))) &
+                                 screen_data(3 - sl2int(h_count1(2))) &
+                                 screen_data(1 - sl2int(h_count1(2)));
                     end if;
                 end if;
                 -- Implement Color Palette
@@ -514,16 +576,16 @@ begin
                 end case;
             end if;              
             -- Vertical Sync
-            if (svga_vcount = 556) then
-                vsync <= '0';
-            elsif (svga_vcount = 560) then
-                vsync <= '1';
+            if (v_count = vsync_start) then
+                vsync_int <= '0';
+            elsif (v_count = vsync_end) then
+                vsync_int <= '1';
             end if;
             -- Horizontal Sync
-            if (svga_hcount1 = 759) then
-                hsync <= '0';
-            elsif (svga_hcount1 = 887) then
-                hsync <= '1';
+            if (h_count1 = hsync_start) then
+                hsync_int <= '0';
+            elsif (h_count1 = hsync_end) then
+                hsync_int <= '1';
             end if;
                     
         end if;        
@@ -538,5 +600,8 @@ begin
         end if;
         screen_addr <= tmp(14 downto 0);
     end process;
+    
+    vsync <= '1'                      when mode(1) = '0' else vsync_int;
+    hsync <= hsync_int xnor vsync_int when mode(1) = '0' else hsync_int;
     
 end behavioral;

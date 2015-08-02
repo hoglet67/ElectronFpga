@@ -20,8 +20,9 @@ use ieee.numeric_std.all;
 
 entity ElectronFpga_core is
     port (
-        clk_svga  : in    std_logic;
         clk_16M00 : in    std_logic;
+        clk_33M33 : in    std_logic;
+        clk_40M00 : in    std_logic;
         ps2_clk   : in    std_logic;
         ps2_data  : in    std_logic;
         ERSTn     : in    std_logic;
@@ -37,8 +38,9 @@ entity ElectronFpga_core is
         SDMISO    : in    std_logic;
         SDSS      : out   std_logic;
         SDCLK     : out   std_logic;
-        SDMOSI    : out   std_logic
-        );
+        SDMOSI    : out   std_logic;
+        DIP       : in   std_logic_vector(1 downto 0)
+    );
 end;
 
 architecture behavioral of ElectronFpga_core is
@@ -54,17 +56,17 @@ architecture behavioral of ElectronFpga_core is
 
     signal rom_basic_data    : std_logic_vector (7 downto 0);
     signal rom_os_data       : std_logic_vector (7 downto 0);
-    signal rom_mmc_data       : std_logic_vector (7 downto 0);
+    signal rom_mmc_data      : std_logic_vector (7 downto 0);
     signal ula_data          : std_logic_vector (7 downto 0);
 
     signal clken_counter     : std_logic_vector (3 downto 0);
     signal cpu_cycle         : std_logic;
     signal cpu_clken         : std_logic;
       
-    signal key_break   : std_logic;
-    signal key_turbo   : std_logic_vector(1 downto 0);
-    signal sound       : std_logic;
-    signal kbd_data   : std_logic_vector(3 downto 0);
+    signal key_break         : std_logic;
+    signal key_turbo         : std_logic_vector(1 downto 0);
+    signal sound             : std_logic;
+    signal kbd_data          : std_logic_vector(3 downto 0);
 
     signal ula_irq_n         : std_logic;
 
@@ -120,11 +122,11 @@ begin
         data    => rom_os_data
     );
 
-    rom_mmc : entity work.RomSmelk3006 port map(
-        clk     => clk_16M00,
-        addr    => cpu_addr(13 downto 0),
-        data    => rom_mmc_data
-    );
+--    rom_mmc : entity work.RomSmelk3006 port map(
+--        clk     => clk_16M00,
+--        addr    => cpu_addr(13 downto 0),
+--        data    => rom_mmc_data
+--    );
      
     via : entity work.M6522 port map(
         I_RS       => cpu_addr(3 downto 0),
@@ -173,8 +175,9 @@ begin
     SDSS          <= '0';         
     
     ula : entity work.ElectronULA port map (
-        clk_svga  => clk_svga,
         clk_16M00 => clk_16M00,
+        clk_33M33 => clk_33M33,
+        clk_40M00 => clk_40M00,
         
         -- CPU Interface
         cpu_clken => cpu_clken,
@@ -189,7 +192,7 @@ begin
         -- Rom Enable
         ROM_n     => ROM_n,
         
-        -- SVGA
+        -- Video
         red       => red,
         green     => green,
         blue      => blue,
@@ -206,7 +209,9 @@ begin
         caps      => LED1,
         motor     => LED2,
         
-        rom_latch => rom_latch
+        rom_latch => rom_latch,
+        
+        mode      => DIP
     );
         
     input : entity work.keyboard port map(
@@ -228,7 +233,7 @@ begin
     audior  <= sound;
     cpu_din <= rom_basic_data when ROM_n = '0' and cpu_addr(14) = '0' else
                rom_os_data    when ROM_n = '0' and cpu_addr(14) = '1' else
-               rom_mmc_data   when cpu_addr(15 downto 14) = "10" and rom_latch = "0111" else
+               -- rom_mmc_data   when cpu_addr(15 downto 14) = "10" and rom_latch = "0111" else
                mc6522_data    when mc6522_enable = '1' else
                ula_data;
     

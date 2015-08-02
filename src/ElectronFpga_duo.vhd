@@ -21,7 +21,7 @@ use ieee.numeric_std.all;
 
 entity ElectronFpga_duo is
     port (
-        clk_32M00       : in    std_logic;
+        clk_32M00      : in    std_logic;
         ps2_clk        : in    std_logic;
         ps2_data       : in    std_logic;
         ERST           : in    std_logic;
@@ -39,14 +39,16 @@ entity ElectronFpga_duo is
         SDMISO         : in    std_logic;
         SDSS           : out   std_logic;
         SDCLK          : out   std_logic;
-        SDMOSI         : out   std_logic
+        SDMOSI         : out   std_logic;
+        DIP            : in   std_logic_vector(1 downto 0)
      );
 end;
 
 architecture behavioral of ElectronFpga_duo is
 
-    signal clk_svga   : std_logic;
     signal clk_16M00  : std_logic;
+    signal clk_33M33  : std_logic;
+    signal clk_40M00  : std_logic;
     signal ERSTn      : std_logic;     
     signal pwrup_RSTn : std_logic;
     signal reset_ctr  : std_logic_vector (7 downto 0) := (others => '0');
@@ -55,7 +57,7 @@ begin
 
     inst_dcm4 : entity work.dcm4 port map(
         CLKIN_IN          => clk_32M00,
-        CLK0_OUT          => clk_svga,
+        CLK0_OUT          => clk_40M00,
         CLK0_OUT1         => open,
         CLK2X_OUT         => open
     );
@@ -66,11 +68,19 @@ begin
         CLK0_OUT1         => open,
         CLK2X_OUT         => open
     );
-    
+
+    inst_dcm6 : entity work.dcm6 port map(
+        CLKIN_IN          => clk_32M00,
+        CLK0_OUT          => clk_33M33,
+        CLK0_OUT1         => open,
+        CLK2X_OUT         => open
+    );
+
     inst_ElectronFpga_core : entity work.ElectronFpga_core
      port map (
-        clk_svga          => clk_svga,
         clk_16M00         => clk_16M00,
+        clk_33M33         => clk_33M33,
+        clk_40M00         => clk_40M00,
         ps2_clk           => ps2_clk,
         ps2_data          => ps2_data,
         ERSTn             => ERSTn,
@@ -86,7 +96,8 @@ begin
         SDMISO            => SDMISO,
         SDSS              => SDSS,
         SDCLK             => SDCLK,
-        SDMOSI            => SDMOSI
+        SDMOSI            => SDMOSI,
+        DIP               => DIP
     );  
     
     ERSTn      <= pwrup_RSTn and not ERST;
