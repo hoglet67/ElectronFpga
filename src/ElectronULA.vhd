@@ -151,6 +151,8 @@ architecture behavioral of ElectronULA is
   
   signal ctrl_caps      : std_logic;
 
+  signal field          : std_logic;
+
 -- Helper function to cast an std_logic value to an integer
 function sl2int (x: std_logic) return integer is
 begin
@@ -170,10 +172,10 @@ end;
 begin
 
     -- video timing constants
-    -- mode 00 - RGB/s @ 50Hz
-    -- mode 01 - RGB/s @ 50Hz
-    -- mode 10 - SVGA @ 50Hz
-    -- mode 11 - SVGA @ 60Hz
+    -- mode 00 - RGB/s @ 50Hz non-interlaced
+    -- mode 01 - RGB/s @ 50Hz interlaced
+    -- mode 10 - SVGA  @ 50Hz
+    -- mode 11 - SVGA  @ 60Hz
     
     clk_video    <= clk_40M00 when mode = "11" else
                     clk_33M33 when mode = "10" else
@@ -203,8 +205,9 @@ begin
 
     v_total      <= std_logic_vector(to_unsigned(627, 10)) when mode = "11" else
                     std_logic_vector(to_unsigned(627, 10)) when mode = "10" else
-                    std_logic_vector(to_unsigned(311, 10));
-
+                    std_logic_vector(to_unsigned(311, 10)) when field = '0' else
+                    std_logic_vector(to_unsigned(312, 10));
+                    
     v_active_gph <= std_logic_vector(to_unsigned(512, 10)) when mode = "11" else
                     std_logic_vector(to_unsigned(512, 10)) when mode = "10" else
                     std_logic_vector(to_unsigned(256, 10));
@@ -301,10 +304,14 @@ begin
             end if;
             -- Delect "2" being pressed
             if (addr = x"b7ff" and page_enable = '1' and page(2 downto 1) = "00" and ctrl_caps = '1' and kbd(0) = '1') then
-                mode <= "10";
+                mode <= "01";
             end if;
             -- Delect "3" being pressed
             if (addr = x"bbff" and page_enable = '1' and page(2 downto 1) = "00" and ctrl_caps = '1' and kbd(0) = '1') then
+                mode <= "10";
+            end if;            
+            -- Delect "4" being pressed
+            if (addr = x"bdff" and page_enable = '1' and page(2 downto 1) = "00" and ctrl_caps = '1' and kbd(0) = '1') then
                 mode <= "11";
             end if;            
             -- Synchronize the display interrupt signal from the VGA clock domain
@@ -487,6 +494,13 @@ begin
                     v_count <= (others => '0');
                     char_row <= (others => '0');
                     row_offset <= (others => '0');
+                    if (mode = "01") then
+                        -- Interlaced, so alternate odd and even fields
+                        field <= not field;
+                    else
+                        -- Non-interlaced, so odd fields only
+                        field <= '0';
+                    end if;
                 else
                     v_count <= v_count + 1;
                     if (v_count(0) = '1' or mode(1) = '0') then
@@ -614,10 +628,26 @@ begin
                 end case;
             end if;              
             -- Vertical Sync
-            if (v_count = vsync_start) then
-                vsync_int <= '0';
-            elsif (v_count = vsync_end) then
-                vsync_int <= '1';
+            if (field = '0') then
+                -- first field of interlaced scanning (or non interlaced)
+                -- vsync starts at the begging of the line            
+                if (h_count1 = 0) then
+                    if (v_count = vsync_start) then
+                        vsync_int <= '0';
+                    elsif (v_count = vsync_end) then
+                        vsync_int <= '1';
+                    end if;
+                end if;
+            else
+                -- second field of intelaced scanning
+                -- vsync starts half way through the line
+                if (h_count1 = ('0' & h_total(10 downto 1))) then
+                    if (v_count = vsync_start) then 
+                        vsync_int <= '0';
+                    elsif (v_count = vsync_end) then
+                        vsync_int <= '1';
+                    end if;
+                end if;
             end if;
             -- Horizontal Sync
             if (h_count1 = hsync_start) then
@@ -646,7 +676,7 @@ begin
         screen_addr <= tmp(14 downto 0);
     end process;
     
-    vsync <= '1'                      when mode(1) = '0' else vsync_int;
-    hsync <= hsync_int xnor vsync_int when mode(1) = '0' else hsync_int;
+    vsync <= '1'                     when mode(1) = '0' else vsync_int;
+    hsync <= hsync_int and vsync_int when mode(1) = '0' else hsync_int;
     
 end behavioral;
