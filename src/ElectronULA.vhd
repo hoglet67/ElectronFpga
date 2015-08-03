@@ -110,6 +110,9 @@ architecture behavioral of ElectronULA is
   signal v_active_txt   : std_logic_vector(9 downto 0);
   signal v_total        : std_logic_vector(9 downto 0);
   signal v_count        : std_logic_vector(9 downto 0);
+
+  signal v_rtc          : std_logic_vector(9 downto 0);
+  signal v_display      : std_logic_vector(9 downto 0);
   
   signal char_row       : std_logic_vector(3 downto 0);
   signal row_offset     : std_logic_vector(14 downto 0);
@@ -136,10 +139,13 @@ architecture behavioral of ElectronULA is
   -- the number of bytes to increment row_offset when moving from one char row to the next
   signal mode_rowstep   : std_logic_vector(9 downto 0);
   
-  signal display_field  : std_logic;
-  signal display_end    : std_logic;
-  signal display_end1   : std_logic;
-  signal display_end2   : std_logic;
+  signal display_intr   : std_logic;
+  signal display_intr1  : std_logic;
+  signal display_intr2  : std_logic;
+
+  signal rtc_intr       : std_logic;
+  signal rtc_intr1      : std_logic;
+  signal rtc_intr2      : std_logic;
 
   signal clk_video      : std_logic;
   
@@ -207,7 +213,13 @@ begin
                     std_logic_vector(to_unsigned(500, 10)) when mode = "10" else
                     std_logic_vector(to_unsigned(250, 10));
 
+    v_display    <= std_logic_vector(to_unsigned(512, 10)) when mode = "11" else
+                    std_logic_vector(to_unsigned(512, 10)) when mode = "10" else
+                    std_logic_vector(to_unsigned(256, 10));
 
+    v_rtc        <= std_logic_vector(to_unsigned(200, 10)) when mode = "11" else
+                    std_logic_vector(to_unsigned(200, 10)) when mode = "10" else
+                    std_logic_vector(to_unsigned(100, 10));
      
     ram : entity work.RAM_32K_DualPort port map(
 
@@ -275,7 +287,7 @@ begin
            ctrl_caps     <= '0';
                             
         elsif rising_edge(clk_16M00) then
-            -- Detect control+shift 1...4 and change video format
+            -- Detect control+caps 1...4 and change video format
             if (addr = x"9fff" and page_enable = '1' and page(2 downto 1) = "00") then
                 if (kbd(2 downto 1) = "11") then
                     ctrl_caps <= '1';
@@ -295,19 +307,34 @@ begin
             if (addr = x"bbff" and page_enable = '1' and page(2 downto 1) = "00" and ctrl_caps = '1' and kbd(0) = '1') then
                 mode <= "11";
             end if;            
-            -- Synchronize the display end signal from the VGA clock domain
-            display_end1 <= display_end;
-            display_end2 <= display_end1;
-            -- Generate the display end interrupt on the rising edge (bottom of the screen)
-            if (display_end2 = '0' and display_end1 = '1') then
+            -- Synchronize the display interrupt signal from the VGA clock domain
+            display_intr1 <= display_intr;
+            display_intr2 <= display_intr1;
+            -- Generate the display end interrupt on the rising edge (line 256 of the screen)
+            if (display_intr2 = '0' and display_intr1 = '1') then
                 isr(2) <= ier(2);
             end if;
-            -- Generate the 50Hz real time clock interrupt
-            if (rtc_counter = 319999) then
-                rtc_counter <= (others => '0');
-                isr(3) <= ier(3);
+            -- Synchronize the rtc interrupt signal from the VGA clock domain
+            rtc_intr1 <= rtc_intr;
+            rtc_intr2 <= rtc_intr1;
+            if (mode = "11") then
+                -- For 60Hz frame rates we must synthesise a the 50Hz real time clock interrupt
+                -- In theory the counter limit should be 319999, but there are additional
+                -- rtc ticks if not rtc interrupt is received between two display interrupts
+                -- hence the correction factor of 6/5. This comes from the probability
+                -- of the there not being a 50Hz rtc interrupts between any two successive
+                -- 60Hz display interrupts.
+                if (rtc_counter = 383999) then
+                    rtc_counter <= (others => '0');
+                    isr(3) <= ier(3);
+                else
+                    rtc_counter <= rtc_counter + 1;
+                end if;
             else
-                rtc_counter <= rtc_counter + 1;
+                -- Generate the rtc interrupt on the rising edge (line 100 of the screen)
+                if (rtc_intr2 = '0' and rtc_intr1 = '1') then
+                    isr(3) <= ier(3);
+                end if;            
             end if;
             -- Sound Frequency = 1MHz / [16 * (S + 1)]
             if (comms_mode = "01") then
@@ -460,7 +487,6 @@ begin
                     v_count <= (others => '0');
                     char_row <= (others => '0');
                     row_offset <= (others => '0');
-                    display_field <= not display_field;                    
                 else
                     v_count <= v_count + 1;
                     if (v_count(0) = '1' or mode(1) = '0') then
@@ -481,11 +507,6 @@ begin
                 end if;
             end if;
             -- RGB Data
-            if (v_count >= v_active_gph) then
-                display_end <= display_field;
-            else
-                display_end <= '0';
-            end if;
             if (h_count1 >= h_active or (mode_text = '0' and v_count >= v_active_gph) or (mode_text = '1' and v_count >= v_active_txt) or char_row >= 8) then
                 -- blanking and border are always black
                 red   <= (others => '0');
@@ -601,10 +622,17 @@ begin
             -- Horizontal Sync
             if (h_count1 = hsync_start) then
                 hsync_int <= '0';
+                if (v_count = v_display) then
+                    display_intr <= '1';
+                end if;
+                if (v_count = v_rtc) then
+                    rtc_intr <= '1';
+                end if;
             elsif (h_count1 = hsync_end) then
-                hsync_int <= '1';
+                hsync_int    <= '1';
+                display_intr <= '0';
+                rtc_intr     <= '0';
             end if;
-                    
         end if;        
     end process;
     
