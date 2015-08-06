@@ -33,6 +33,8 @@ entity ElectronFpga_core is
         hsync     : out   std_logic;
         audiol    : out   std_logic;
         audioR    : out   std_logic;
+        casIn     : in    std_logic;
+        casOut    : out   std_logic;        
         LED1      : out   std_logic;        
         LED2      : out   std_logic;
         SDMISO    : in    std_logic;
@@ -202,8 +204,12 @@ begin
         -- Audio
         sound     => sound,
 
+        -- Casette
+        casIn     => casIn,
+        casOut    => casOut,
+
         -- Keyboard
-        kbd       => kbd_data,
+        kbd       => kbd_data,        
 
         -- MISC
         caps      => LED1,

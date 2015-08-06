@@ -32,6 +32,8 @@ entity ElectronFpga_duo is
         hsync          : out   std_logic;
         audiol         : out   std_logic;
         audioR         : out   std_logic;
+        casIn          : in    std_logic;
+        casOut         : out   std_logic;
         LED1           : out   std_logic;
         LED2           : out   std_logic;
         ARDUINO_RESET  : out   std_logic;
@@ -91,6 +93,8 @@ begin
         hsync             => hsync,
         audiol            => audiol,
         audioR            => audioR,
+        casIn             => casIn,
+        casOut            => casOut,
         LED1              => LED1,
         LED2              => LED2,
         SDMISO            => SDMISO,

@@ -15,10 +15,8 @@
 
 
 -- TODO:
--- Implement Cassette
--- Implement 50Hz VGA
--- Implement 15.875KHz RGB Video Output
--- Fix display interrupt to be once per field
+-- Implement Cassette Out
+-- Implement 6502 slowdown due to simulated RAM contention
 
 library ieee;
 use ieee.std_logic_1164.all;
@@ -57,6 +55,10 @@ entity ElectronULA is
         -- Keyboard
         kbd       : in  std_logic_vector(3 downto 0);
 
+        -- Casette
+        casIn     : in  std_logic;
+        casOut    : out std_logic;
+
         -- MISC
         caps      : out std_logic;
         motor     : out std_logic;
@@ -79,7 +81,7 @@ architecture behavioral of ElectronULA is
 
   signal power_on_reset : std_logic := '1';
   signal rtc_counter    : std_logic_vector(18 downto 0);
-  signal sound_counter  : std_logic_vector(15 downto 0);
+  signal general_counter: std_logic_vector(15 downto 0);
   signal sound_bit      : std_logic;
   signal isr_data       : std_logic_vector(7 downto 0);
   
@@ -153,6 +155,18 @@ architecture behavioral of ElectronULA is
 
   signal field          : std_logic;
 
+  signal caps_int       : std_logic;
+  signal motor_int      : std_logic;
+
+  -- Tape Interface
+  signal cintone        : std_logic;
+  signal cindat         : std_logic;
+  signal databits       : std_logic_vector(3 downto 0);
+  signal casIn1         : std_logic;
+  signal casIn2         : std_logic;
+  signal casIn3         : std_logic;
+  signal ignore_next    : std_logic;
+    
 -- Helper function to cast an std_logic value to an integer
 function sl2int (x: std_logic) return integer is
 begin
@@ -271,7 +285,6 @@ begin
     
     rom_latch  <= page_enable & page;
    
-    -- ULA Writes
     process (clk_16M00, RST_n)
     begin
         if (RST_n = '0') then
@@ -282,13 +295,17 @@ begin
            page_enable   <= '0';
            page          <= (others => '0');
            counter       <= (others => '0');
-           comms_mode    <= (others => '0');
+           comms_mode    <= "01";
+           motor_int     <= '0';
+           caps_int      <= '0';
            rtc_counter   <= (others => '0');
-           sound_counter <= (others => '0');
+           general_counter <= (others => '0');
            sound_bit     <= '0';           
            mode          <= mode_init;
            ctrl_caps     <= '0';
-                            
+           cindat        <= '0';
+           cintone       <= '0';
+           
         elsif rising_edge(clk_16M00) then
             -- Detect control+caps 1...4 and change video format
             if (addr = x"9fff" and page_enable = '1' and page(2 downto 1) = "00") then
@@ -343,15 +360,101 @@ begin
                     isr(3) <= ier(3);
                 end if;            
             end if;
-            -- Sound Frequency = 1MHz / [16 * (S + 1)]
-            if (comms_mode = "01") then
-                if (sound_counter = 0) then
-                    sound_counter <= counter & "00000000";
+            if (comms_mode = "00") then
+                if (casIn2 = '0') then
+                    general_counter <= (others => '0');
+                else
+                    general_counter <= general_counter + 1;
+                end if;
+            elsif (comms_mode = "01") then
+                -- Sound Frequency = 1MHz / [16 * (S + 1)]
+                if (general_counter = 0) then
+                    general_counter <= counter & "00000000";
                     sound_bit <= not sound_bit;
                 else
-                    sound_counter <= sound_counter - 1;
+                    general_counter <= general_counter - 1;
                 end if;            
             end if;
+            
+            
+            -- Tape Interface Receive
+            casIn1 <= casIn;
+            casIn2 <= casIn1;
+            casIn3 <= casIn2;
+            if (comms_mode = "00" and motor_int = '1') then
+                -- Only take actions on the falling edge of casIn
+                -- On the falling edge, general_counter will contain length of
+                -- the previous high pulse in 16MHz cycles.
+                -- A 1200Hz pulse is 6666 cycles
+                -- A 2400Hz pulse is 3333 cycles
+                -- A threshold in between would be 5000 cycles.
+                -- Ignore pulses shorter then say 500 cycles as these are
+                -- probably just noise.
+
+                if (casIn3 = '1' and casIn2 = '0' and general_counter > 500) then
+                    -- a Pulse of length > 500 cycles has been detected
+
+                    if (cindat = '0' and cintone = '0' and general_counter <= 5000) then
+                        -- High Tone detected
+                        cindat  <= '0';
+                        cintone <= '1';
+                        databits <= (others => '0');
+                        -- Generate the high tone detect interrupt
+                        isr(6) <= '1';
+
+                    elsif (cindat = '0' and cintone = '1' and general_counter > 5000) then
+                        -- Start bit detected
+                        cindat  <= '1';
+                        cintone <= '0';
+                        databits <= (others => '0');
+                        
+                    elsif (cindat = '1' and ignore_next = '1') then
+                        -- Ignoring the second pulse in a bit at 2400Hz
+                        ignore_next <= '0';
+
+                    elsif (cindat = '1' and databits < 9) then
+
+                        if (databits < 8) then
+                            if (general_counter > 5000) then
+                                -- shift in a zero
+                                data_shift <= '0' & data_shift(7 downto 1);
+                            else
+                                -- shift in a one
+                                data_shift <= '1' & data_shift(7 downto 1);
+                            end if;
+                            -- Generate the receive data int as soon as the
+                            -- last bit has been shifted in.
+                            if (databits = 7) then
+                                isr(4) <= '1';
+                            end if;
+                        end if;
+                        -- Ignore the second pulse in a bit at 2400Hz
+                        if (general_counter > 5000) then
+                            ignore_next <= '0';
+                        else
+                            ignore_next <= '1';
+                        end if;
+                        -- Move on to the next data bit
+                        databits <= databits + 1;
+                    elsif (cindat = '1' and databits = 9) then                         
+                        if (general_counter > 5000) then
+                            -- Found next start bit...
+                            cindat  <= '1';
+                            cintone <= '0';
+                            databits <= (others => '0');
+                        else
+                            -- Back in tone again
+                            cindat  <= '0';
+                            cintone <= '1';
+                            databits <= (others => '0');
+                            -- Generate the high tone detect interrupt
+                            isr(6) <= '1';
+                       end if;                           
+                   end if;
+                end if;
+            end if;
+            
+            -- ULA Writes
             if (cpu_clken = '1') then
                 if (addr(15 downto 8) = x"FE") then
                     if (R_W_n = '1') then
@@ -404,8 +507,8 @@ begin
                         when x"6" =>
                             counter <= data_in;
                         when x"7" =>
-                            caps         <= data_in(7);
-                            motor        <= data_in(6);
+                            caps_int     <= data_in(7);
+                            motor_int    <= data_in(6);
                             case (data_in(5 downto 3)) is
                             when "000" =>
                                 mode_base    <= x"30";
@@ -678,5 +781,9 @@ begin
     
     vsync <= '1'                     when mode(1) = '0' else vsync_int;
     hsync <= hsync_int and vsync_int when mode(1) = '0' else hsync_int;
+    caps  <= caps_int;
+    motor <= motor_int;
+    
+    casOut <= '0';
     
 end behavioral;
