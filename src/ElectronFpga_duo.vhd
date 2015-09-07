@@ -42,7 +42,8 @@ entity ElectronFpga_duo is
         SDSS           : out   std_logic;
         SDCLK          : out   std_logic;
         SDMOSI         : out   std_logic;
-        DIP            : in   std_logic_vector(1 downto 0)
+        DIP            : in    std_logic_vector(1 downto 0);
+        test           : out   std_logic_vector(7 downto 0)
      );
 end;
 
@@ -101,7 +102,8 @@ begin
         SDSS              => SDSS,
         SDCLK             => SDCLK,
         SDMOSI            => SDMOSI,
-        DIP               => DIP
+        DIP               => DIP,
+        test              => test
     );  
     
     ERSTn      <= pwrup_RSTn and not ERST;

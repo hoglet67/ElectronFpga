@@ -16,7 +16,6 @@
 
 -- TODO:
 -- Implement Cassette Out
--- Implement 6502 slowdown due to simulated RAM contention
 
 library ieee;
 use ieee.std_logic_1164.all;
@@ -65,7 +64,9 @@ entity ElectronULA is
         
         rom_latch : out std_logic_vector(3 downto 0);
 
-        mode_init : in std_logic_vector(1 downto 0)
+        mode_init : in std_logic_vector(1 downto 0);
+        
+        contention: out std_logic
         );
 end;
 
@@ -157,6 +158,13 @@ architecture behavioral of ElectronULA is
 
   signal caps_int       : std_logic;
   signal motor_int      : std_logic;
+  
+  -- Supports changing the jumpers
+  signal mode_init_copy : std_logic_vector(1 downto 0);
+
+  -- Stable copies sampled once per frame
+  signal screen_base1   : std_logic_vector(14 downto 6);
+  signal mode_base1     : std_logic_vector(7 downto 0);
 
   -- Tape Interface
   signal cintone        : std_logic;
@@ -230,12 +238,12 @@ begin
                     std_logic_vector(to_unsigned(500, 10)) when mode = "10" else
                     std_logic_vector(to_unsigned(250, 10));
 
-    v_display    <= std_logic_vector(to_unsigned(512, 10)) when mode = "11" else
-                    std_logic_vector(to_unsigned(512, 10)) when mode = "10" else
+    v_display    <= std_logic_vector(to_unsigned(513, 10)) when mode = "11" else
+                    std_logic_vector(to_unsigned(513, 10)) when mode = "10" else
                     std_logic_vector(to_unsigned(256, 10));
 
-    v_rtc        <= std_logic_vector(to_unsigned(200, 10)) when mode = "11" else
-                    std_logic_vector(to_unsigned(200, 10)) when mode = "10" else
+    v_rtc        <= std_logic_vector(to_unsigned(201, 10)) when mode = "11" else
+                    std_logic_vector(to_unsigned(201, 10)) when mode = "10" else
                     std_logic_vector(to_unsigned(100, 10));
      
     ram : entity work.RAM_32K_DualPort port map(
@@ -288,23 +296,24 @@ begin
     process (clk_16M00, RST_n)
     begin
         if (RST_n = '0') then
-           isr           <= (others => '0');
-           ier           <= (others => '0');
-           screen_base   <= (others => '0');
-           data_shift    <= (others => '0');
-           page_enable   <= '0';
-           page          <= (others => '0');
-           counter       <= (others => '0');
-           comms_mode    <= "01";
-           motor_int     <= '0';
-           caps_int      <= '0';
-           rtc_counter   <= (others => '0');
+           isr             <= (others => '0');
+           ier             <= (others => '0');
+           screen_base     <= (others => '0');
+           data_shift      <= (others => '0');
+           page_enable     <= '0';
+           page            <= (others => '0');
+           counter         <= (others => '0');
+           comms_mode      <= "01";
+           motor_int       <= '0';
+           caps_int        <= '0';
+           rtc_counter     <= (others => '0');
            general_counter <= (others => '0');
-           sound_bit     <= '0';           
-           mode          <= mode_init;
-           ctrl_caps     <= '0';
-           cindat        <= '0';
-           cintone       <= '0';
+           sound_bit       <= '0';           
+           mode            <= mode_init;
+           mode_init_copy  <= mode_init;
+           ctrl_caps       <= '0';
+           cindat          <= '0';
+           cintone         <= '0';
            
         elsif rising_edge(clk_16M00) then
             -- Detect control+caps 1...4 and change video format
@@ -315,22 +324,27 @@ begin
                     ctrl_caps <= '0';
                 end if;
             end if;
-            -- Delect "1" being pressed
+            -- Detect "1" being pressed
             if (addr = x"afff" and page_enable = '1' and page(2 downto 1) = "00" and ctrl_caps = '1' and kbd(0) = '1') then
                 mode <= "00";
             end if;
-            -- Delect "2" being pressed
+            -- Detect "2" being pressed
             if (addr = x"b7ff" and page_enable = '1' and page(2 downto 1) = "00" and ctrl_caps = '1' and kbd(0) = '1') then
                 mode <= "01";
             end if;
-            -- Delect "3" being pressed
+            -- Detect "3" being pressed
             if (addr = x"bbff" and page_enable = '1' and page(2 downto 1) = "00" and ctrl_caps = '1' and kbd(0) = '1') then
                 mode <= "10";
             end if;            
-            -- Delect "4" being pressed
+            -- Detect "4" being pressed
             if (addr = x"bdff" and page_enable = '1' and page(2 downto 1) = "00" and ctrl_caps = '1' and kbd(0) = '1') then
                 mode <= "11";
-            end if;            
+            end if;
+            -- Detect Jumpers being changed
+            if (mode_init_copy /= mode_init) then
+                mode <= mode_init;
+                mode_init_copy <= mode_init;
+            end if;
             -- Synchronize the display interrupt signal from the VGA clock domain
             display_intr1 <= display_intr;
             display_intr2 <= display_intr1;
@@ -597,6 +611,8 @@ begin
                     v_count <= (others => '0');
                     char_row <= (others => '0');
                     row_offset <= (others => '0');
+                    screen_base1  <= screen_base;
+                    mode_base1  <= mode_base;
                     if (mode = "01") then
                         -- Interlaced, so alternate odd and even fields
                         field <= not field;
@@ -629,7 +645,10 @@ begin
                 red   <= (others => '0');
                 green <= (others => '0');
                 blue  <= (others => '0');
+                contention <= '0';
             else
+                -- Indicate possible memory contention on active scan lines
+                contention <= not mode_40;
                 -- rendering an actual pixel
                 if (mode_bpp = 0) then
                     -- 1 bit per pixel, map to colours 0 and 8 for the palette lookup
@@ -769,12 +788,12 @@ begin
         end if;        
     end process;
     
-    process (screen_base, mode_base, row_offset, col_offset)
+    process (screen_base1, mode_base1, row_offset, col_offset)
         variable tmp: std_logic_vector(15 downto 0);
     begin
-        tmp := ("0" & screen_base & "000000") + row_offset + col_offset;
+        tmp := ("0" & screen_base1 & "000000") + row_offset + col_offset;
         if (tmp(15) = '1') then
-            tmp := tmp + (mode_base & "00000000");
+            tmp := tmp + (mode_base1 & "00000000");
         end if;
         screen_addr <= tmp(14 downto 0);
     end process;

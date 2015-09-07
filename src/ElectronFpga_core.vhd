@@ -41,7 +41,8 @@ entity ElectronFpga_core is
         SDSS      : out   std_logic;
         SDCLK     : out   std_logic;
         SDMOSI    : out   std_logic;
-        DIP       : in   std_logic_vector(1 downto 0)
+        DIP       : in    std_logic_vector(1 downto 0);
+        test      : out   std_logic_vector(7 downto 0)
     );
 end;
 
@@ -64,6 +65,9 @@ architecture behavioral of ElectronFpga_core is
     signal clken_counter     : std_logic_vector (3 downto 0);
     signal cpu_cycle         : std_logic;
     signal cpu_clken         : std_logic;
+    signal cpu_clken_1       : std_logic;
+    signal cpu_clken_2       : std_logic;
+    signal cpu_clken_4       : std_logic;
       
     signal key_break         : std_logic;
     signal key_turbo         : std_logic_vector(1 downto 0);
@@ -72,8 +76,14 @@ architecture behavioral of ElectronFpga_core is
 
     signal ula_irq_n         : std_logic;
 
-    signal via4_clken        : std_logic;
     signal via1_clken        : std_logic;
+    signal via1_clken_1      : std_logic;
+    signal via1_clken_2      : std_logic;
+    signal via1_clken_4      : std_logic;
+    signal via4_clken        : std_logic;
+    signal via4_clken_1      : std_logic;
+    signal via4_clken_2      : std_logic;
+    signal via4_clken_4      : std_logic;
     signal mc6522_enable     : std_logic;
     signal mc6522_data       : std_logic_vector(7 downto 0);
     signal mc6522_irq_n      : std_logic;
@@ -91,6 +101,13 @@ architecture behavioral of ElectronFpga_core is
     signal sdclk_int         : std_logic;
     
     signal rom_latch         : std_logic_vector(3 downto 0);
+
+    signal contention        : std_logic;
+    signal contention1       : std_logic;
+    signal contention2       : std_logic;
+    signal rom_access        : std_logic;
+
+    signal clk_state         : std_logic_vector(2 downto 0);
 
 begin
 
@@ -124,11 +141,11 @@ begin
         data    => rom_os_data
     );
 
-    rom_mmc : entity work.RomSmelk3006 port map(
-        clk     => clk_16M00,
-        addr    => cpu_addr(13 downto 0),
-        data    => rom_mmc_data
-    );
+--    rom_mmc : entity work.RomSmelk3006 port map(
+--        clk     => clk_16M00,
+--        addr    => cpu_addr(13 downto 0),
+--        data    => rom_mmc_data
+--    );
      
     via : entity work.M6522 port map(
         I_RS       => cpu_addr(3 downto 0),
@@ -217,7 +234,9 @@ begin
         
         rom_latch => rom_latch,
         
-        mode_init => DIP
+        mode_init => DIP,
+        
+        contention => contention
     );
         
     input : entity work.keyboard port map(
@@ -243,56 +262,114 @@ begin
                rom_mmc_data   when cpu_addr(15 downto 14) = "10" and rom_latch = "0111" else
                mc6522_data    when mc6522_enable = '1' else
                ula_data;
-    
+   
 --------------------------------------------------------
 -- clock enable generator
 --------------------------------------------------------
-    clk_gen : process(clk_16M00, RSTn)
+
+    -- rom_access <= '1' when cpu_addr(15) = '1' and cpu_addr(15 downto 8) /= x"fe" else '0';
+    -- rom_access <= cpu_addr(15);
+    rom_access <= not ROM_n;
+    
+    clk_gen1 : process(clk_16M00, RSTn)
     begin
         if RSTn = '0' then
             clken_counter <= (others => '0');
-            cpu_clken <= '0';
         elsif rising_edge(clk_16M00) then
+            -- clock state machine
+            if (clken_counter(0) = '1' and clken_counter(1) = '1') then
+                case clk_state is
+                when "000" =>
+                    if (rom_access = '1') then
+                        clk_state <= "001";
+                    else
+                        clk_state <= "100";
+                    end if;
+                when "001" =>
+                    clk_state <= "010";
+                when "010" =>
+                    if (rom_access = '1') then
+                        clk_state <= "011";
+                    else
+                        clk_state <= "110";
+                    end if;
+                when "011" =>
+                    clk_state <= "000";
+                when "100" =>
+                    clk_state <= "101";
+                when "101" =>
+                    if (contention2 = '1') then
+                        clk_state <= "101";
+                    else
+                        clk_state <= "011";                    
+                    end if;
+                when "110" =>
+                    clk_state <= "111";
+                when "111" =>
+                    clk_state <= "100";
+                when others => null;
+                end case;
+            end if;
+            -- clken counter
             clken_counter <= clken_counter + 1;
-            case (key_turbo) is
-                when "01" =>
-                    -- 2MHz
-                    -- cpu_clken active on cycle 0, 8
-                    -- address/data changes on cycle 1, 9
-                    cpu_clken <= clken_counter(0) and clken_counter(1) and clken_counter(2);  -- on cycles 0, 8
-                    via1_clken <= clken_counter(0) and clken_counter(1) and clken_counter(2);
-                    via4_clken <= clken_counter(0);
-                when "10" =>
-                    -- 4MHz
-                    -- cpu_clken active on cycle 0, 4, 8, 12
-                    -- address/data changes on cycle 1, 5, 9, 13
-                    cpu_clken <= clken_counter(0) and clken_counter(1);
-                    via1_clken <= clken_counter(0) and clken_counter(1);
-                    via4_clken <= '1';
-                when "11" =>
-                    -- 8MHz
-                    -- cpu_clken active on cycle 0, 2, 4, 6, 8, 10, 12, 14
-                    -- address/data changes on cycle 1, 3, 5, 7, 9, 11, 13, 15
-                    -- NOTE: this case is not ideal, because no matter how you time phi2, one or other
-                    -- edge will change at the same time as address/data changes.
-                    -- (1) Address Setup at start of write cycle
-                    -- (2) Data hold and end of write cycle
-                    -- For now we will optimise for (2)
-                    cpu_clken <= clken_counter(0);
-                    via1_clken <= clken_counter(0);
-                    via4_clken <= '1';
-                when others =>
-                    -- 1MHz
-                    -- cpu_clken active on cycle 0
-                    -- address/data changes on cycle 1
-                    -- phi2 active on cycle 2..9
-                    cpu_clken <= clken_counter(0) and clken_counter(1) and clken_counter(2) and clken_counter(3);
-                    via1_clken <= clken_counter(0) and clken_counter(1) and clken_counter(2) and clken_counter(3);
-                    via4_clken <= clken_counter(0) and clken_counter(1);
-            end case;
+            -- Synchronize contention signal
+            contention1 <= contention;
+            contention2 <= contention1;
+            -- 1MHz
+            -- cpu_clken active on cycle 0
+            -- address/data changes on cycle 1
+            cpu_clken_1  <= clken_counter(0) and clken_counter(1) and clken_counter(2) and clken_counter(3);
+            via1_clken_1 <= clken_counter(0) and clken_counter(1) and clken_counter(2) and clken_counter(3);
+            via4_clken_1 <= clken_counter(0) and clken_counter(1);            
+            -- 2MHz
+            -- cpu_clken active on cycle 0, 8
+            -- address/data changes on cycle 1, 9
+            cpu_clken_2  <= clken_counter(0) and clken_counter(1) and clken_counter(2);
+            via1_clken_2 <= clken_counter(0) and clken_counter(1) and clken_counter(2);
+            via4_clken_2 <= clken_counter(0);           
+            -- 4MHz - no contention
+            -- cpu_clken active on cycle 0, 4, 8, 12
+            -- address/data changes on cycle 1, 5, 9, 13
+            cpu_clken_4  <= clken_counter(0) and clken_counter(1);
+            via1_clken_4 <= clken_counter(0) and clken_counter(1);
+            via4_clken_4 <= '1';
         end if;
     end process;
+            
+    clk_gen2 : process(key_turbo, clken_counter, clk_state,
+                       cpu_clken_1, cpu_clken_2, cpu_clken_4,
+                       via1_clken_1, via1_clken_2, via1_clken_4,
+                       via4_clken_1, via4_clken_2, via4_clken_4)
+    begin
+        case (key_turbo) is
+            when "01" =>
+                -- 2Mhz Contention
+                if (clken_counter(0) = '1' and clken_counter(1) = '1' and (clk_state = "001" or clk_state = "011")) then
+                    cpu_clken <= '1';
+                else
+                    cpu_clken <= '0';
+                end if;
+                via1_clken <= via1_clken_2;
+                via4_clken <= via4_clken_2;
+            when "10" =>
+                -- 2Mhz No Contention
+                cpu_clken  <= cpu_clken_2;
+                via1_clken <= via1_clken_2;
+                via4_clken <= via4_clken_2;
+            when "11" =>
+                -- 4MHz No contention
+                cpu_clken  <= cpu_clken_4;
+                via1_clken <= via1_clken_4;
+                via4_clken <= via4_clken_4;
+            when others =>
+                -- 1MHz No Contention
+                cpu_clken  <= cpu_clken_1;
+                via1_clken <= via1_clken_1;
+                via4_clken <= via4_clken_1;
+        end case;
+    end process;
     
+    test <= cpu_clken & cpu_clken_1 & cpu_clken_2 & contention2 & cpu_addr(15) & CPU_IRQ_n & "00";
 end behavioral;
 
 
