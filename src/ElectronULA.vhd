@@ -66,7 +66,7 @@ entity ElectronULA is
 
         mode_init : in std_logic_vector(1 downto 0);
         
-        contention: out std_logic
+        contention: out std_logic        
         );
 end;
 
@@ -287,9 +287,13 @@ begin
     -- Bits 6..2 refect in interrups status regs
     -- Bit 1 is the power up reset bit, cleared by the first read after power up
     -- Bit 0 is the OR of bits 6..2
-    master_irq <= isr(6) or isr(5) or isr(4) or isr(3) or isr(2);
+    master_irq <= (isr(6) and ier(6)) or 
+                  (isr(5) and ier(5)) or
+                  (isr(4) and ier(4)) or
+                  (isr(3) and ier(3)) or
+                  (isr(2) and ier(2));
     IRQ_n      <= not master_irq; 
-    isr_data   <= '0' & isr(6 downto 2) & power_on_reset & master_irq;
+    isr_data   <= '1' & isr(6 downto 2) & power_on_reset & master_irq;
     
     rom_latch  <= page_enable & page;
    
@@ -350,7 +354,7 @@ begin
             display_intr2 <= display_intr1;
             -- Generate the display end interrupt on the rising edge (line 256 of the screen)
             if (display_intr2 = '0' and display_intr1 = '1') then
-                isr(2) <= ier(2);
+                isr(2) <= '1';
             end if;
             -- Synchronize the rtc interrupt signal from the VGA clock domain
             rtc_intr1 <= rtc_intr;
@@ -364,14 +368,14 @@ begin
                 -- 60Hz display interrupts.
                 if (rtc_counter = 383999) then
                     rtc_counter <= (others => '0');
-                    isr(3) <= ier(3);
+                    isr(3) <= '1';
                 else
                     rtc_counter <= rtc_counter + 1;
                 end if;
             else
                 -- Generate the rtc interrupt on the rising edge (line 100 of the screen)
                 if (rtc_intr2 = '0' and rtc_intr1 = '1') then
-                    isr(3) <= ier(3);
+                    isr(3) <= '1';
                 end if;            
             end if;
             if (comms_mode = "00") then
@@ -466,6 +470,11 @@ begin
                        end if;                           
                    end if;
                 end if;
+            else
+                cindat      <= '0';
+                cintone     <= '0';
+                databits    <= (others => '0');
+                ignore_next <= '0';
             end if;
             
             -- ULA Writes
@@ -804,5 +813,5 @@ begin
     motor <= motor_int;
     
     casOut <= '0';
-    
+
 end behavioral;
