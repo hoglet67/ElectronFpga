@@ -10,12 +10,11 @@ IMAGE=tmp/rom_image.bin
 
 rm -f $IMAGE
 
-# Slots 0-3
+# Slots 0-3 (sideways RAM)
 cat blank.rom                  >> $IMAGE
 cat blank.rom                  >> $IMAGE
 cat blank.rom                  >> $IMAGE
-cat smelk3006.rom              >> $IMAGE
-# cat mmfs-b.rom                 >> $IMAGE
+cat mmfs_v1_02.rom             >> $IMAGE
 
 # Slots 4-7 (sideways RAM)
 cat blank.rom                  >> $IMAGE
@@ -30,7 +29,7 @@ cat Basic2.rom                 >> $IMAGE
 cat Basic2.rom                 >> $IMAGE
 
 # Slots C-F
-cat blank.rom                  >> $IMAGE
+cat pres_ap2_v1_23.rom         >> $IMAGE
 cat blank.rom                  >> $IMAGE
 cat blank.rom                  >> $IMAGE
 cat blank.rom                  >> $IMAGE
