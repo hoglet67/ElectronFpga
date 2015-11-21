@@ -105,7 +105,8 @@ architecture behavioral of ElectronFpga_core is
     signal contention        : std_logic;
     signal contention1       : std_logic;
     signal contention2       : std_logic;
-    signal rom_access        : std_logic;
+    signal rom_access        : std_logic; -- always at 2mhz, no contention
+    signal ram_access        : std_logic; -- 1MHz/2Mhz/Stopped
 
     signal clk_state         : std_logic_vector(2 downto 0);
 
@@ -141,11 +142,11 @@ begin
         data    => rom_os_data
     );
 
---    rom_mmc : entity work.RomSmelk3006 port map(
---        clk     => clk_16M00,
---        addr    => cpu_addr(13 downto 0),
---        data    => rom_mmc_data
---    );
+    rom_mmc : entity work.RomSmelk3006 port map(
+        clk     => clk_16M00,
+        addr    => cpu_addr(13 downto 0),
+        data    => rom_mmc_data
+    );
      
     via : entity work.M6522 port map(
         I_RS       => cpu_addr(3 downto 0),
@@ -175,7 +176,7 @@ begin
         I_P2_H     => via1_clken,
         ENA_4      => via4_clken,
         CLK        => clk_16M00);                                      
-
+    
     -- SDCLK is driven from either PB1 or CB1 depending on the SR Mode
     sdclk_int     <= mc6522_portb_out(1) when mc6522_portb_oe_l(1) = '0' else
                      mc6522_cb1_out      when mc6522_cb1_oe_l = '0' else                     
@@ -191,8 +192,9 @@ begin
     mc6522_cb2_in <= SDMISO;
     
     -- SDSS is hardwired to 0 (always selected) as there is only one slave attached
-    SDSS          <= '0';         
-    
+    SDSS          <= '0';
+
+
     ula : entity work.ElectronULA port map (
         clk_16M00 => clk_16M00,
         clk_33M33 => clk_33M33,
@@ -267,9 +269,11 @@ begin
 -- clock enable generator
 --------------------------------------------------------
 
-    -- rom_access <= '1' when cpu_addr(15) = '1' and cpu_addr(15 downto 8) /= x"fe" else '0';
-    -- rom_access <= cpu_addr(15);
+    -- ROM accesses always happen at 2Mhz
     rom_access <= not ROM_n;
+    -- RAM accesses always happen at 1Mhz and subber contention
+    ram_access <= not cpu_addr(15);
+    -- IO accesses always happen at 1MHz and don't suffer contention
     
     clk_gen1 : process(clk_16M00, RSTn)
     begin
@@ -277,34 +281,40 @@ begin
             clken_counter <= (others => '0');
         elsif rising_edge(clk_16M00) then
             -- clock state machine
-            if (clken_counter(0) = '1' and clken_counter(1) = '1') then
+            if clken_counter(0) = '1' and clken_counter(1) = '1' then
                 case clk_state is
                 when "000" =>
-                    if (rom_access = '1') then
+                    if rom_access = '1' then
+                        -- 2MHz no contention
                         clk_state <= "001";
                     else
-                        clk_state <= "100";
+                        -- 1MHz, possible contention
+                        clk_state <= "101";
                     end if;
                 when "001" =>
+                    -- CPU is clocked in this state
                     clk_state <= "010";
                 when "010" =>
-                    if (rom_access = '1') then
+                    if rom_access = '1' then
+                        -- 2MHz no contention
                         clk_state <= "011";
                     else
-                        clk_state <= "110";
+                        -- 1MHz, possible contention
+                        clk_state <= "111";
                     end if;
                 when "011" =>
-                    clk_state <= "000";
+                    -- CPU is clocked in this state
+                    clk_state <= "000";                    
                 when "100" =>
                     clk_state <= "101";
                 when "101" =>
-                    if (contention2 = '1') then
-                        clk_state <= "101";
+                    clk_state <= "110";
+                when "110" =>
+                    if ram_access = '1' and contention2 = '1' then
+                        clk_state <= "111";
                     else
                         clk_state <= "011";                    
                     end if;
-                when "110" =>
-                    clk_state <= "111";
                 when "111" =>
                     clk_state <= "100";
                 when others => null;
@@ -344,13 +354,21 @@ begin
         case (key_turbo) is
             when "01" =>
                 -- 2Mhz Contention
-                if (clken_counter(0) = '1' and clken_counter(1) = '1' and (clk_state = "001" or clk_state = "011")) then
-                    cpu_clken <= '1';
-                else
-                    cpu_clken <= '0';
+                cpu_clken <= '0';
+                via1_clken <= '0';
+                via4_clken <= '0';
+                if clken_counter(0) = '1' and clken_counter(1) = '1' then
+                    -- 1MHz/2MHz/Stopped
+                    if clk_state = "001" or clk_state = "011" then
+                        cpu_clken <= '1';
+                    end if;
+                    -- 1MHz fixed
+                    if clk_state = "011" or clk_state = "111" then
+                        via1_clken <= '1';
+                    end if;
+                    -- 4MHz fixed
+                    via4_clken <= '1';
                 end if;
-                via1_clken <= via1_clken_2;
-                via4_clken <= via4_clken_2;
             when "10" =>
                 -- 2Mhz No Contention
                 cpu_clken  <= cpu_clken_2;
