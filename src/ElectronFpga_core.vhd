@@ -47,6 +47,7 @@ entity ElectronFpga_core is
         -- 512KB logical address space
         ext_nOE        : out std_logic;
         ext_nWE        : out std_logic;
+        ext_nCS        : out std_logic;
         ext_A          : out std_logic_vector (18 downto 0);
         ext_Dout       : in  std_logic_vector (7 downto 0);
         ext_Din        : out std_logic_vector (7 downto 0);
@@ -293,6 +294,9 @@ begin
 
     -- Could make this more restrictinb
     ext_nOE <= '0' when cpu_R_W_n = '1' and ext_enable = '1'; 
+
+    -- Always enabled
+    ext_nCS <= '0';
         
 --------------------------------------------------------
 -- clock enable generator
