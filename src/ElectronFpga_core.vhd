@@ -88,14 +88,12 @@ architecture behavioral of ElectronFpga_core is
     signal cpu_NMI_n         : std_logic;
     signal ROM_n             : std_logic;
 
-    signal rom_basic_data    : std_logic_vector (7 downto 0);
-    signal rom_os_data       : std_logic_vector (7 downto 0);
-    signal rom_mmc_data      : std_logic_vector (7 downto 0);
     signal ula_data          : std_logic_vector (7 downto 0);
 
     signal clken_counter     : std_logic_vector (3 downto 0);
     signal cpu_cycle         : std_logic;
     signal cpu_clken         : std_logic;
+    signal cpu_clken_r       : std_logic;
     signal cpu_clken_1       : std_logic;
     signal cpu_clken_2       : std_logic;
     signal cpu_clken_4       : std_logic;
@@ -141,6 +139,8 @@ architecture behavioral of ElectronFpga_core is
 
     signal clk_state         : std_logic_vector(2 downto 0);
 
+    signal ext_enable        : std_logic;
+    
 begin
 
     cpu : entity work.T65 port map (
@@ -159,24 +159,6 @@ begin
         A(15 downto 0)  => cpu_addr(15 downto 0),
         DI              => cpu_din,
         DO              => cpu_dout
-    );
-
-    rom_basic : entity work.RomBasic2 port map(
-        clk     => clk_16M00,
-        addr    => cpu_addr(13 downto 0),
-        data    => rom_basic_data
-    );
-
-    rom_os : entity work.RomOS100 port map(
-        clk     => clk_16M00,
-        addr    => cpu_addr(13 downto 0),
-        data    => rom_os_data
-    );
-
-    rom_mmc : entity work.RomSmelk3006 port map(
-        clk     => clk_16M00,
-        addr    => cpu_addr(13 downto 0),
-        data    => rom_mmc_data
     );
 
     via : entity work.M6522 port map(
@@ -290,12 +272,28 @@ begin
     RSTn    <= hard_reset_n and key_break;
     audio_l <= sound;
     audio_r <= sound;
-    cpu_din <= rom_basic_data when ROM_n = '0' and cpu_addr(14) = '0' else
-               rom_os_data    when ROM_n = '0' and cpu_addr(14) = '1' else
-               rom_mmc_data   when cpu_addr(15 downto 14) = "10" and rom_latch = "0111" else
+
+    ext_enable <= '1' when ROM_n = '0' or (cpu_addr(15 downto 14) = "10" and rom_latch(3 downto 1) /= "100") else '0';
+    
+    cpu_din <= ext_Dout       when ext_enable = '1' else
                mc6522_data    when mc6522_enable = '1' else
                ula_data;
 
+    -- The OS rom image lives in slot 8 as on the Elk this is where the
+    -- keyboard appears, which keeps the external memory image down to 256KB.
+
+    ext_A <= "0" & "1000"    & cpu_addr(13 downto 0) when cpu_addr(15 downto 14) = "11" else
+             "0" & rom_latch & cpu_addr(13 downto 0);
+
+    ext_Din <= cpu_dout;
+
+    -- Slots 4,5,6,7 are writeable
+    -- WE lags the cpu by one cycle to give the RAM some setup and hold time
+    ext_nWE <= '0' when cpu_R_W_n = '0' and ext_enable = '1' and cpu_addr(15 downto 14) = "10" and rom_latch(3 downto 2) = "01" and cpu_clken_r = '1' else '1';
+
+    -- Could make this more restrictinb
+    ext_nOE <= '0' when cpu_R_W_n = '1' and ext_enable = '1'; 
+        
 --------------------------------------------------------
 -- clock enable generator
 --------------------------------------------------------
@@ -311,6 +309,8 @@ begin
         if RSTn = '0' then
             clken_counter <= (others => '0');
         elsif rising_edge(clk_16M00) then
+            -- delayed cpu_clken for use as an external write signal
+            cpu_clken_r <= cpu_clken;
             -- clock state machine
             if clken_counter(0) = '1' and clken_counter(1) = '1' then
                 case clk_state is

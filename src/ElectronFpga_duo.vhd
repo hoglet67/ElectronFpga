@@ -49,12 +49,22 @@ end;
 
 architecture behavioral of ElectronFpga_duo is
 
-    signal clk_16M00  : std_logic;
-    signal clk_33M33  : std_logic;
-    signal clk_40M00  : std_logic;
-    signal ERSTn      : std_logic;     
-    signal pwrup_RSTn : std_logic;
-    signal reset_ctr  : std_logic_vector (7 downto 0) := (others => '0');
+    signal clk_16M00      : std_logic;
+    signal clk_33M33      : std_logic;
+    signal clk_40M00      : std_logic;
+    signal ERSTn          : std_logic;     
+    signal pwrup_RSTn     : std_logic;
+    signal reset_ctr      : std_logic_vector (7 downto 0) := (others => '0');
+
+    signal rom_basic_data : std_logic_vector (7 downto 0);
+    signal rom_os_data    : std_logic_vector (7 downto 0);
+    signal rom_mmc_data   : std_logic_vector (7 downto 0);
+
+    signal ext_A          : std_logic_vector (18 downto 0);
+    signal ext_Din        : std_logic_vector (7 downto 0);
+    signal ext_Dout       : std_logic_vector (7 downto 0);
+    signal ext_nWE        : std_logic;
+    signal ext_nOE        : std_logic;
     
 begin
 
@@ -79,6 +89,29 @@ begin
         CLK2X_OUT         => open
     );
 
+    rom_basic : entity work.RomBasic2 port map(
+        clk     => clk_16M00,
+        addr    => ext_A(13 downto 0),
+        data    => rom_basic_data
+    );
+
+    rom_os : entity work.RomOS100 port map(
+        clk     => clk_16M00,
+        addr    => ext_A(13 downto 0),
+        data    => rom_os_data
+    );
+
+    rom_mmc : entity work.RomSmelk3006 port map(
+        clk     => clk_16M00,
+        addr    => ext_A(13 downto 0),
+        data    => rom_mmc_data
+    );
+
+    ext_Dout <= rom_os_data    when ext_A(18 downto 15) = "0100" else
+                rom_basic_data when ext_A(18 downto 15) = "0101" else
+                rom_mmc_data   when ext_A(18 downto 14) = "00111" else
+                x"AA";
+    
     inst_ElectronFpga_core : entity work.ElectronFpga_core
      port map (
         clk_16M00         => clk_16M00,
@@ -94,11 +127,11 @@ begin
         video_hsync       => hsync,
         audio_l           => audioL,
         audio_r           => audioR,
-        ext_nOE           => open,
-        ext_nWE           => open,
-        ext_A             => open,
-        ext_Dout          => (others => '0'),
-        ext_Din           => open,
+        ext_nOE           => ext_nOE,
+        ext_nWE           => ext_nWE,
+        ext_A             => ext_A,
+        ext_Dout          => ext_Dout,
+        ext_Din           => ext_Din,
         SDMISO            => SDMISO,
         SDSS              => SDSS,
         SDCLK             => SDCLK,
