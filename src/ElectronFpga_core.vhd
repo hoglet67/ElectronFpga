@@ -1,15 +1,15 @@
 --------------------------------------------------------------------------------
 -- Copyright (c) 2015 David Banks
 --------------------------------------------------------------------------------
---   ____  ____ 
---  /   /\/   / 
--- /___/  \  /    
--- \   \   \/    
---  \   \         
+--   ____  ____
+--  /   /\/   /
+-- /___/  \  /
+-- \   \   \/
+--  \   \
 --  /   /         Filename  : ElectronFpga_core.vhd
 -- /___/   /\     Timestamp : 28/07/2015
--- \   \  /  \ 
---  \___\/\___\ 
+-- \   \  /  \
+--  \___\/\___\
 --
 --Design Name: ElectronFpga_core
 
@@ -20,29 +20,60 @@ use ieee.numeric_std.all;
 
 entity ElectronFpga_core is
     port (
-        clk_16M00 : in    std_logic;
-        clk_33M33 : in    std_logic;
-        clk_40M00 : in    std_logic;
-        ps2_clk   : in    std_logic;
-        ps2_data  : in    std_logic;
-        ERSTn     : in    std_logic;
-        red       : out   std_logic_vector (3 downto 0);
-        green     : out   std_logic_vector (3 downto 0);
-        blue      : out   std_logic_vector (3 downto 0);
-        vsync     : out   std_logic;
-        hsync     : out   std_logic;
-        audiol    : out   std_logic;
-        audioR    : out   std_logic;
-        casIn     : in    std_logic;
-        casOut    : out   std_logic;        
-        LED1      : out   std_logic;        
-        LED2      : out   std_logic;
-        SDMISO    : in    std_logic;
-        SDSS      : out   std_logic;
-        SDCLK     : out   std_logic;
-        SDMOSI    : out   std_logic;
-        DIP       : in    std_logic_vector(1 downto 0);
-        test      : out   std_logic_vector(7 downto 0)
+        -- Clocks
+        clk_16M00      : in  std_logic;
+        clk_33M33      : in  std_logic;
+        clk_40M00      : in  std_logic;
+
+        -- Hard reset (active low)
+        hard_reset_n   : in  std_logic;
+
+        -- Keyboard
+        ps2_clk        : in  std_logic;
+        ps2_data       : in  std_logic;
+
+        -- Video
+        video_red      : out std_logic_vector (3 downto 0);
+        video_green    : out std_logic_vector (3 downto 0);
+        video_blue     : out std_logic_vector (3 downto 0);
+        video_vsync    : out std_logic;
+        video_hsync    : out std_logic;
+
+        -- Audio
+        audio_l        : out std_logic;
+        audio_r        : out std_logic;
+
+        -- External memory (e.g. SRAM and/or FLASH)
+        -- 512KB logical address space
+        ext_nOE        : out std_logic;
+        ext_nWE        : out std_logic;
+        ext_A          : out std_logic_vector (18 downto 0);
+        ext_Dout       : in  std_logic_vector (7 downto 0);
+        ext_Din        : out std_logic_vector (7 downto 0);
+
+        -- SD Card
+        SDMISO         : in  std_logic;
+        SDSS           : out std_logic;
+        SDCLK          : out std_logic;
+        SDMOSI         : out std_logic;
+
+        -- KeyBoard LEDs (active high)
+        caps_led       : out std_logic;
+        motor_led      : out std_logic;
+
+        -- Casette Port
+        cassette_in    : in  std_logic;
+        cassette_out   : out std_logic;
+
+        -- Format of Video
+        -- 00 - sRGB - interlaced
+        -- 01 - sRGB - non interlaced
+        -- 10 - SVGA - 50Hz
+        -- 11 - SVGA - 60Hz
+        vid_mode       : in  std_logic_vector(1 downto 0);
+
+        -- Test outputs
+        test           : out std_logic_vector(7 downto 0)
     );
 end;
 
@@ -68,7 +99,7 @@ architecture behavioral of ElectronFpga_core is
     signal cpu_clken_1       : std_logic;
     signal cpu_clken_2       : std_logic;
     signal cpu_clken_4       : std_logic;
-      
+
     signal key_break         : std_logic;
     signal key_turbo         : std_logic_vector(1 downto 0);
     signal sound             : std_logic;
@@ -99,7 +130,7 @@ architecture behavioral of ElectronFpga_core is
     signal mc6522_portb_out  : std_logic_vector(7 downto 0);
     signal mc6522_portb_oe_l : std_logic_vector(7 downto 0);
     signal sdclk_int         : std_logic;
-    
+
     signal rom_latch         : std_logic_vector(3 downto 0);
 
     signal contention        : std_logic;
@@ -147,7 +178,7 @@ begin
         addr    => cpu_addr(13 downto 0),
         data    => rom_mmc_data
     );
-     
+
     via : entity work.M6522 port map(
         I_RS       => cpu_addr(3 downto 0),
         I_DATA     => cpu_dout(7 downto 0),
@@ -175,22 +206,22 @@ begin
         RESET_L    => RSTn,
         I_P2_H     => via1_clken,
         ENA_4      => via4_clken,
-        CLK        => clk_16M00);                                      
-    
+        CLK        => clk_16M00);
+
     -- SDCLK is driven from either PB1 or CB1 depending on the SR Mode
     sdclk_int     <= mc6522_portb_out(1) when mc6522_portb_oe_l(1) = '0' else
-                     mc6522_cb1_out      when mc6522_cb1_oe_l = '0' else                     
+                     mc6522_cb1_out      when mc6522_cb1_oe_l = '0' else
                      '1';
     SDCLK         <= sdclk_int;
     mc6522_cb1_in <= sdclk_int;
-    
+
     -- SDMOSI is always driven from PB0
     SDMOSI        <= mc6522_portb_out(0) when mc6522_portb_oe_l(0) = '0' else
                      '1';
-    
+
     -- SDMISO is always read from CB2
     mc6522_cb2_in <= SDMISO;
-    
+
     -- SDSS is hardwired to 0 (always selected) as there is only one slave attached
     SDSS          <= '0';
 
@@ -199,7 +230,7 @@ begin
         clk_16M00 => clk_16M00,
         clk_33M33 => clk_33M33,
         clk_40M00 => clk_40M00,
-        
+
         -- CPU Interface
         cpu_clken => cpu_clken,
         addr      => cpu_addr,
@@ -212,38 +243,38 @@ begin
 
         -- Rom Enable
         ROM_n     => ROM_n,
-        
+
         -- Video
-        red       => red,
-        green     => green,
-        blue      => blue,
-        vsync     => vsync,
-        hsync     => hsync,
+        red       => video_red,
+        green     => video_green,
+        blue      => video_blue,
+        vsync     => video_vsync,
+        hsync     => video_hsync,
 
         -- Audio
         sound     => sound,
 
         -- Casette
-        casIn     => casIn,
-        casOut    => casOut,
+        casIn     => cassette_in,
+        casOut    => cassette_out,
 
         -- Keyboard
-        kbd       => kbd_data,        
+        kbd       => kbd_data,
 
         -- MISC
-        caps      => LED1,
-        motor     => LED2,
-        
+        caps      => caps_led,
+        motor     => motor_led,
+
         rom_latch => rom_latch,
-        
-        mode_init => DIP,
-        
+
+        mode_init => vid_mode,
+
         contention => contention
     );
-        
+
     input : entity work.keyboard port map(
         clk        => clk_16M00,
-        rst_n      => ERSTn, -- to avoid a loop when break pressed!
+        rst_n      => hard_reset_n, -- to avoid a loop when break pressed!
         ps2_clk    => ps2_clk,
         ps2_data   => ps2_data,
         col        => kbd_data,
@@ -255,16 +286,16 @@ begin
     mc6522_enable  <= '1' when cpu_addr(15 downto 4) = x"fcb" else '0';
     cpu_IRQ_n      <= mc6522_irq_n AND ula_irq_n;
     cpu_NMI_n      <= '1';
-  
-    RSTn    <= ERSTn and key_break;
-    audiol  <= sound;
-    audior  <= sound;
+
+    RSTn    <= hard_reset_n and key_break;
+    audio_l <= sound;
+    audio_r <= sound;
     cpu_din <= rom_basic_data when ROM_n = '0' and cpu_addr(14) = '0' else
                rom_os_data    when ROM_n = '0' and cpu_addr(14) = '1' else
                rom_mmc_data   when cpu_addr(15 downto 14) = "10" and rom_latch = "0111" else
                mc6522_data    when mc6522_enable = '1' else
                ula_data;
-   
+
 --------------------------------------------------------
 -- clock enable generator
 --------------------------------------------------------
@@ -274,7 +305,7 @@ begin
     -- RAM accesses always happen at 1Mhz and subber contention
     ram_access <= not cpu_addr(15);
     -- IO accesses always happen at 1MHz and don't suffer contention
-    
+
     clk_gen1 : process(clk_16M00, RSTn)
     begin
         if RSTn = '0' then
@@ -304,7 +335,7 @@ begin
                     end if;
                 when "011" =>
                     -- CPU is clocked in this state
-                    clk_state <= "000";                    
+                    clk_state <= "000";
                 when "100" =>
                     clk_state <= "101";
                 when "101" =>
@@ -313,7 +344,7 @@ begin
                     if ram_access = '1' and contention2 = '1' then
                         clk_state <= "111";
                     else
-                        clk_state <= "011";                    
+                        clk_state <= "011";
                     end if;
                 when "111" =>
                     clk_state <= "100";
@@ -330,13 +361,13 @@ begin
             -- address/data changes on cycle 1
             cpu_clken_1  <= clken_counter(0) and clken_counter(1) and clken_counter(2) and clken_counter(3);
             via1_clken_1 <= clken_counter(0) and clken_counter(1) and clken_counter(2) and clken_counter(3);
-            via4_clken_1 <= clken_counter(0) and clken_counter(1);            
+            via4_clken_1 <= clken_counter(0) and clken_counter(1);
             -- 2MHz
             -- cpu_clken active on cycle 0, 8
             -- address/data changes on cycle 1, 9
             cpu_clken_2  <= clken_counter(0) and clken_counter(1) and clken_counter(2);
             via1_clken_2 <= clken_counter(0) and clken_counter(1) and clken_counter(2);
-            via4_clken_2 <= clken_counter(0);           
+            via4_clken_2 <= clken_counter(0);
             -- 4MHz - no contention
             -- cpu_clken active on cycle 0, 4, 8, 12
             -- address/data changes on cycle 1, 5, 9, 13
@@ -345,7 +376,7 @@ begin
             via4_clken_4 <= '1';
         end if;
     end process;
-            
+
     clk_gen2 : process(key_turbo, clken_counter, clk_state,
                        cpu_clken_1, cpu_clken_2, cpu_clken_4,
                        via1_clken_1, via1_clken_2, via1_clken_4,
@@ -386,7 +417,7 @@ begin
                 via4_clken <= via4_clken_1;
         end case;
     end process;
-    
+
     test <= cpu_clken & cpu_clken_1 & cpu_clken_2 & contention2 & cpu_addr(15) & CPU_IRQ_n & "00";
 end behavioral;
 

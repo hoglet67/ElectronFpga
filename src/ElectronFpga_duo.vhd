@@ -30,7 +30,7 @@ entity ElectronFpga_duo is
         blue           : out   std_logic_vector (3 downto 0);
         vsync          : out   std_logic;
         hsync          : out   std_logic;
-        audiol         : out   std_logic;
+        audioL         : out   std_logic;
         audioR         : out   std_logic;
         casIn          : in    std_logic;
         casOut         : out   std_logic;
@@ -84,25 +84,30 @@ begin
         clk_16M00         => clk_16M00,
         clk_33M33         => clk_33M33,
         clk_40M00         => clk_40M00,
+        hard_reset_n      => ERSTn,
         ps2_clk           => ps2_clk,
         ps2_data          => ps2_data,
-        ERSTn             => ERSTn,
-        red               => red,
-        green             => green,
-        blue              => blue,
-        vsync             => vsync,
-        hsync             => hsync,
-        audiol            => audiol,
-        audioR            => audioR,
-        casIn             => casIn,
-        casOut            => casOut,
-        LED1              => LED1,
-        LED2              => LED2,
+        video_red         => red,
+        video_green       => green,
+        video_blue        => blue,
+        video_vsync       => vsync,
+        video_hsync       => hsync,
+        audio_l           => audioL,
+        audio_r           => audioR,
+        ext_nOE           => open,
+        ext_nWE           => open,
+        ext_A             => open,
+        ext_Dout          => (others => '0'),
+        ext_Din           => open,
         SDMISO            => SDMISO,
         SDSS              => SDSS,
         SDCLK             => SDCLK,
         SDMOSI            => SDMOSI,
-        DIP               => DIP,
+        caps_led          => LED1,
+        motor_led         => LED2,
+        cassette_in       => casIn,
+        cassette_out      => casOut,
+        vid_mode          => DIP,
         test              => test
     );  
     
