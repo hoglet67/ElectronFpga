@@ -20,8 +20,9 @@ use ieee.numeric_std.all;
 
 entity ElectronFpga_core is
     generic (
-        IncludeABRRegs   : boolean := false;
-        IncludeJafaMode7 : boolean := false
+        IncludeICEDebugger : boolean := false;
+        IncludeABRRegs     : boolean := false;
+        IncludeJafaMode7   : boolean := false
     );
     port (
         -- Clocks
@@ -80,7 +81,12 @@ entity ElectronFpga_core is
         vid_mode       : in  std_logic_vector(1 downto 0);
 
         -- Test outputs
-        test           : out std_logic_vector(7 downto 0)
+        test           : out std_logic_vector(7 downto 0);
+
+        -- ICE T65 Deubgger 57600 baud serial
+        avr_RxD        : in    std_logic;
+        avr_TxD        : out   std_logic
+        
     );
 end;
 
@@ -154,23 +160,75 @@ architecture behavioral of ElectronFpga_core is
 
 begin
 
-    cpu : entity work.T65 port map (
-        Mode            => "00",
-        Abort_n         => '1',
-        SO_n            => '1',
-        Res_n           => RSTn,
-        Enable          => cpu_clken,
-        Clk             => clk_16M00,
-        Rdy             => '1',
-        IRQ_n           => cpu_IRQ_n,
-        NMI_n           => cpu_NMI_n,
-        R_W_n           => cpu_R_W_n,
-        Sync            => open,
-        A(23 downto 16) => open,
-        A(15 downto 0)  => cpu_addr(15 downto 0),
-        DI              => cpu_din,
-        DO              => cpu_dout
-    );
+    GenDebug: if IncludeICEDebugger generate
+        signal cpu_clken1 : std_logic;
+    begin
+        core : entity work.MOS6502CpuMonCore
+            generic map (
+                UseT65Core   => true,
+                UseAlanDCore => false
+                )
+            port map (
+                clock_avr    => clk_16M00,
+                busmon_clk   => clk_16M00,
+                busmon_clken => cpu_clken1,
+                cpu_clk      => clk_16M00,
+                cpu_clken    => cpu_clken,
+                IRQ_n        => cpu_IRQ_n,
+                NMI_n        => cpu_NMI_n,
+                Sync         => open,
+                Addr         => cpu_addr(15 downto 0),
+                R_W_n        => cpu_R_W_n,
+                Din          => cpu_din,
+                Dout         => cpu_dout,
+                SO_n         => '1',
+                Res_n_in     => RSTn,
+                Res_n_out    => open,
+                Rdy          => '1',
+                trig         => "00",
+                avr_RxD      => avr_RxD,
+                avr_TxD      => avr_TxD,
+                sw1          => '0',
+                nsw2         => hard_reset_n,
+                led3         => open,
+                led6         => open,
+                led8         => open,
+                tmosi        => open,
+                tdin         => open,
+                tcclk        => open
+                );
+
+        process(clk_16M00)
+        begin
+            if rising_edge(clk_16M00) then
+                cpu_clken1 <= cpu_clken;
+            end if;
+        end process;
+
+    end generate;
+
+    GenNoDebugCore: if not IncludeICEDebugger generate
+        T65core : entity work.T65
+        port map (
+            Mode            => "00",
+            Abort_n         => '1',
+            SO_n            => '1',
+            Res_n           => RSTn,
+            Enable          => cpu_clken,
+            Clk             => clk_16M00,
+            Rdy             => '1',
+            IRQ_n           => cpu_IRQ_n,
+            NMI_n           => cpu_NMI_n,
+            R_W_n           => cpu_R_W_n,
+            Sync            => open,
+            A(23 downto 16) => open,
+            A(15 downto 0)  => cpu_addr(15 downto 0),
+            DI              => cpu_din,
+            DO              => cpu_dout
+        );
+        avr_TxD <= '1';
+    end generate;
+
 
     via : entity work.M6522 port map(
         I_RS       => cpu_addr(3 downto 0),
@@ -352,6 +410,7 @@ begin
        abr_lo_bank_lock <= '1';
        abr_hi_bank_lock <= '1';
    end generate;
+
 --------------------------------------------------------
 -- clock enable generator
 --------------------------------------------------------

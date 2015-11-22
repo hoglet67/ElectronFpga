@@ -52,7 +52,9 @@ entity ElectronFpga_duo is
         SDCLK          : out   std_logic;
         SDMOSI         : out   std_logic;
         DIP            : in    std_logic_vector(1 downto 0);
-        test           : out   std_logic_vector(7 downto 0)
+        test           : out   std_logic_vector(7 downto 0);
+        avr_RxD        : in    std_logic;
+        avr_TxD        : out   std_logic
      );
 end;
 
@@ -137,10 +139,11 @@ begin
         CLK2X_OUT         => open
     );
     
-    inst_ElectronFpga_core : entity work.ElectronFpga_core
+    electron_core : entity work.ElectronFpga_core
     generic map (
-        IncludeABRRegs   => true,
-        IncludeJafaMode7 => true
+        IncludeICEDebugger => true, 
+        IncludeABRRegs     => true,
+        IncludeJafaMode7   => true
     )
     port map (
         clk_16M00         => clock_16,
@@ -173,7 +176,9 @@ begin
         cassette_in       => casIn,
         cassette_out      => casOut,
         vid_mode          => DIP,
-        test              => test
+        test              => test,
+        avr_RxD           => avr_RxD,
+        avr_TxD           => avr_TxD
     );  
     
 --------------------------------------------------------

@@ -80,6 +80,9 @@ NET SDSS            LOC="P112" | IOSTANDARD=LVTTL | DRIVE=2 | SLEW=SLOW; # B2
 NET DIP<0>          LOC="P111" | IOSTANDARD=LVTTL;                       #
 NET DIP<1>          LOC="P105" | IOSTANDARD=LVTTL;                       #
 
+NET avr_RxD         LOC="P46"  | IOSTANDARD=LVTTL;                       # RX
+NET avr_TxD         LOC="P141" | IOSTANDARD=LVTTL | DRIVE=2 | SLEW=SLOW; # TX
+
 NET "clk_32M00"                   CLOCK_DEDICATED_ROUTE = FALSE;
 PIN "inst_dcm4/CLKFX_BUFG_INST.O" CLOCK_DEDICATED_ROUTE = FALSE; 
 PIN "inst_dcm5/CLKFX_BUFG_INST.O" CLOCK_DEDICATED_ROUTE = FALSE;
