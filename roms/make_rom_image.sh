@@ -14,10 +14,10 @@ rm -f $IMAGE
 cat blank.rom                  >> $IMAGE
 cat blank.rom                  >> $IMAGE
 cat blank.rom                  >> $IMAGE
-cat mmfs_v1_02.rom             >> $IMAGE
+cat blank.rom                  >> $IMAGE
 
 # Slots 4-7 (sideways RAM)
-cat blank.rom                  >> $IMAGE
+cat mmfs_swram_v1_02.rom       >> $IMAGE
 cat blank.rom                  >> $IMAGE
 cat blank.rom                  >> $IMAGE
 cat blank.rom                  >> $IMAGE
