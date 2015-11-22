@@ -19,6 +19,9 @@ use ieee.std_logic_unsigned.all;
 use ieee.numeric_std.all;
 
 entity ElectronFpga_core is
+    generic (
+        IncludeABRRegs : boolean := true
+    );
     port (
         -- Clocks
         clk_16M00      : in  std_logic;
@@ -142,6 +145,10 @@ architecture behavioral of ElectronFpga_core is
 
     signal ext_enable        : std_logic;
     
+    signal abr_enable        : std_logic;
+    signal abr_lo_bank_lock  : std_logic;
+    signal abr_hi_bank_lock  : std_logic;
+
 begin
 
     cpu : entity work.T65 port map (
@@ -288,16 +295,54 @@ begin
 
     ext_Din <= cpu_dout;
 
-    -- Slots 4,5,6,7 are writeable
     -- WE lags the cpu by one cycle to give the RAM some setup and hold time
-    ext_nWE <= '0' when cpu_R_W_n = '0' and ext_enable = '1' and cpu_addr(15 downto 14) = "10" and rom_latch(3 downto 2) = "01" and cpu_clken_r = '1' else '1';
+    ext_nWE <=
+        -- Default is disable WE, except in a few cases
+        '1' when cpu_R_W_n = '1' or ext_enable = '0' or cpu_clken_r = '0' or cpu_addr(15 downto 14) /= "10" else
+        -- Slots 0,2 are write protected with FCDC/FCDD
+        '0' when rom_latch(3 downto 2) = "00" and rom_latch(0) = '0' and abr_lo_bank_lock = '0' else
+        -- Slots 1,3 are write protected with FCDE/FCDF
+        '0' when rom_latch(3 downto 2) = "00" and rom_latch(0) = '1' and abr_hi_bank_lock = '0' else
+        -- Slots 4 (MMFS) has B600 onwards as writeable for private workspace
+        '0' when rom_latch(3 downto 0) = "0100" and cpu_addr(13 downto 8) >= "110110" else
+        -- Other slots are read only
+        '1';
 
     -- Could make this more restrictinb
     ext_nOE <= '0' when cpu_R_W_n = '1' and ext_enable = '1'; 
 
     -- Always enabled
     ext_nCS <= '0';
-        
+
+--------------------------------------------------------
+-- ABR Lock Registers
+--------------------------------------------------------
+
+    ABRIncluded: if IncludeABRRegs generate
+        abr_enable <= '1' when cpu_addr(15 downto 2) & "00" = x"fcdc" else '0';    
+        process(clk_16M00, RSTn)
+        begin
+            if RSTn = '0' then
+                abr_lo_bank_lock <= '1';
+                abr_hi_bank_lock <= '1';
+            elsif rising_edge(clk_16M00) then
+                if cpu_clken = '1' then
+                    if abr_enable = '1' and cpu_R_W_n = '0' then
+                        if cpu_addr(1) = '0' then
+                            abr_lo_bank_lock <= cpu_addr(0);
+                        else
+                            abr_hi_bank_lock <= cpu_addr(0);
+                        end if;
+                    end if;
+                end if; 
+            end if;
+        end process;
+    end generate;
+
+   ABRExcluded: if not IncludeABRRegs generate
+       abr_lo_bank_lock <= '1';
+       abr_hi_bank_lock <= '1';
+   end generate;
 --------------------------------------------------------
 -- clock enable generator
 --------------------------------------------------------
