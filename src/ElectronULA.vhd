@@ -23,8 +23,13 @@ use ieee.std_logic_unsigned.all;
 use ieee.numeric_std.all;
 
 entity ElectronULA is
+    generic (
+        IncludeJafaMode7 : boolean := false
+    );
     port (
         clk_16M00 : in  std_logic;
+        clk_24M00 : in  std_logic;
+        clk_32M00 : in  std_logic;
         clk_33M33 : in  std_logic;
         clk_40M00 : in  std_logic;
         
@@ -66,7 +71,7 @@ entity ElectronULA is
 
         mode_init : in std_logic_vector(1 downto 0);
         
-        contention: out std_logic        
+        contention: out std_logic
         );
 end;
 
@@ -174,7 +179,52 @@ architecture behavioral of ElectronULA is
   signal casIn2         : std_logic;
   signal casIn3         : std_logic;
   signal ignore_next    : std_logic;
-    
+
+  -- internal RGB signals before final mux
+  signal red_int        : std_logic_vector(3 downto 0);
+  signal green_int      : std_logic_vector(3 downto 0);
+  signal blue_int       : std_logic_vector(3 downto 0);
+  
+  -- CRTC signals (only used when Jafa Mode 7 is enabled)
+  signal crtc_enable    :   std_logic;
+  signal crtc_clken     :   std_logic;
+  signal crtc_do        :   std_logic_vector(7 downto 0);
+  signal crtc_vsync     :   std_logic;
+  signal crtc_hsync     :   std_logic;
+  signal crtc_de        :   std_logic;
+  signal crtc_cursor    :   std_logic;
+  signal crtc_cursor1   :   std_logic;
+  signal crtc_cursor2   :   std_logic;
+  signal crtc_ma        :   std_logic_vector(13 downto 0);
+  signal crtc_ra        :   std_logic_vector(4 downto 0);
+  signal status_enable  :   std_logic;
+  signal status_do      :   std_logic_vector(7 downto 0);
+  
+  -- SAA5050 signals (only used when Jafa Mode 7 is enabled)
+  signal ttxt_clken     :   std_logic;
+  signal ttxt_glr       :   std_logic;
+  signal ttxt_dew       :   std_logic;
+  signal ttxt_crs       :   std_logic;
+  signal ttxt_lose      :   std_logic;
+  signal ttxt_r_int     :   std_logic;
+  signal ttxt_g_int     :   std_logic;
+  signal ttxt_b_int     :   std_logic;
+  signal ttxt_r         :   std_logic;
+  signal ttxt_g         :   std_logic;
+  signal ttxt_b         :   std_logic;
+  signal ttxt_r_out     :   std_logic;
+  signal ttxt_g_out     :   std_logic;
+  signal ttxt_b_out     :   std_logic;
+  signal ttxt_hs_out    :   std_logic;
+  signal ttxt_vs_out    :   std_logic;
+  signal mist_r         :   std_logic_vector(1 downto 0);
+  signal mist_g         :   std_logic_vector(1 downto 0);
+  signal mist_b         :   std_logic_vector(1 downto 0);
+  signal mist_hs        :   std_logic;
+  signal mist_vs        :   std_logic;
+
+  signal mode7_enable   :   std_logic;
+
 -- Helper function to cast an std_logic value to an integer
 function sl2int (x: std_logic) return integer is
 begin
@@ -280,6 +330,8 @@ begin
                 "0000" & kbd          when addr(15 downto 14) = "10" and page_enable = '1' and page(2 downto 1) = "00" else
                 isr_data              when addr(15 downto 8) = x"FE" and addr(3 downto 0) = x"0" else
                 data_shift            when addr(15 downto 8) = x"FE" and addr(3 downto 0) = x"4" else
+                crtc_do               when crtc_enable = '1' and IncludeJafaMode7 else
+                status_do             when status_enable = '1' and IncludeJafaMode7 else
                 x"F1"; -- todo FIXEME
 
     -- Register FEx0 is the Interrupt Status Register (Read Only)
@@ -651,9 +703,9 @@ begin
             -- RGB Data
             if (h_count1 >= h_active or (mode_text = '0' and v_count >= v_active_gph) or (mode_text = '1' and v_count >= v_active_txt) or char_row >= 8) then
                 -- blanking and border are always black
-                red   <= (others => '0');
-                green <= (others => '0');
-                blue  <= (others => '0');
+                red_int   <= (others => '0');
+                green_int <= (others => '0');
+                blue_int  <= (others => '0');
                 contention <= '0';
             else
                 -- Indicate possible memory contention on active scan lines
@@ -692,69 +744,69 @@ begin
                 -- Implement Color Palette
                 case (pixel) is
                 when "0000" =>
-                    red   <= (others => palette(1)(0));
-                    green <= (others => palette(1)(4));
-                    blue  <= (others => palette(0)(4));
+                    red_int   <= (others => palette(1)(0));
+                    green_int <= (others => palette(1)(4));
+                    blue_int  <= (others => palette(0)(4));
                 when "0001" =>
-                    red   <= (others => palette(7)(0));
-                    green <= (others => palette(7)(4));
-                    blue  <= (others => palette(6)(4));
+                    red_int   <= (others => palette(7)(0));
+                    green_int <= (others => palette(7)(4));
+                    blue_int  <= (others => palette(6)(4));
                 when "0010" =>
-                    red   <= (others => palette(1)(1));
-                    green <= (others => palette(1)(5));
-                    blue  <= (others => palette(0)(5));
+                    red_int   <= (others => palette(1)(1));
+                    green_int <= (others => palette(1)(5));
+                    blue_int  <= (others => palette(0)(5));
                 when "0011" =>
-                    red   <= (others => palette(7)(1));
-                    green <= (others => palette(7)(5));
-                    blue  <= (others => palette(6)(5));
+                    red_int   <= (others => palette(7)(1));
+                    green_int <= (others => palette(7)(5));
+                    blue_int  <= (others => palette(6)(5));
                 when "0100" =>
-                    red   <= (others => palette(3)(0));
-                    green <= (others => palette(3)(4));
-                    blue  <= (others => palette(2)(4));
+                    red_int   <= (others => palette(3)(0));
+                    green_int <= (others => palette(3)(4));
+                    blue_int  <= (others => palette(2)(4));
                 when "0101" =>
-                    red   <= (others => palette(5)(0));
-                    green <= (others => palette(5)(4));
-                    blue  <= (others => palette(4)(4));
+                    red_int   <= (others => palette(5)(0));
+                    green_int <= (others => palette(5)(4));
+                    blue_int  <= (others => palette(4)(4));
                 when "0110" =>
-                    red   <= (others => palette(3)(1));
-                    green <= (others => palette(3)(5));
-                    blue  <= (others => palette(2)(5));
+                    red_int   <= (others => palette(3)(1));
+                    green_int <= (others => palette(3)(5));
+                    blue_int  <= (others => palette(2)(5));
                 when "0111" =>
-                    red   <= (others => palette(5)(1));
-                    green <= (others => palette(5)(5));
-                    blue  <= (others => palette(4)(5));
+                    red_int   <= (others => palette(5)(1));
+                    green_int <= (others => palette(5)(5));
+                    blue_int  <= (others => palette(4)(5));
                 when "1000" =>
-                    red   <= (others => palette(1)(2));
-                    green <= (others => palette(0)(2));
-                    blue  <= (others => palette(0)(6));
+                    red_int   <= (others => palette(1)(2));
+                    green_int <= (others => palette(0)(2));
+                    blue_int  <= (others => palette(0)(6));
                 when "1001" =>
-                    red   <= (others => palette(7)(2));
-                    green <= (others => palette(6)(2));
-                    blue  <= (others => palette(6)(6));
+                    red_int   <= (others => palette(7)(2));
+                    green_int <= (others => palette(6)(2));
+                    blue_int  <= (others => palette(6)(6));
                 when "1010" =>
-                    red   <= (others => palette(1)(3));
-                    green <= (others => palette(0)(3));
-                    blue  <= (others => palette(0)(7));
+                    red_int   <= (others => palette(1)(3));
+                    green_int <= (others => palette(0)(3));
+                    blue_int  <= (others => palette(0)(7));
                 when "1011" =>
-                    red   <= (others => palette(7)(3));
-                    green <= (others => palette(6)(3));
-                    blue  <= (others => palette(6)(7));
+                    red_int   <= (others => palette(7)(3));
+                    green_int <= (others => palette(6)(3));
+                    blue_int  <= (others => palette(6)(7));
                 when "1100" =>
-                    red   <= (others => palette(3)(2));
-                    green <= (others => palette(2)(2));
-                    blue  <= (others => palette(2)(6));
+                    red_int   <= (others => palette(3)(2));
+                    green_int <= (others => palette(2)(2));
+                    blue_int  <= (others => palette(2)(6));
                 when "1101" =>
-                    red   <= (others => palette(5)(2));
-                    green <= (others => palette(4)(2));
-                    blue  <= (others => palette(4)(6));
+                    red_int   <= (others => palette(5)(2));
+                    green_int <= (others => palette(4)(2));
+                    blue_int  <= (others => palette(4)(6));
                 when "1110" =>
-                    red   <= (others => palette(3)(3));
-                    green <= (others => palette(2)(3));
-                    blue  <= (others => palette(2)(7));
+                    red_int   <= (others => palette(3)(3));
+                    green_int <= (others => palette(2)(3));
+                    blue_int  <= (others => palette(2)(7));
                 when "1111" =>
-                    red   <= (others => palette(5)(3));
-                    green <= (others => palette(4)(3));
-                    blue  <= (others => palette(4)(7));
+                    red_int   <= (others => palette(5)(3));
+                    green_int <= (others => palette(4)(3));
+                    blue_int  <= (others => palette(4)(7));
                 when others =>
                 end case;
             end if;              
@@ -797,21 +849,166 @@ begin
         end if;        
     end process;
     
-    process (screen_base1, mode_base1, row_offset, col_offset)
+    process (screen_base1, mode_base1, row_offset, col_offset, mode7_enable)
         variable tmp: std_logic_vector(15 downto 0);
     begin
         tmp := ("0" & screen_base1 & "000000") + row_offset + col_offset;
         if (tmp(15) = '1') then
             tmp := tmp + (mode_base1 & "00000000");
         end if;
-        screen_addr <= tmp(14 downto 0);
+        if mode7_enable = '1' then
+            screen_addr <= "11111" & crtc_ma(9 downto 0);
+        else
+            screen_addr <= tmp(14 downto 0);
+        end if;
     end process;
     
-    vsync <= '1'                     when mode(1) = '0' else vsync_int;
-    hsync <= hsync_int and vsync_int when mode(1) = '0' else hsync_int;
+    red   <= (others => ttxt_r_out) when mode7_enable = '1' else
+             red_int;
+
+    green <= (others => ttxt_g_out) when mode7_enable = '1' else
+             green_int;
+
+    blue  <= (others => ttxt_b_out) when mode7_enable = '1' else
+             blue_int;
+    
+    vsync <= ttxt_vs_out when mode7_enable = '1' else
+             '1' when mode(1) = '0' else
+             vsync_int;
+
+    hsync <= ttxt_hs_out when mode7_enable = '1' else
+             hsync_int and vsync_int when mode(1) = '0' else
+             hsync_int;
+
     caps  <= caps_int;
     motor <= motor_int;
     
     casOut <= '0';
 
+--------------------------------------------------------
+-- Optional Jafa Mk1 Compatible Mode 7 Implementation
+--------------------------------------------------------
+    
+    JafaIncluded: if IncludeJafaMode7 generate
+        -- FC1C - Write address register
+        -- FC1D - Write data register
+        -- FC1E - Read status register - only bit 5 (vsync) is implemented
+        -- FC1F - Read data register
+
+        process (clk_16M00)
+        variable counter : std_logic_vector(3 downto 0);
+        begin
+            if rising_edge(clk_16M00) then
+                if counter = "1111" then
+                    crtc_clken <= '1';
+                else
+                    crtc_clken <= '0';
+                end if;
+                counter := counter + 1;
+                -- Generate a cursor signal that is delayed by 2 characters
+                if crtc_clken = '1' then
+                    crtc_cursor1 <= crtc_cursor;
+                    crtc_cursor2 <= crtc_cursor1;
+                end if;
+            end if;
+        end process;
+
+        process (clk_24M00)
+        begin
+            if rising_edge(clk_24M00) then
+                ttxt_clken <= not ttxt_clken;
+            end if;
+        end process;
+        
+        crtc_enable <= '1' when addr(15 downto 0) = x"fc1c" or
+                                addr(15 downto 0) = x"fc1d" or
+                                addr(15 downto 0) = x"fc1f"
+                           else '0';
+                           
+        status_enable <= '1' when addr(15 downto 0) = x"fc1e" else '0';
+
+        status_do <= "00" & crtc_vsync & "00000";
+        
+        crtc : entity work.mc6845 port map (
+            -- inputs
+            CLOCK  => clk_16M00,
+            CLKEN  => crtc_clken,
+            nRESET => RST_n,
+            ENABLE => crtc_enable,
+            R_nW   => R_W_n,
+            RS     => addr(0),
+            DI     => data_in,
+            LPSTB  => '0',
+            -- outputs
+            DO     => crtc_do,
+            VSYNC  => crtc_vsync,
+            HSYNC  => crtc_hsync,
+            DE     => crtc_de,
+            CURSOR => crtc_cursor,
+            MA     => crtc_ma,
+            RA     => crtc_ra
+        );
+
+        ttxt_glr <= not crtc_hsync;
+        ttxt_dew <= crtc_vsync;
+        ttxt_crs <= not crtc_ra(0);
+        ttxt_lose <= crtc_de;
+
+        teletext : entity work.saa5050 port map (
+            -- inputs
+            CLOCK    => clk_24M00,
+            CLKEN    => ttxt_clken,
+            nRESET   => RST_n,
+            DI_CLOCK => clk_16M00,
+            DI_CLKEN => '1',
+            DI       => screen_data(6 downto 0),
+            GLR      => ttxt_glr,
+            DEW      => ttxt_dew,
+            CRS      => ttxt_crs,
+            LOSE     => ttxt_lose,
+            -- outputs
+            R        => ttxt_r_int,
+            G        => ttxt_g_int,
+            B        => ttxt_b_int
+        );
+        
+        -- make the cursor visible
+        ttxt_r <= ttxt_r_int xor crtc_cursor2;
+        ttxt_g <= ttxt_g_int xor crtc_cursor2;
+        ttxt_b <= ttxt_b_int xor crtc_cursor2;
+        
+        -- Scan Doubler from the MIST project
+        inst_mist_scandoubler: entity work.mist_scandoubler port map (
+            clk       => clk_32M00,
+            clk_16    => clk_16M00,
+            clk_16_en => '1',
+            scanlines => '0',
+            hs_in     => not crtc_hsync,
+            vs_in     => not crtc_vsync,
+            r_in      => ttxt_r,
+            g_in      => ttxt_g,
+            b_in      => ttxt_b,
+            hs_out    => mist_hs,
+            vs_out    => mist_vs,
+            r_out     => mist_r,
+            g_out     => mist_g,
+            b_out     => mist_b,
+            is15k     => open
+            );
+        -- MUX to select sRGB/VGA based on vid_mode(1)
+        ttxt_r_out  <= mist_r(1) when mode(1) = '1' else ttxt_r;
+        ttxt_g_out  <= mist_g(1) when mode(1) = '1' else ttxt_g;
+        ttxt_b_out  <= mist_b(1) when mode(1) = '1' else ttxt_b;
+        ttxt_vs_out <= mist_vs   when mode(1) = '1' else '1';
+        ttxt_hs_out <= mist_hs   when mode(1) = '1' else  not (crtc_hsync or crtc_vsync);
+        -- enable mode 7
+        mode7_enable <= crtc_ma(13);
+    end generate;
+
+    JafaNotIncluded: if not IncludeJafaMode7 generate
+        -- disable mode 7
+        mode7_enable <= '0';
+    end generate;
+    
+    
 end behavioral;

@@ -59,6 +59,7 @@ end;
 architecture behavioral of ElectronFpga_duo is
 
     signal clock_16        : std_logic;
+    signal clock_24        : std_logic;
     signal clock_33        : std_logic;
     signal clock_40        : std_logic;
     signal hard_reset_n    : std_logic;     
@@ -128,10 +129,23 @@ begin
         CLK0_OUT1         => open,
         CLK2X_OUT         => open
     );
+
+    inst_dcm7 : entity work.dcm7 port map(
+        CLKIN_IN          => clk_32M00,
+        CLK0_OUT          => clock_24,
+        CLK0_OUT1         => open,
+        CLK2X_OUT         => open
+    );
     
     inst_ElectronFpga_core : entity work.ElectronFpga_core
+    generic map (
+        IncludeABRRegs   => true,
+        IncludeJafaMode7 => true
+    )
     port map (
         clk_16M00         => clock_16,
+        clk_24M00         => clock_24,
+        clk_32M00         => clk_32M00,
         clk_33M33         => clock_33,
         clk_40M00         => clock_40,
         hard_reset_n      => hard_reset_n,

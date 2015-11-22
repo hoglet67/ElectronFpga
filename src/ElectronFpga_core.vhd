@@ -20,11 +20,14 @@ use ieee.numeric_std.all;
 
 entity ElectronFpga_core is
     generic (
-        IncludeABRRegs : boolean := true
+        IncludeABRRegs   : boolean := false;
+        IncludeJafaMode7 : boolean := false
     );
     port (
         -- Clocks
         clk_16M00      : in  std_logic;
+        clk_24M00      : in  std_logic; -- for Jafa Mode7
+        clk_32M00      : in  std_logic; -- for Jafa Mode7
         clk_33M33      : in  std_logic;
         clk_40M00      : in  std_logic;
 
@@ -216,8 +219,14 @@ begin
     SDSS          <= '0';
 
 
-    ula : entity work.ElectronULA port map (
+    ula : entity work.ElectronULA
+    generic map (
+        IncludeJafaMode7 => IncludeJafaMode7
+    )
+    port map (
         clk_16M00 => clk_16M00,
+        clk_24M00 => clk_24M00,
+        clk_32M00 => clk_32M00,
         clk_33M33 => clk_33M33,
         clk_40M00 => clk_40M00,
 

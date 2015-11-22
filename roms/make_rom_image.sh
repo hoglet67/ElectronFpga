@@ -32,4 +32,4 @@ cat Basic2.rom                 >> $IMAGE
 cat pres_ap2_v1_23.rom         >> $IMAGE
 cat blank.rom                  >> $IMAGE
 cat blank.rom                  >> $IMAGE
-cat blank.rom                  >> $IMAGE
+cat M7_191.rom                 >> $IMAGE
