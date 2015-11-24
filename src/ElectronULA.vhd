@@ -351,299 +351,304 @@ begin
    
     process (clk_16M00, RST_n)
     begin
-        if (RST_n = '0') then
-           isr             <= (others => '0');
-           ier             <= (others => '0');
-           screen_base     <= (others => '0');
-           data_shift      <= (others => '0');
-           page_enable     <= '0';
-           page            <= (others => '0');
-           counter         <= (others => '0');
-           comms_mode      <= "01";
-           motor_int       <= '0';
-           caps_int        <= '0';
-           rtc_counter     <= (others => '0');
-           general_counter <= (others => '0');
-           sound_bit       <= '0';           
-           mode            <= mode_init;
-           mode_init_copy  <= mode_init;
-           ctrl_caps       <= '0';
-           cindat          <= '0';
-           cintone         <= '0';
            
-        elsif rising_edge(clk_16M00) then
-            -- Detect control+caps 1...4 and change video format
-            if (addr = x"9fff" and page_enable = '1' and page(2 downto 1) = "00") then
-                if (kbd(2 downto 1) = "11") then
-                    ctrl_caps <= '1';
-                else
-                    ctrl_caps <= '0';
-                end if;
-            end if;
-            -- Detect "1" being pressed
-            if (addr = x"afff" and page_enable = '1' and page(2 downto 1) = "00" and ctrl_caps = '1' and kbd(0) = '1') then
-                mode <= "00";
-            end if;
-            -- Detect "2" being pressed
-            if (addr = x"b7ff" and page_enable = '1' and page(2 downto 1) = "00" and ctrl_caps = '1' and kbd(0) = '1') then
-                mode <= "01";
-            end if;
-            -- Detect "3" being pressed
-            if (addr = x"bbff" and page_enable = '1' and page(2 downto 1) = "00" and ctrl_caps = '1' and kbd(0) = '1') then
-                mode <= "10";
-            end if;            
-            -- Detect "4" being pressed
-            if (addr = x"bdff" and page_enable = '1' and page(2 downto 1) = "00" and ctrl_caps = '1' and kbd(0) = '1') then
-                mode <= "11";
-            end if;
-            -- Detect Jumpers being changed
-            if (mode_init_copy /= mode_init) then
-                mode <= mode_init;
-                mode_init_copy <= mode_init;
-            end if;
-            -- Synchronize the display interrupt signal from the VGA clock domain
-            display_intr1 <= display_intr;
-            display_intr2 <= display_intr1;
-            -- Generate the display end interrupt on the rising edge (line 256 of the screen)
-            if (display_intr2 = '0' and display_intr1 = '1') then
-                isr(2) <= '1';
-            end if;
-            -- Synchronize the rtc interrupt signal from the VGA clock domain
-            rtc_intr1 <= rtc_intr;
-            rtc_intr2 <= rtc_intr1;
-            if (mode = "11") then
-                -- For 60Hz frame rates we must synthesise a the 50Hz real time clock interrupt
-                -- In theory the counter limit should be 319999, but there are additional
-                -- rtc ticks if not rtc interrupt is received between two display interrupts
-                -- hence the correction factor of 6/5. This comes from the probability
-                -- of the there not being a 50Hz rtc interrupts between any two successive
-                -- 60Hz display interrupts.
-                if (rtc_counter = 383999) then
-                    rtc_counter <= (others => '0');
-                    isr(3) <= '1';
-                else
-                    rtc_counter <= rtc_counter + 1;
-                end if;
+        if rising_edge(clk_16M00) then
+        
+            if (RST_n = '0') then
+            
+               isr             <= (others => '0');
+               ier             <= (others => '0');
+               screen_base     <= (others => '0');
+               data_shift      <= (others => '0');
+               page_enable     <= '0';
+               page            <= (others => '0');
+               counter         <= (others => '0');
+               comms_mode      <= "01";
+               motor_int       <= '0';
+               caps_int        <= '0';
+               rtc_counter     <= (others => '0');
+               general_counter <= (others => '0');
+               sound_bit       <= '0';           
+               mode            <= mode_init;
+               mode_init_copy  <= mode_init;
+               ctrl_caps       <= '0';
+               cindat          <= '0';
+               cintone         <= '0';
+               
             else
-                -- Generate the rtc interrupt on the rising edge (line 100 of the screen)
-                if (rtc_intr2 = '0' and rtc_intr1 = '1') then
-                    isr(3) <= '1';
-                end if;            
-            end if;
-            if (comms_mode = "00") then
-                if (casIn2 = '0') then
-                    general_counter <= (others => '0');
-                else
-                    general_counter <= general_counter + 1;
+                -- Detect control+caps 1...4 and change video format
+                if (addr = x"9fff" and page_enable = '1' and page(2 downto 1) = "00") then
+                    if (kbd(2 downto 1) = "11") then
+                        ctrl_caps <= '1';
+                    else
+                        ctrl_caps <= '0';
+                    end if;
                 end if;
-            elsif (comms_mode = "01") then
-                -- Sound Frequency = 1MHz / [16 * (S + 1)]
-                if (general_counter = 0) then
-                    general_counter <= counter & "00000000";
-                    sound_bit <= not sound_bit;
-                else
-                    general_counter <= general_counter - 1;
+                -- Detect "1" being pressed
+                if (addr = x"afff" and page_enable = '1' and page(2 downto 1) = "00" and ctrl_caps = '1' and kbd(0) = '1') then
+                    mode <= "00";
+                end if;
+                -- Detect "2" being pressed
+                if (addr = x"b7ff" and page_enable = '1' and page(2 downto 1) = "00" and ctrl_caps = '1' and kbd(0) = '1') then
+                    mode <= "01";
+                end if;
+                -- Detect "3" being pressed
+                if (addr = x"bbff" and page_enable = '1' and page(2 downto 1) = "00" and ctrl_caps = '1' and kbd(0) = '1') then
+                    mode <= "10";
                 end if;            
-            end if;
-            
-            
-            -- Tape Interface Receive
-            casIn1 <= casIn;
-            casIn2 <= casIn1;
-            casIn3 <= casIn2;
-            if (comms_mode = "00" and motor_int = '1') then
-                -- Only take actions on the falling edge of casIn
-                -- On the falling edge, general_counter will contain length of
-                -- the previous high pulse in 16MHz cycles.
-                -- A 1200Hz pulse is 6666 cycles
-                -- A 2400Hz pulse is 3333 cycles
-                -- A threshold in between would be 5000 cycles.
-                -- Ignore pulses shorter then say 500 cycles as these are
-                -- probably just noise.
+                -- Detect "4" being pressed
+                if (addr = x"bdff" and page_enable = '1' and page(2 downto 1) = "00" and ctrl_caps = '1' and kbd(0) = '1') then
+                    mode <= "11";
+                end if;
+                -- Detect Jumpers being changed
+                if (mode_init_copy /= mode_init) then
+                    mode <= mode_init;
+                    mode_init_copy <= mode_init;
+                end if;
+                -- Synchronize the display interrupt signal from the VGA clock domain
+                display_intr1 <= display_intr;
+                display_intr2 <= display_intr1;
+                -- Generate the display end interrupt on the rising edge (line 256 of the screen)
+                if (display_intr2 = '0' and display_intr1 = '1') then
+                    isr(2) <= '1';
+                end if;
+                -- Synchronize the rtc interrupt signal from the VGA clock domain
+                rtc_intr1 <= rtc_intr;
+                rtc_intr2 <= rtc_intr1;
+                if (mode = "11") then
+                    -- For 60Hz frame rates we must synthesise a the 50Hz real time clock interrupt
+                    -- In theory the counter limit should be 319999, but there are additional
+                    -- rtc ticks if not rtc interrupt is received between two display interrupts
+                    -- hence the correction factor of 6/5. This comes from the probability
+                    -- of the there not being a 50Hz rtc interrupts between any two successive
+                    -- 60Hz display interrupts.
+                    if (rtc_counter = 383999) then
+                        rtc_counter <= (others => '0');
+                        isr(3) <= '1';
+                    else
+                        rtc_counter <= rtc_counter + 1;
+                    end if;
+                else
+                    -- Generate the rtc interrupt on the rising edge (line 100 of the screen)
+                    if (rtc_intr2 = '0' and rtc_intr1 = '1') then
+                        isr(3) <= '1';
+                    end if;            
+                end if;
+                if (comms_mode = "00") then
+                    if (casIn2 = '0') then
+                        general_counter <= (others => '0');
+                    else
+                        general_counter <= general_counter + 1;
+                    end if;
+                elsif (comms_mode = "01") then
+                    -- Sound Frequency = 1MHz / [16 * (S + 1)]
+                    if (general_counter = 0) then
+                        general_counter <= counter & "00000000";
+                        sound_bit <= not sound_bit;
+                    else
+                        general_counter <= general_counter - 1;
+                    end if;            
+                end if;
+                
+                
+                -- Tape Interface Receive
+                casIn1 <= casIn;
+                casIn2 <= casIn1;
+                casIn3 <= casIn2;
+                if (comms_mode = "00" and motor_int = '1') then
+                    -- Only take actions on the falling edge of casIn
+                    -- On the falling edge, general_counter will contain length of
+                    -- the previous high pulse in 16MHz cycles.
+                    -- A 1200Hz pulse is 6666 cycles
+                    -- A 2400Hz pulse is 3333 cycles
+                    -- A threshold in between would be 5000 cycles.
+                    -- Ignore pulses shorter then say 500 cycles as these are
+                    -- probably just noise.
 
-                if (casIn3 = '1' and casIn2 = '0' and general_counter > 500) then
-                    -- a Pulse of length > 500 cycles has been detected
+                    if (casIn3 = '1' and casIn2 = '0' and general_counter > 500) then
+                        -- a Pulse of length > 500 cycles has been detected
 
-                    if (cindat = '0' and cintone = '0' and general_counter <= 5000) then
-                        -- High Tone detected
-                        cindat  <= '0';
-                        cintone <= '1';
-                        databits <= (others => '0');
-                        -- Generate the high tone detect interrupt
-                        isr(6) <= '1';
-
-                    elsif (cindat = '0' and cintone = '1' and general_counter > 5000) then
-                        -- Start bit detected
-                        cindat  <= '1';
-                        cintone <= '0';
-                        databits <= (others => '0');
-                        
-                    elsif (cindat = '1' and ignore_next = '1') then
-                        -- Ignoring the second pulse in a bit at 2400Hz
-                        ignore_next <= '0';
-
-                    elsif (cindat = '1' and databits < 9) then
-
-                        if (databits < 8) then
-                            if (general_counter > 5000) then
-                                -- shift in a zero
-                                data_shift <= '0' & data_shift(7 downto 1);
-                            else
-                                -- shift in a one
-                                data_shift <= '1' & data_shift(7 downto 1);
-                            end if;
-                            -- Generate the receive data int as soon as the
-                            -- last bit has been shifted in.
-                            if (databits = 7) then
-                                isr(4) <= '1';
-                            end if;
-                        end if;
-                        -- Ignore the second pulse in a bit at 2400Hz
-                        if (general_counter > 5000) then
-                            ignore_next <= '0';
-                        else
-                            ignore_next <= '1';
-                        end if;
-                        -- Move on to the next data bit
-                        databits <= databits + 1;
-                    elsif (cindat = '1' and databits = 9) then                         
-                        if (general_counter > 5000) then
-                            -- Found next start bit...
-                            cindat  <= '1';
-                            cintone <= '0';
-                            databits <= (others => '0');
-                        else
-                            -- Back in tone again
+                        if (cindat = '0' and cintone = '0' and general_counter <= 5000) then
+                            -- High Tone detected
                             cindat  <= '0';
                             cintone <= '1';
                             databits <= (others => '0');
                             -- Generate the high tone detect interrupt
                             isr(6) <= '1';
-                       end if;                           
-                   end if;
-                end if;
-            else
-                cindat      <= '0';
-                cintone     <= '0';
-                databits    <= (others => '0');
-                ignore_next <= '0';
-            end if;
-            
-            -- ULA Writes
-            if (cpu_clken = '1') then
-                if (addr(15 downto 8) = x"FE") then
-                    if (R_W_n = '1') then
-                        -- Clear the power on reset flag on the first read of the ISR (FEx0)
-                        if (addr(3 downto 0) = x"0") then
-                            power_on_reset <= '0';
-                        end if;
-                        -- Clear the RDFull interrupts on reading the data_shift register
-                        if (addr(3 downto 0) = x"4") then
-                            isr(4) <= '0';
-                        end if;                    
-                    else
-                        case addr(3 downto 0) is
-                        when x"0" =>
-                            ier(6 downto 2) <= data_in(6 downto 2);
-                        when x"1" =>
-                        when x"2" =>
-                            screen_base(8 downto 6) <= data_in(7 downto 5);
-                        when x"3" =>
-                            screen_base(14 downto 9) <= data_in(5 downto 0);
-                        when x"4" =>
-                            data_shift <= data_in;
-                            -- Clear the TDEmpty interrupt on writing the
-                            -- data_shift register
-                            isr(5) <= '0';
-                        when x"5" =>
-                            if (data_in(6) = '1') then
-                                -- Clear High Tone Detect IRQ
-                                isr(6) <= '0';
-                            end if;
-                            if (data_in(5) = '1') then
-                                -- Clear Real Time Clock IRQ
-                                isr(3) <= '0';
-                            end if;
-                            if (data_in(4) = '1') then
-                                -- Clear Display End IRQ
-                                isr(2) <= '0';
-                            end if;
-                            if (page_enable = '1' and page(2) = '0') then
-                                -- Roms 8-11 currently selected, so only selecting 8-15 will be honoured
-                                if (data_in(3) = '1') then
-                                    page_enable <= data_in(3);
-                                    page <= data_in(2 downto 0);
+
+                        elsif (cindat = '0' and cintone = '1' and general_counter > 5000) then
+                            -- Start bit detected
+                            cindat  <= '1';
+                            cintone <= '0';
+                            databits <= (others => '0');
+                            
+                        elsif (cindat = '1' and ignore_next = '1') then
+                            -- Ignoring the second pulse in a bit at 2400Hz
+                            ignore_next <= '0';
+
+                        elsif (cindat = '1' and databits < 9) then
+
+                            if (databits < 8) then
+                                if (general_counter > 5000) then
+                                    -- shift in a zero
+                                    data_shift <= '0' & data_shift(7 downto 1);
+                                else
+                                    -- shift in a one
+                                    data_shift <= '1' & data_shift(7 downto 1);
                                 end if;
-                            else
-                                -- Roms 0-7 or 12-15 currently selected, so anything goes
-                                page_enable <= data_in(3);
-                                page <= data_in(2 downto 0);                            
+                                -- Generate the receive data int as soon as the
+                                -- last bit has been shifted in.
+                                if (databits = 7) then
+                                    isr(4) <= '1';
+                                end if;
                             end if;
-                        when x"6" =>
-                            counter <= data_in;
-                        when x"7" =>
-                            caps_int     <= data_in(7);
-                            motor_int    <= data_in(6);
-                            case (data_in(5 downto 3)) is
-                            when "000" =>
-                                mode_base    <= x"30";
-                                mode_bpp     <= "00";
-                                mode_40      <= '0';
-                                mode_text    <= '0';
-                                mode_rowstep <= std_logic_vector(to_unsigned(633, 10)); -- 640 - 7
-                            when "001" =>
-                                mode_base    <= x"30";
-                                mode_bpp     <= "01";
-                                mode_40      <= '0';
-                                mode_text    <= '0';
-                                mode_rowstep <= std_logic_vector(to_unsigned(633, 10)); -- 640 - 7
-                            when "010" =>
-                                mode_base    <= x"30";
-                                mode_bpp     <= "10";
-                                mode_40      <= '0';
-                                mode_text    <= '0';
-                                mode_rowstep <= std_logic_vector(to_unsigned(633, 10)); -- 640 - 7
-                            when "011" =>
-                                mode_base    <= x"40";
-                                mode_bpp     <= "00";
-                                mode_40      <= '0';
-                                mode_text    <= '1';
-                                mode_rowstep <= std_logic_vector(to_unsigned(631, 10)); -- 640 - 9
-                            when "100" =>
-                                mode_base    <= x"58";
-                                mode_bpp     <= "00";
-                                mode_40      <= '1';
-                                mode_text    <= '0';
-                                mode_rowstep <= std_logic_vector(to_unsigned(313, 10)); -- 320 - 7
-                            when "101" =>
-                                mode_base    <= x"60";
-                                mode_bpp     <= "01";
-                                mode_40      <= '1';
-                                mode_text    <= '0';
-                                mode_rowstep <= std_logic_vector(to_unsigned(313, 10)); -- 320 - 7
-                            when "110" =>
-                                mode_base    <= x"60";
-                                mode_bpp     <= "00";
-                                mode_40      <= '1';
-                                mode_text    <= '1';
-                                mode_rowstep <= std_logic_vector(to_unsigned(311, 10)); -- 320 - 9
-                            when "111" =>
-                                -- mode 7 seems to default to mode 4
-                                mode_base    <= x"58";
-                                mode_bpp     <= "00";
-                                mode_40      <= '1';
-                                mode_text    <= '0';
-                                mode_rowstep <= std_logic_vector(to_unsigned(313, 10)); -- 320 - 7
-                            when others =>
-                            end case;                            
-                            comms_mode   <= data_in(2 downto 1);
-                        when others =>
-                            -- A '1' in the palatte data means disable the colour
-                            -- Invert the stored palette, to make the palette logic simpler
-                            palette(slv2int(addr(2 downto 0))) <= data_in xor "11111111";
-                        end case;
+                            -- Ignore the second pulse in a bit at 2400Hz
+                            if (general_counter > 5000) then
+                                ignore_next <= '0';
+                            else
+                                ignore_next <= '1';
+                            end if;
+                            -- Move on to the next data bit
+                            databits <= databits + 1;
+                        elsif (cindat = '1' and databits = 9) then                         
+                            if (general_counter > 5000) then
+                                -- Found next start bit...
+                                cindat  <= '1';
+                                cintone <= '0';
+                                databits <= (others => '0');
+                            else
+                                -- Back in tone again
+                                cindat  <= '0';
+                                cintone <= '1';
+                                databits <= (others => '0');
+                                -- Generate the high tone detect interrupt
+                                isr(6) <= '1';
+                           end if;                           
+                       end if;
                     end if;
-                end if;          
+                else
+                    cindat      <= '0';
+                    cintone     <= '0';
+                    databits    <= (others => '0');
+                    ignore_next <= '0';
+                end if;
+                
+                -- ULA Writes
+                if (cpu_clken = '1') then
+                    if (addr(15 downto 8) = x"FE") then
+                        if (R_W_n = '1') then
+                            -- Clear the power on reset flag on the first read of the ISR (FEx0)
+                            if (addr(3 downto 0) = x"0") then
+                                power_on_reset <= '0';
+                            end if;
+                            -- Clear the RDFull interrupts on reading the data_shift register
+                            if (addr(3 downto 0) = x"4") then
+                                isr(4) <= '0';
+                            end if;                    
+                        else
+                            case addr(3 downto 0) is
+                            when x"0" =>
+                                ier(6 downto 2) <= data_in(6 downto 2);
+                            when x"1" =>
+                            when x"2" =>
+                                screen_base(8 downto 6) <= data_in(7 downto 5);
+                            when x"3" =>
+                                screen_base(14 downto 9) <= data_in(5 downto 0);
+                            when x"4" =>
+                                data_shift <= data_in;
+                                -- Clear the TDEmpty interrupt on writing the
+                                -- data_shift register
+                                isr(5) <= '0';
+                            when x"5" =>
+                                if (data_in(6) = '1') then
+                                    -- Clear High Tone Detect IRQ
+                                    isr(6) <= '0';
+                                end if;
+                                if (data_in(5) = '1') then
+                                    -- Clear Real Time Clock IRQ
+                                    isr(3) <= '0';
+                                end if;
+                                if (data_in(4) = '1') then
+                                    -- Clear Display End IRQ
+                                    isr(2) <= '0';
+                                end if;
+                                if (page_enable = '1' and page(2) = '0') then
+                                    -- Roms 8-11 currently selected, so only selecting 8-15 will be honoured
+                                    if (data_in(3) = '1') then
+                                        page_enable <= data_in(3);
+                                        page <= data_in(2 downto 0);
+                                    end if;
+                                else
+                                    -- Roms 0-7 or 12-15 currently selected, so anything goes
+                                    page_enable <= data_in(3);
+                                    page <= data_in(2 downto 0);                            
+                                end if;
+                            when x"6" =>
+                                counter <= data_in;
+                            when x"7" =>
+                                caps_int     <= data_in(7);
+                                motor_int    <= data_in(6);
+                                case (data_in(5 downto 3)) is
+                                when "000" =>
+                                    mode_base    <= x"30";
+                                    mode_bpp     <= "00";
+                                    mode_40      <= '0';
+                                    mode_text    <= '0';
+                                    mode_rowstep <= std_logic_vector(to_unsigned(633, 10)); -- 640 - 7
+                                when "001" =>
+                                    mode_base    <= x"30";
+                                    mode_bpp     <= "01";
+                                    mode_40      <= '0';
+                                    mode_text    <= '0';
+                                    mode_rowstep <= std_logic_vector(to_unsigned(633, 10)); -- 640 - 7
+                                when "010" =>
+                                    mode_base    <= x"30";
+                                    mode_bpp     <= "10";
+                                    mode_40      <= '0';
+                                    mode_text    <= '0';
+                                    mode_rowstep <= std_logic_vector(to_unsigned(633, 10)); -- 640 - 7
+                                when "011" =>
+                                    mode_base    <= x"40";
+                                    mode_bpp     <= "00";
+                                    mode_40      <= '0';
+                                    mode_text    <= '1';
+                                    mode_rowstep <= std_logic_vector(to_unsigned(631, 10)); -- 640 - 9
+                                when "100" =>
+                                    mode_base    <= x"58";
+                                    mode_bpp     <= "00";
+                                    mode_40      <= '1';
+                                    mode_text    <= '0';
+                                    mode_rowstep <= std_logic_vector(to_unsigned(313, 10)); -- 320 - 7
+                                when "101" =>
+                                    mode_base    <= x"60";
+                                    mode_bpp     <= "01";
+                                    mode_40      <= '1';
+                                    mode_text    <= '0';
+                                    mode_rowstep <= std_logic_vector(to_unsigned(313, 10)); -- 320 - 7
+                                when "110" =>
+                                    mode_base    <= x"60";
+                                    mode_bpp     <= "00";
+                                    mode_40      <= '1';
+                                    mode_text    <= '1';
+                                    mode_rowstep <= std_logic_vector(to_unsigned(311, 10)); -- 320 - 9
+                                when "111" =>
+                                    -- mode 7 seems to default to mode 4
+                                    mode_base    <= x"58";
+                                    mode_bpp     <= "00";
+                                    mode_40      <= '1';
+                                    mode_text    <= '0';
+                                    mode_rowstep <= std_logic_vector(to_unsigned(313, 10)); -- 320 - 7
+                                when others =>
+                                end case;                            
+                                comms_mode   <= data_in(2 downto 1);
+                            when others =>
+                                -- A '1' in the palatte data means disable the colour
+                                -- Invert the stored palette, to make the palette logic simpler
+                                palette(slv2int(addr(2 downto 0))) <= data_in xor "11111111";
+                            end case;
+                        end if;
+                    end if;          
+                end if;
             end if;
         end if;
     end process;
