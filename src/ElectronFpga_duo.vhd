@@ -19,6 +19,9 @@ use ieee.std_logic_1164.all;
 use ieee.std_logic_unsigned.all;
 use ieee.numeric_std.all;
 
+library UNISIM;
+use UNISIM.Vcomponents.all;
+
 entity ElectronFpga_duo is
     port (
         clk_32M00      : in    std_logic;
@@ -60,8 +63,11 @@ end;
 
 architecture behavioral of ElectronFpga_duo is
 
+    signal clk_32M00_out   : std_logic;
+
     signal clock_16        : std_logic;
     signal clock_24        : std_logic;
+    signal clock_32        : std_logic;
     signal clock_33        : std_logic;
     signal clock_40        : std_logic;
     signal hard_reset_n    : std_logic;     
@@ -111,32 +117,26 @@ signal bs_state, bs_state_next : BS_STATE_TYPE := INIT;
 
 begin
 
-    inst_dcm4 : entity work.dcm4 port map(
-        CLKIN_IN          => clk_32M00,
-        CLK0_OUT          => clock_40,
-        CLK0_OUT1         => open,
-        CLK2X_OUT         => open
-    );
+	inst_pll1: entity work.pll1 port map(
+        -- 32 MHz input clock
+		clk_32M00 => clk_32M00,
+        -- 32 MHz passthrough clock (for chaining DCMs off)
+        clk_32M00_out => clk_32M00_out,
+        -- the main system clock, and also the video clock in sRGB mode
+		clock_16  => clock_16,
+        -- used as a 24.00MHz for the SAA5050 in Mode 7
+		clock_24  => clock_24,
+        -- used as a output clock MIST scan doubler for the SAA5050 in Mode 7
+		clock_32  => clock_32,
+        -- used as a video clock when the ULA is in 60Hz VGA Mode
+		clock_40  => clock_40
+	);
 
-    inst_dcm5 : entity work.dcm5 port map(
-        CLKIN_IN          => clk_32M00,
-        CLK0_OUT          => clock_16,
-        CLK0_OUT1         => open,
-        CLK2X_OUT         => open
-    );
 
-    inst_dcm6 : entity work.dcm6 port map(
-        CLKIN_IN          => clk_32M00,
-        CLK0_OUT          => clock_33,
-        CLK0_OUT1         => open,
-        CLK2X_OUT         => open
-    );
-
-    inst_dcm7 : entity work.dcm7 port map(
-        CLKIN_IN          => clk_32M00,
-        CLK0_OUT          => clock_24,
-        CLK0_OUT1         => open,
-        CLK2X_OUT         => open
+    inst_dcm1 : entity work.dcm1 port map(
+        CLKIN_IN          => clk_32M00_out,
+        -- used as a video clock when the ULA is in 50Hz VGA Mode
+        CLKFX_OUT         => clock_33
     );
     
     electron_core : entity work.ElectronFpga_core
@@ -148,7 +148,7 @@ begin
     port map (
         clk_16M00         => clock_16,
         clk_24M00         => clock_24,
-        clk_32M00         => clk_32M00,
+        clk_32M00         => clock_32,
         clk_33M33         => clock_33,
         clk_40M00         => clock_40,
         hard_reset_n      => hard_reset_n,
@@ -186,9 +186,9 @@ begin
 --------------------------------------------------------
 
     -- Generate a reliable power up reset, as ERST on the Papilio doesn't do this
-    reset_gen : process(clk_32M00)
+    reset_gen : process(clock_32)
     begin
-        if rising_edge(clk_32M00) then
+        if rising_edge(clock_32) then
             if (reset_counter(reset_counter'high) = '0') then
                 reset_counter <= reset_counter + 1;
             end if;
@@ -223,12 +223,12 @@ begin
     RAM_Dout            <= SRAM_D; -- anyone can read SRAM_D without contention but his provides some logical separation
 
     -- bootstrap state machine
-    state_bootstrap : process(clk_32M00, powerup_reset_n, bs_state_next)
+    state_bootstrap : process(clock_32, powerup_reset_n, bs_state_next)
         begin
             bs_state <= bs_state_next;                            -- advance bootstrap state machine
             if powerup_reset_n = '0' then                         -- external reset pin
                 bs_state_next <= INIT;                            -- move state machine to INIT state
-            elsif rising_edge(clk_32M00) then
+            elsif rising_edge(clock_32) then
                 case bs_state is
                     when INIT =>
                         bootstrap_busy <= '1';                    -- indicate bootstrap in progress (holds user in reset)
@@ -315,7 +315,7 @@ begin
         flash_data => flash_data,
         flash_init => flash_init,
         flash_Done => flash_Done,
-        flash_clk  => clk_32M00
+        flash_clk  => clock_32
     );
 
     
