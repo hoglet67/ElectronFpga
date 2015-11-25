@@ -23,7 +23,6 @@ TIMESPEC TS_clk_period4 = PERIOD "clk_period_grp4" 25.00ns HIGH;
 NET "clock_24" TNM_NET = FFS "clk_domain_24_ffs";
 NET "clock_32" TNM_NET = FFS "clk_domain_32_ffs";
 NET "clock_16" TNM_NET = FFS "clk_domain_16_ffs";
-NET "clock_16" TNM_NET = RAMS "clk_domain_16_ram";
 NET "electron_core/ula/clk_video_BUFG" TNM_NET = FFS "clk_domain_vid_ffs";
 NET "electron_core/ula/clk_video_BUFG" TNM_NET = RAMS "clk_domain_vid_ram";
 
@@ -32,10 +31,8 @@ TIMESPEC "TS_CrossDomain2" = FROM "clk_domain_32_ffs" TO "clk_domain_16_ffs" TIG
 TIMESPEC "TS_CrossDomain3" = FROM "clk_domain_16_ffs" TO "clk_domain_24_ffs" TIG;
 TIMESPEC "TS_CrossDomain4" = FROM "clk_domain_16_ffs" TO "clk_domain_vid_ffs" TIG;
 TIMESPEC "TS_CrossDomain5" = FROM "clk_domain_16_ffs" TO "clk_domain_vid_ram" TIG;
-TIMESPEC "TS_CrossDomain6" = FROM "clk_domain_16_ram" TO "clk_domain_vid_ffs" TIG;
-TIMESPEC "TS_CrossDomain7" = FROM "clk_domain_vid_ffs" TO "clk_domain_16_ffs" TIG;
-TIMESPEC "TS_CrossDomain8" = FROM "clk_domain_vid_ram" TO "clk_domain_16_ffs" TIG;
-TIMESPEC "TS_CrossDomain9" = FROM "clk_domain_vid_ffs" TO "clk_domain_16_ram" TIG;
+TIMESPEC "TS_CrossDomain6" = FROM "clk_domain_vid_ffs" TO "clk_domain_16_ffs" TIG;
+TIMESPEC "TS_CrossDomain7" = FROM "clk_domain_vid_ram" TO "clk_domain_16_ffs" TIG;
 
 ## Allow clocks to drive logic
 PIN "inst_pll1/clkout1_buf.O" CLOCK_DEDICATED_ROUTE = FALSE;     # 16MHz

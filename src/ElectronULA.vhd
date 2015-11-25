@@ -225,6 +225,17 @@ architecture behavioral of ElectronULA is
 
   signal mode7_enable   :   std_logic;
 
+  -- internal signals to generate the video clock
+  signal clk_16M00_a    :   std_logic;
+  signal clk_16M00_b    :   std_logic;
+  signal clk_16M00_c    :   std_logic;
+  signal clk_33M33_a    :   std_logic;
+  signal clk_33M33_b    :   std_logic;
+  signal clk_33M33_c    :   std_logic;
+  signal clk_40M00_a    :   std_logic;
+  signal clk_40M00_b    :   std_logic;
+  signal clk_40M00_c    :   std_logic;
+  
 -- Helper function to cast an std_logic value to an integer
 function sl2int (x: std_logic) return integer is
 begin
@@ -248,11 +259,67 @@ begin
     -- mode 01 - RGB/s @ 50Hz interlaced
     -- mode 10 - SVGA  @ 50Hz
     -- mode 11 - SVGA  @ 60Hz
-    
-    clk_video    <= clk_40M00 when mode = "11" else
-                    clk_33M33 when mode = "10" else
-                    clk_16M00;
 
+    -- A simple clock mux causes lots of warnings from the Xilinx tool
+    --  clk_video    <= clk_40M00 when mode = "11" else
+    --                  clk_33M33 when mode = "10" else
+    --                  clk_16M00;
+    -- Instead, we regenerate the clock using edge triggered flip flops
+
+    process(clk_16M00)
+    begin
+        if rising_edge(clk_16M00) then
+            clk_16M00_a <= not clk_16M00_a;
+        end if;
+    end process;
+
+    process(clk_16M00)
+    begin
+        if falling_edge(clk_16M00) then
+            clk_16M00_b <= not clk_16M00_b;
+        end if;
+    end process;
+
+    clk_16M00_c <= clk_16M00_a xor clk_16M00_b;
+
+    process(clk_33M33)
+    begin
+        if rising_edge(clk_33M33) then
+            clk_33M33_a <= not clk_33M33_a;
+        end if;
+    end process;
+
+    process(clk_33M33)
+    begin
+        if falling_edge(clk_33M33) then
+            clk_33M33_b <= not clk_33M33_b;
+        end if;
+    end process;
+
+    clk_33M33_c <= clk_33M33_a xor clk_33M33_b;
+
+    process(clk_40M00)
+    begin
+        if rising_edge(clk_40M00) then
+            clk_40M00_a <= not clk_40M00_a;
+        end if;
+    end process;
+
+    process(clk_40M00)
+    begin
+        if falling_edge(clk_40M00) then
+            clk_40M00_b <= not clk_40M00_b;
+        end if;
+    end process;
+
+    clk_40M00_c <= clk_40M00_a xor clk_40M00_b;
+        
+            
+    clk_video    <= clk_40M00_c when mode = "11" else
+                    clk_33M33_c when mode = "10" else
+                    clk_16M00_c;
+    
+    
     hsync_start  <= std_logic_vector(to_unsigned(759, 11)) when mode = "11" else
                     std_logic_vector(to_unsigned(759, 11)) when mode = "10" else
                     std_logic_vector(to_unsigned(762, 11));    
