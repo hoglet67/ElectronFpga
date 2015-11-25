@@ -226,7 +226,7 @@ begin
             DI              => cpu_din,
             DO              => cpu_dout
         );
-        avr_TxD <= '1';
+        avr_TxD <= avr_RxD;
     end generate;
 
 
