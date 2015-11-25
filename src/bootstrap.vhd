@@ -29,7 +29,6 @@ entity bootstrap is
     );
     port (
         clock           : in    std_logic;
-        clock_en        : in    std_logic;
 
         -- initiate bootstrap
         powerup_reset_n : in    std_logic;
@@ -62,6 +61,9 @@ end;
 
 architecture behavioral of bootstrap is
 
+-- an internal clock enable, avoiding gated clocks
+signal clock_en         : std_logic := '0';
+
 --
 -- bootstrap signals
 --
@@ -84,7 +86,7 @@ type    BS_STATE_TYPE is (
             WAIT0, WAIT1, WAIT2, WAIT3, WAIT4, WAIT5, WAIT6, WAIT7, WAIT8, WAIT9, WAIT10, WAIT11
         );
 
-signal bs_state, bs_state_next : BS_STATE_TYPE := INIT;
+signal bs_state : BS_STATE_TYPE := INIT;
 
 begin
 
@@ -101,100 +103,110 @@ begin
 
     RAM_Dout            <= SRAM_D; -- anyone can read SRAM_D without contention but his provides some logical separation
 
+    -- flash clock enable toggles on alternate cycles
+    process(clock)
+    begin
+        if rising_edge(clock) then        
+            clock_en <= not clock_en;
+        end if;
+    end process;
+    
     -- bootstrap state machine
-    state_bootstrap : process(clock, powerup_reset_n, bs_state_next)
+    state_bootstrap : process(clock, powerup_reset_n)
         begin
-            bs_state <= bs_state_next;                            -- advance bootstrap state machine
             if powerup_reset_n = '0' then                         -- external reset pin
-                bs_state_next <= INIT;                            -- move state machine to INIT state
+                bs_state <= INIT;                                 -- move state machine to INIT state
             elsif rising_edge(clock) then
-                case bs_state is
-                    when INIT =>
-                        bs_busy <= '1';                    -- indicate bootstrap in progress (holds user in reset)
-                        flash_init <= '0';                        -- signal FLASH to begin init
-                        bs_A   <= (others => '1');                -- SRAM address all ones (becomes zero on first increment)
-                        bs_nCS <= '0';                            -- SRAM always selected during bootstrap
-                        bs_nOE <= '1';                            -- SRAM output disabled during bootstrap
-                        bs_nWE <= '1';                            -- SRAM write enable inactive default state
-                        bs_state_next <= START_READ_FLASH;
-                    when START_READ_FLASH =>
-                        flash_init <= '1';                        -- allow FLASH to exit init state
-                        if flash_Done = '0' then                  -- wait for FLASH init to begin
-                            bs_state_next <= READ_FLASH;
-                        end if;
-                    when READ_FLASH =>
-                        if flash_Done = '1' then                  -- wait for FLASH init to complete
-                            bs_state_next <= WAIT0;
-                        end if;
-                    when WAIT0 =>                                 -- wait for the first FLASH byte to be available
-                        bs_state_next <= WAIT1;
-                    when WAIT1 =>
-                        bs_state_next <= WAIT2;
-                    when WAIT2 =>
-                        bs_state_next <= WAIT3;
-                    when WAIT3 =>
-                        bs_state_next <= WAIT4;
-                    when WAIT4 =>
-                        bs_state_next <= WAIT5;
-                    when WAIT5 =>
-                        bs_state_next <= WAIT6;
-                    when WAIT6 =>
-                        bs_state_next <= WAIT7;
-                    when WAIT7 =>
-                        bs_state_next <= WAIT8;
-                    when WAIT8 =>
-                        bs_state_next <= FLASH0;
-                    when WAIT9 =>
-                        bs_state_next <= WAIT10;
-                    when WAIT10 =>
-                        bs_state_next <= WAIT11;
-                    when WAIT11 =>
-                        bs_state_next <= FLASH0;
-                    -- every 8 clock cycles (32M/8 = 2Mhz) we have a new byte from FLASH
-                    -- use this ample time to write it to SRAM, we just have to toggle nWE
-                    when FLASH0 =>
-                        bs_A <= bs_A + 1;                         -- increment SRAM address
-                        bs_state_next <= FLASH1;                  -- idle
-                    when FLASH1 =>
-                        bs_Din( 7 downto 0) <= flash_data;       -- place byte on SRAM data bus
-                        bs_state_next <= FLASH2;                  -- idle
-                    when FLASH2 =>
-                        bs_nWE <= '0';                            -- SRAM write enable
-                        bs_state_next <= FLASH3;
-                    when FLASH3 =>
-                        bs_state_next <= FLASH4;                  -- idle
-                    when FLASH4 =>
-                        bs_state_next <= FLASH5;                  -- idle
-                    when FLASH5 =>
-                        bs_state_next <= FLASH6;                  -- idle
-                    when FLASH6 =>
-                        bs_nWE <= '1';                            -- SRAM write disable
-                        bs_state_next <= FLASH7;
-                    when FLASH7 =>
-                        if "000" & bs_A = user_length then        -- when we've reached end address
-                            bs_busy <= '0';                -- indicate bootsrap is done
-                            flash_init <= '0';                    -- place FLASH in init state
-                            bs_state_next <= FLASH7;              -- remain in this state until reset
-                        else
-                            bs_state_next <= FLASH0;              -- else loop back
-                        end if;
-                    when others =>                                -- catch all, never reached
-                        bs_state_next <= INIT;
-                end case;
+                if clock_en = '1' then
+                    case bs_state is
+                        when INIT =>
+                            bs_busy <= '1';                       -- indicate bootstrap in progress (holds user in reset)
+                            flash_init <= '0';                    -- signal FLASH to begin init
+                            bs_A   <= (others => '1');            -- SRAM address all ones (becomes zero on first increment)
+                            bs_nCS <= '0';                        -- SRAM always selected during bootstrap
+                            bs_nOE <= '1';                        -- SRAM output disabled during bootstrap
+                            bs_nWE <= '1';                        -- SRAM write enable inactive default state
+                            bs_state <= START_READ_FLASH;
+                        when START_READ_FLASH =>
+                            flash_init <= '1';                    -- allow FLASH to exit init state
+                            if flash_Done = '0' then              -- wait for FLASH init to begin
+                                bs_state <= READ_FLASH;
+                            end if;
+                        when READ_FLASH =>
+                            if flash_Done = '1' then              -- wait for FLASH init to complete
+                                bs_state <= WAIT0;
+                            end if;
+                        when WAIT0 =>                             -- wait for the first FLASH byte to be available
+                            bs_state <= WAIT1;
+                        when WAIT1 =>
+                            bs_state <= WAIT2;
+                        when WAIT2 =>
+                            bs_state <= WAIT3;
+                        when WAIT3 =>
+                            bs_state <= WAIT4;
+                        when WAIT4 =>
+                            bs_state <= WAIT5;
+                        when WAIT5 =>
+                            bs_state <= WAIT6;
+                        when WAIT6 =>
+                            bs_state <= WAIT7;
+                        when WAIT7 =>
+                            bs_state <= WAIT8;
+                        when WAIT8 =>
+                            bs_state <= FLASH0;
+                        when WAIT9 =>
+                            bs_state <= WAIT10;
+                        when WAIT10 =>
+                            bs_state <= WAIT11;
+                        when WAIT11 =>
+                            bs_state <= FLASH0;
+                        -- every 8 clock cycles (32M/8 = 2Mhz) we have a new byte from FLASH
+                        -- use this ample time to write it to SRAM, we just have to toggle nWE
+                        when FLASH0 =>
+                            bs_A <= bs_A + 1;                     -- increment SRAM address
+                            bs_state <= FLASH1;                   -- idle
+                        when FLASH1 =>
+                            bs_Din( 7 downto 0) <= flash_data;    -- place byte on SRAM data bus
+                            bs_state <= FLASH2;                   -- idle
+                        when FLASH2 =>
+                            bs_nWE <= '0';                        -- SRAM write enable
+                            bs_state <= FLASH3;
+                        when FLASH3 =>
+                            bs_state <= FLASH4;                   -- idle
+                        when FLASH4 =>
+                            bs_state <= FLASH5;                   -- idle
+                        when FLASH5 =>
+                            bs_state <= FLASH6;                   -- idle
+                        when FLASH6 =>
+                            bs_nWE <= '1';                        -- SRAM write disable
+                            bs_state <= FLASH7;
+                        when FLASH7 =>
+                            if "000" & bs_A = user_length then    -- when we've reached end address
+                                bs_busy <= '0';                   -- indicate bootsrap is done
+                                flash_init <= '0';                -- place FLASH in init state
+                                bs_state <= FLASH7;               -- remain in this state until reset
+                            else
+                                bs_state <= FLASH0;               -- else loop back
+                            end if;
+                        when others =>                            -- catch all, never reached
+                            bs_state <= INIT;
+                    end case;
+                end if;
             end if;
         end process;
 
     -- FLASH chip SPI driver
     u_flash : entity work.spi_flash port map (
-        U_FLASH_CK => FLASH_CK,
-        U_FLASH_CS => FLASH_CS,
-        U_FLASH_SI => FLASH_SI,
-        U_FLASH_SO => FLASH_SO,
-        flash_addr => user_address,
-        flash_data => flash_data,
-        flash_init => flash_init,
-        flash_Done => flash_Done,
-        flash_clk  => clock
+        flash_clk   => clock,
+        flash_clken => clock_en,
+        flash_init  => flash_init,
+        flash_addr  => user_address,
+        flash_data  => flash_data,
+        flash_Done  => flash_Done,
+        U_FLASH_CK  => FLASH_CK,
+        U_FLASH_CS  => FLASH_CS,
+        U_FLASH_SI  => FLASH_SI,
+        U_FLASH_SO  => FLASH_SO
     );
 
 end behavioral;

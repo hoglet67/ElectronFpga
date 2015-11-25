@@ -196,7 +196,6 @@ begin
     )
     port map(
         clock           => clock_32,
-        clock_en        => '1',
         powerup_reset_n => powerup_reset_n,
         bootstrap_busy  => bootstrap_busy,
         RAM_nOE         => RAM_nOE,
