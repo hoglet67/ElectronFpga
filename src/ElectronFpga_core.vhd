@@ -94,7 +94,7 @@ architecture behavioral of ElectronFpga_core is
 
     signal RSTn              : std_logic;
     signal cpu_R_W_n         : std_logic;
-    signal cpu_addr          : std_logic_vector (15 downto 0);
+    signal cpu_addr          : std_logic_vector (23 downto 0);
     signal cpu_din           : std_logic_vector (7 downto 0);
     signal cpu_dout          : std_logic_vector (7 downto 0);
     signal cpu_IRQ_n         : std_logic;
@@ -221,8 +221,7 @@ begin
             NMI_n           => cpu_NMI_n,
             R_W_n           => cpu_R_W_n,
             Sync            => open,
-            A(23 downto 16) => open,
-            A(15 downto 0)  => cpu_addr(15 downto 0),
+            A               => cpu_addr,
             DI              => cpu_din,
             DO              => cpu_dout
         );
@@ -258,6 +257,9 @@ begin
         I_P2_H     => via1_clken,
         ENA_4      => via4_clken,
         CLK        => clk_16M00);
+        
+    -- loop back data port
+    mc6522_portb_in <= mc6522_portb_out;
 
     -- SDCLK is driven from either PB1 or CB1 depending on the SR Mode
     sdclk_int     <= mc6522_portb_out(1) when mc6522_portb_oe_l(1) = '0' else
@@ -290,7 +292,7 @@ begin
 
         -- CPU Interface
         cpu_clken => cpu_clken,
-        addr      => cpu_addr,
+        addr      => cpu_addr(15 downto 0),
         data_in   => cpu_dout,
         data_out  => ula_data,
         R_W_n     => cpu_R_W_n,

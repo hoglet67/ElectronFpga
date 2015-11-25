@@ -190,7 +190,9 @@ architecture behavioral of ElectronULA is
   signal crtc_clken     :   std_logic;
   signal crtc_do        :   std_logic_vector(7 downto 0);
   signal crtc_vsync     :   std_logic;
+  signal crtc_vsync_n   :   std_logic;
   signal crtc_hsync     :   std_logic;
+  signal crtc_hsync_n   :   std_logic;
   signal crtc_de        :   std_logic;
   signal crtc_cursor    :   std_logic;
   signal crtc_cursor1   :   std_logic;
@@ -921,7 +923,7 @@ begin
         end if;        
     end process;
     
-    process (screen_base1, mode_base1, row_offset, col_offset, mode7_enable)
+    process (screen_base1, mode_base1, row_offset, col_offset, crtc_ma, mode7_enable)
         variable tmp: std_logic_vector(15 downto 0);
     begin
         tmp := ("0" & screen_base1 & "000000") + row_offset + col_offset;
@@ -1021,7 +1023,10 @@ begin
             RA     => crtc_ra
         );
 
-        ttxt_glr <= not crtc_hsync;
+        crtc_hsync_n <= not crtc_hsync;
+        crtc_vsync_n <= not crtc_vsync;
+        
+        ttxt_glr <= crtc_hsync_n;
         ttxt_dew <= crtc_vsync;
         ttxt_crs <= not crtc_ra(0);
         ttxt_lose <= crtc_de;
@@ -1055,8 +1060,8 @@ begin
             clk_16    => clk_16M00,
             clk_16_en => '1',
             scanlines => '0',
-            hs_in     => not crtc_hsync,
-            vs_in     => not crtc_vsync,
+            hs_in     => crtc_hsync_n,
+            vs_in     => crtc_vsync_n,
             r_in      => ttxt_r,
             g_in      => ttxt_g,
             b_in      => ttxt_b,
@@ -1072,7 +1077,7 @@ begin
         ttxt_g_out  <= mist_g(1) when mode(1) = '1' else ttxt_g;
         ttxt_b_out  <= mist_b(1) when mode(1) = '1' else ttxt_b;
         ttxt_vs_out <= mist_vs   when mode(1) = '1' else '1';
-        ttxt_hs_out <= mist_hs   when mode(1) = '1' else  not (crtc_hsync or crtc_vsync);
+        ttxt_hs_out <= mist_hs   when mode(1) = '1' else crtc_hsync_n and crtc_vsync_n;
         -- enable mode 7
         mode7_enable <= crtc_ma(13);
     end generate;
