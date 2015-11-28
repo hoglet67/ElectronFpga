@@ -3,9 +3,6 @@ use ieee.std_logic_1164.all;
 use ieee.std_logic_unsigned.all;
 use ieee.numeric_std.all;
 
-library UNISIM;
-use UNISIM.Vcomponents.all;
-
 entity RomBasic2 is
     port (
         clk  : in  std_logic;
