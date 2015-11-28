@@ -356,30 +356,53 @@ begin
                mc6522_data    when mc6522_enable = '1' else
                ula_data;
 
-    -- The OS rom image lives in slot 8 as on the Elk this is where the
-    -- keyboard appears, which keeps the external memory image down to 256KB.
+    -- Pipeline external memory interface
+    process(clk_16M00,hard_reset_n)
+    begin
 
-    ext_A <= "0" & "1000"    & cpu_addr(13 downto 0) when cpu_addr(15 downto 14) = "11" else
-             "0" & rom_latch & cpu_addr(13 downto 0);
+        if hard_reset_n = '0' then
+            ext_A   <= (others => '0');
+            ext_Din <= (others => '0');
+            ext_nWE <= '1';
+            ext_nOE <= '1';
+        elsif rising_edge(clk_16M00) then
+            -- The OS rom image lives in slot 8 as on the Elk this is where the
+            -- keyboard appears, which keeps the external memory image down to 256KB.
+            if cpu_addr(15 downto 14) = "11" then
+                ext_A <= "0" & "1000"    & cpu_addr(13 downto 0);
+            else
+                ext_A <= "0" & rom_latch & cpu_addr(13 downto 0);
+            end if;
 
-    ext_Din <= cpu_dout;
+            ext_Din <= cpu_dout;
 
-    -- WE lags the cpu by one cycle to give the RAM some setup and hold time
-    ext_nWE <=
-        -- Default is disable WE, except in a few cases
-        '1' when cpu_R_W_n = '1' or ext_enable = '0' or cpu_clken_r = '0' or cpu_addr(15 downto 14) /= "10" else
-        -- Slots 0,2 are write protected with FCDC/FCDD
-        '0' when rom_latch(3 downto 2) = "00" and rom_latch(0) = '0' and abr_lo_bank_lock = '0' else
-        -- Slots 1,3 are write protected with FCDE/FCDF
-        '0' when rom_latch(3 downto 2) = "00" and rom_latch(0) = '1' and abr_hi_bank_lock = '0' else
-        -- Slots 4 (MMFS) has B600 onwards as writeable for private workspace
-        '0' when rom_latch(3 downto 0) = "0100" and cpu_addr(13 downto 8) >= "110110" else
-        -- Other slots are read only
-        '1';
+            if cpu_R_W_n = '1' or ext_enable = '0' or cpu_clken_r = '0' or cpu_addr(15 downto 14) /= "10" then
+                -- Default is disable WE, except in a few cases
+                ext_nWE <= '1';
+            elsif rom_latch(3 downto 2) = "00" and rom_latch(0) = '0' and abr_lo_bank_lock = '0' then
+                -- Slots 0,2 are write protected with FCDC/FCDD
+                ext_nWE <= '0';
+            elsif rom_latch(3 downto 2) = "00" and rom_latch(0) = '1' and abr_hi_bank_lock = '0' then
+                -- Slots 1,3 are write protected with FCDE/FCDF
+                ext_nWE <= '0';
+            elsif rom_latch(3 downto 0) = "0100" and cpu_addr(13 downto 8) >= "110110" then
+                -- Slots 4 (MMFS) has B600 onwards as writeable for private workspace
+                ext_nWE <= '0';
+            else
+                -- Other slots are read only
+                ext_nWE <= '1';
+            end if;
 
-    -- Could make this more restrictinb
-    ext_nOE <= '0' when cpu_R_W_n = '1' and ext_enable = '1'; 
+            -- Could make this more restrictinb
+            if cpu_R_W_n = '1' and ext_enable = '1' then
+                ext_nOE <= '0';
+            else
+                ext_nOE <= '1';
+            end if;
 
+        end if;
+    end process;
+    
     -- Always enabled
     ext_nCS <= '0';
 

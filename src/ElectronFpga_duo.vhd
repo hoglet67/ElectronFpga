@@ -63,8 +63,6 @@ end;
 
 architecture behavioral of ElectronFpga_duo is
 
-    signal clk_32M00_out   : std_logic;
-
     signal clock_16        : std_logic;
     signal clock_24        : std_logic;
     signal clock_32        : std_logic;
@@ -88,7 +86,7 @@ architecture behavioral of ElectronFpga_duo is
     -- this is safely beyond the end of the bitstream
     constant user_address  : std_logic_vector(23 downto 0) := x"060000";
 
-    -- lenth of user data in FLASH
+    -- lenth of user data in FLASH = 256KB (16x 16K ROM) images
     constant user_length   : std_logic_vector(23 downto 0) := x"040000";
 
     -- high when FLASH is being copied to SRAM, can be used by user as active high reset
@@ -98,22 +96,20 @@ begin
 
     inst_pll1: entity work.pll1 port map(
         -- 32 MHz input clock
-        clk_32M00 => clk_32M00,
-        -- 32 MHz passthrough clock (for chaining DCMs off)
-        clk_32M00_out => clk_32M00_out,
+        CLKIN_IN => clk_32M00,
         -- the main system clock, and also the video clock in sRGB mode
-        clock_16  => clock_16,
+        CLK0_OUT => clock_16,
         -- used as a 24.00MHz for the SAA5050 in Mode 7
-        clock_24  => clock_24,
+        CLK1_OUT  => clock_24,
         -- used as a output clock MIST scan doubler for the SAA5050 in Mode 7
-        clock_32  => clock_32,
+        CLK2_OUT  => clock_32,
         -- used as a video clock when the ULA is in 60Hz VGA Mode
-        clock_40  => clock_40
+        CLK3_OUT  => clock_40
     );
 
 
     inst_dcm1 : entity work.dcm1 port map(
-        CLKIN_IN          => clk_32M00_out,
+        CLKIN_IN          => clk_32M00,
         -- used as a video clock when the ULA is in 50Hz VGA Mode
         CLKFX_OUT         => clock_33
     );
@@ -191,11 +187,11 @@ begin
 
     inst_bootstrap: entity work.bootstrap
     generic map (
-        user_address   => x"060000",
-        user_length    => x"040000"
+        user_address   => user_address,
+        user_length    => user_length
     )
     port map(
-        clock           => clock_32,
+        clock           => clock_16,
         powerup_reset_n => powerup_reset_n,
         bootstrap_busy  => bootstrap_busy,
         RAM_nOE         => RAM_nOE,
