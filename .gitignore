@@ -1,10 +1,17 @@
 xilinx/iseconfig/
 xilinx/working/
+
+
+altera/db/
+altera/incremental_db/
+altera/output_files/
+
 nohup.out
 *~
 #*
 not_in_git/
 roms/tmp/
+*.bak
 
 src/xilinx/CpuMon_bd.bmm
 

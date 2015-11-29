@@ -153,7 +153,8 @@ begin
         vid_mode          => DIP,
         test              => test,
         avr_RxD           => avr_RxD,
-        avr_TxD           => avr_TxD
+        avr_TxD           => avr_TxD,
+        cpu_addr          => open
     );
 
 --------------------------------------------------------

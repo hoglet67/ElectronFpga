@@ -24,6 +24,7 @@ use ieee.numeric_std.all;
 
 entity ElectronULA is
     generic (
+        Include32KRAM    : boolean := true;
         IncludeJafaMode7 : boolean := false
     );
     port (
@@ -364,29 +365,49 @@ begin
     v_rtc        <= std_logic_vector(to_unsigned(201, 10)) when mode = "11" else
                     std_logic_vector(to_unsigned(201, 10)) when mode = "10" else
                     std_logic_vector(to_unsigned(100, 10));
-     
-    ram : entity work.RAM_32K_DualPort port map(
 
-      -- Port A is the 6502 port
-        clka  => clk_16M00,
-        wea   => ram_we,
-        addra => addr(14 downto 0),
-        dina  => data_in,
-        douta => ram_data,
 
-        -- Port B is the VGA Port
-        clkb  => clk_video,
-        web   => '0',
-        addrb => screen_addr,
-        dinb  => x"00",
-        doutb => screen_data
-    );
+    -- All of main memory (0x0000-0x7fff) is dual port RAM in the ULA
+    ram_32k_gen: if Include32KRAM generate
+        ram_32k : entity work.RAM_32K_DualPort port map(
+            -- Port A is the 6502 port
+            clka  => clk_16M00,
+            wea   => ram_we,
+            addra => addr(14 downto 0),
+            dina  => data_in,
+            douta => ram_data,
+            -- Port B is the VGA Port
+            clkb  => clk_video,
+            web   => '0',
+            addrb => screen_addr,
+            dinb  => x"00",
+            doutb => screen_data
+            );        
+        ram_we <= '1' when addr(15) = '0' and R_W_n = '0' else '0';
+    end generate;
+
+    -- Just screen memory (0x3000-0x7fff) is dual port RAM in the ULA
+    ram_20k_gen: if not Include32KRAM generate
+        -- xor'ing with 7000 maps 3000-7fff into range 0000-4fff
+        ram_20k : entity work.RAM_20K_DualPort port map(
+            -- Port A is the 6502 port
+            clka  => clk_16M00,
+            wea   => ram_we,
+            addra => addr(14 downto 0) xor "111000000000000",
+            dina  => data_in,
+            douta => ram_data,
+            -- Port B is the VGA Port
+            clkb  => clk_video,
+            web   => '0',
+            addrb => screen_addr xor "111000000000000",
+            dinb  => x"00",
+            doutb => screen_data
+            );    
+        ram_we <= '1' when (addr(15 downto 12) = "0011" or addr(15 downto 14) = "01") and R_W_n = '0' else '0';
+    end generate;
 
     sound <= sound_bit;
     
-    -- FIXME: This should probably be gate with a clock enable
-    ram_we <= '1' when addr(15) = '0' and R_W_n = '0' else '0';
-
     -- The external ROM is enabled:
     -- - When the address is C000-FBFF and FF00-FFFF (i.e. OS Rom)
     -- - When the address is 8000-BFFF and the ROM 10 or 11 is paged in (101x)

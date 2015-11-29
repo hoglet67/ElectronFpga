@@ -17,7 +17,7 @@ cat blank.rom                  >> $IMAGE
 cat blank.rom                  >> $IMAGE
 
 # Slots 4-7 (sideways RAM)
-cat mmfs_swram_v1_02.rom       >> $IMAGE
+cat mmfs_swram.rom             >> $IMAGE
 cat blank.rom                  >> $IMAGE
 cat blank.rom                  >> $IMAGE
 cat blank.rom                  >> $IMAGE

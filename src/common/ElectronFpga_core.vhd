@@ -85,8 +85,10 @@ entity ElectronFpga_core is
 
         -- ICE T65 Deubgger 57600 baud serial
         avr_RxD        : in    std_logic;
-        avr_TxD        : out   std_logic
-        
+        avr_TxD        : out   std_logic;
+
+        cpu_addr       : out   std_logic_vector(15 downto 0)
+
     );
 end;
 
@@ -94,7 +96,7 @@ architecture behavioral of ElectronFpga_core is
 
     signal RSTn              : std_logic;
     signal cpu_R_W_n         : std_logic;
-    signal cpu_addr          : std_logic_vector (23 downto 0);
+    signal cpu_a             : std_logic_vector (23 downto 0);
     signal cpu_din           : std_logic_vector (7 downto 0);
     signal cpu_dout          : std_logic_vector (7 downto 0);
     signal cpu_IRQ_n         : std_logic;
@@ -153,7 +155,7 @@ architecture behavioral of ElectronFpga_core is
     signal clk_state         : std_logic_vector(2 downto 0);
 
     signal ext_enable        : std_logic;
-    
+
     signal abr_enable        : std_logic;
     signal abr_lo_bank_lock  : std_logic;
     signal abr_hi_bank_lock  : std_logic;
@@ -177,7 +179,7 @@ begin
                 IRQ_n        => cpu_IRQ_n,
                 NMI_n        => cpu_NMI_n,
                 Sync         => open,
-                Addr         => cpu_addr(15 downto 0),
+                Addr         => cpu_a(15 downto 0),
                 R_W_n        => cpu_R_W_n,
                 Din          => cpu_din,
                 Dout         => cpu_dout,
@@ -221,7 +223,7 @@ begin
             NMI_n           => cpu_NMI_n,
             R_W_n           => cpu_R_W_n,
             Sync            => open,
-            A               => cpu_addr,
+            A               => cpu_a,
             DI              => cpu_din,
             DO              => cpu_dout
         );
@@ -230,7 +232,7 @@ begin
 
 
     via : entity work.M6522 port map(
-        I_RS       => cpu_addr(3 downto 0),
+        I_RS       => cpu_a(3 downto 0),
         I_DATA     => cpu_dout(7 downto 0),
         O_DATA     => mc6522_data(7 downto 0),
         I_RW_L     => cpu_R_W_n,
@@ -257,7 +259,7 @@ begin
         I_P2_H     => via1_clken,
         ENA_4      => via4_clken,
         CLK        => clk_16M00);
-        
+
     -- loop back data port
     mc6522_portb_in <= mc6522_portb_out;
 
@@ -271,16 +273,15 @@ begin
     -- SDMOSI is always driven from PB0
     SDMOSI        <= mc6522_portb_out(0) when mc6522_portb_oe_l(0) = '0' else
                      '1';
-
     -- SDMISO is always read from CB2
     mc6522_cb2_in <= SDMISO;
 
     -- SDSS is hardwired to 0 (always selected) as there is only one slave attached
     SDSS          <= '0';
 
-
     ula : entity work.ElectronULA
     generic map (
+        Include32KRAM    => false,
         IncludeJafaMode7 => IncludeJafaMode7
     )
     port map (
@@ -292,7 +293,7 @@ begin
 
         -- CPU Interface
         cpu_clken => cpu_clken,
-        addr      => cpu_addr(15 downto 0),
+        addr      => cpu_a(15 downto 0),
         data_in   => cpu_dout,
         data_out  => ula_data,
         R_W_n     => cpu_R_W_n,
@@ -337,12 +338,12 @@ begin
         ps2_clk    => ps2_clk,
         ps2_data   => ps2_data,
         col        => kbd_data,
-        row        => cpu_addr(13 downto 0),
+        row        => cpu_a(13 downto 0),
         break      => key_break,
         turbo      => key_turbo
     );
 
-    mc6522_enable  <= '1' when cpu_addr(15 downto 4) = x"fcb" else '0';
+    mc6522_enable  <= '1' when cpu_a(15 downto 4) = x"fcb" else '0';
     cpu_IRQ_n      <= mc6522_irq_n AND ula_irq_n;
     cpu_NMI_n      <= '1';
 
@@ -350,13 +351,22 @@ begin
     audio_l <= sound;
     audio_r <= sound;
 
-    ext_enable <= '1' when ROM_n = '0' or (cpu_addr(15 downto 14) = "10" and rom_latch(3 downto 1) /= "100") else '0';
-    
+    ext_enable <= '1' when
+                  -- ROM accrss
+                  ROM_n = '0' or
+                  -- Non screen main memory access (0000-2FFF)
+                  cpu_a(15 downto 13) = "000" or cpu_a(15 downto 12) = "0010" or
+                  -- Sideways RAM Access
+                  (cpu_a(15 downto 14) = "10" and rom_latch(3 downto 1) /= "100") else '0';
+
     cpu_din <= ext_Dout       when ext_enable = '1' else
                mc6522_data    when mc6522_enable = '1' else
                ula_data;
 
     -- Pipeline external memory interface
+     -- External addresses 00000-3FFFF are routed to FLASH 80000-DFFFFF
+     -- External addresses 40000-7FFFF are routed to SRAM
+     -- Note: the bottom 32K of CPU address space is mapped to SRAM, 20K of this is overlaid by the ULA
     process(clk_16M00,hard_reset_n)
     begin
 
@@ -366,26 +376,39 @@ begin
             ext_nWE <= '1';
             ext_nOE <= '1';
         elsif rising_edge(clk_16M00) then
-            -- The OS rom image lives in slot 8 as on the Elk this is where the
-            -- keyboard appears, which keeps the external memory image down to 256KB.
-            if cpu_addr(15 downto 14) = "11" then
-                ext_A <= "0" & "1000"    & cpu_addr(13 downto 0);
-            else
-                ext_A <= "0" & rom_latch & cpu_addr(13 downto 0);
+            if cpu_a(15) = '0' then
+                -- exteral main memory access
+                ext_A <= "1" & "000" & cpu_a(14 downto 0);
+            elsif cpu_a(15 downto 14) = "11" then
+                 -- The OS rom image lives in slot 8 as on the Elk this is where the
+                 -- keyboard appears, which keeps the external memory image down to 256KB.
+                ext_A <= "0" & "1000" & cpu_a(13 downto 0);
+            elsif cpu_a(15 downto 14) = "10" and rom_latch(3 downto 2) = "00" then
+                -- Slots 0..3 are mapped to SRAM
+                ext_A <= "1" & rom_latch & cpu_a(13 downto 0);
+            elsif cpu_a(15 downto 14) = "10" and rom_latch(3 downto 0) = "0100" and cpu_a(13 downto 8) >= "110110" then
+                -- Slots 4 (MMFS) has B600 onwards as writeable for private workspace so mapped to SRAM
+                ext_A <= "1" & rom_latch & cpu_a(13 downto 0);
+				else
+					 -- everyting else is ROM
+                ext_A <= "0" & rom_latch & cpu_a(13 downto 0);
             end if;
 
             ext_Din <= cpu_dout;
 
-            if cpu_R_W_n = '1' or ext_enable = '0' or cpu_clken_r = '0' or cpu_addr(15 downto 14) /= "10" then
+            if cpu_R_W_n = '1' or ext_enable = '0' or cpu_clken_r = '0' then
                 -- Default is disable WE, except in a few cases
                 ext_nWE <= '1';
-            elsif rom_latch(3 downto 2) = "00" and rom_latch(0) = '0' and abr_lo_bank_lock = '0' then
+            elsif cpu_a(15) = '0' then
+                -- exteral main memory access
+                ext_nWE <= '0';
+            elsif cpu_a(14) = '0' and rom_latch(3 downto 2) = "00" and rom_latch(0) = '0' and abr_lo_bank_lock = '0' then
                 -- Slots 0,2 are write protected with FCDC/FCDD
                 ext_nWE <= '0';
-            elsif rom_latch(3 downto 2) = "00" and rom_latch(0) = '1' and abr_hi_bank_lock = '0' then
+            elsif cpu_a(14) = '0' and rom_latch(3 downto 2) = "00" and rom_latch(0) = '1' and abr_hi_bank_lock = '0' then
                 -- Slots 1,3 are write protected with FCDE/FCDF
                 ext_nWE <= '0';
-            elsif rom_latch(3 downto 0) = "0100" and cpu_addr(13 downto 8) >= "110110" then
+            elsif cpu_a(14) = '0' and rom_latch(3 downto 0) = "0100" and cpu_a(13 downto 8) >= "110110" then
                 -- Slots 4 (MMFS) has B600 onwards as writeable for private workspace
                 ext_nWE <= '0';
             else
@@ -393,7 +416,7 @@ begin
                 ext_nWE <= '1';
             end if;
 
-            -- Could make this more restrictinb
+            -- Could make this more restrictive
             if cpu_R_W_n = '1' and ext_enable = '1' then
                 ext_nOE <= '0';
             else
@@ -402,7 +425,7 @@ begin
 
         end if;
     end process;
-    
+
     -- Always enabled
     ext_nCS <= '0';
 
@@ -411,7 +434,7 @@ begin
 --------------------------------------------------------
 
     ABRIncluded: if IncludeABRRegs generate
-        abr_enable <= '1' when cpu_addr(15 downto 2) & "00" = x"fcdc" else '0';    
+        abr_enable <= '1' when cpu_a(15 downto 2) & "00" = x"fcdc" else '0';
         process(clk_16M00, RSTn)
         begin
             if RSTn = '0' then
@@ -420,13 +443,13 @@ begin
             elsif rising_edge(clk_16M00) then
                 if cpu_clken = '1' then
                     if abr_enable = '1' and cpu_R_W_n = '0' then
-                        if cpu_addr(1) = '0' then
-                            abr_lo_bank_lock <= cpu_addr(0);
+                        if cpu_a(1) = '0' then
+                            abr_lo_bank_lock <= cpu_a(0);
                         else
-                            abr_hi_bank_lock <= cpu_addr(0);
+                            abr_hi_bank_lock <= cpu_a(0);
                         end if;
                     end if;
-                end if; 
+                end if;
             end if;
         end process;
     end generate;
@@ -443,7 +466,7 @@ begin
     -- ROM accesses always happen at 2Mhz
     rom_access <= not ROM_n;
     -- RAM accesses always happen at 1Mhz and subber contention
-    ram_access <= not cpu_addr(15);
+    ram_access <= not cpu_a(15);
     -- IO accesses always happen at 1MHz and don't suffer contention
 
     clk_gen1 : process(clk_16M00, RSTn)
@@ -560,7 +583,8 @@ begin
         end case;
     end process;
 
-    test <= cpu_clken & cpu_clken_1 & cpu_clken_2 & contention2 & cpu_addr(15) & CPU_IRQ_n & "00";
+    cpu_addr <= cpu_a(15 downto 0);
+
+    test <= cpu_clken & cpu_clken_1 & cpu_clken_2 & contention2 & cpu_a(15) & CPU_IRQ_n & "00";
+
 end behavioral;
-
-
