@@ -155,14 +155,13 @@ begin
 
     inst_dcm0 : entity work.DCM0 port map(
         CLKIN_IN          => clock49,
-        CLK0_OUT          => clock_avr,
-        CLK0_OUT1         => open,
-        CLK2X_OUT         => open
+        CLKFX_OUT         => clock_avr
     );
     
     mon : entity work.BusMonCore
       generic map (
-        num_comparators => 8
+        num_comparators => 8,
+        avr_prog_mem_size => 1024 * 9
       )
       port map (  
         clock_avr    => clock_avr,

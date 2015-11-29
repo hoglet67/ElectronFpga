@@ -24,9 +24,11 @@ use work.OhoPack.all ;
 
 entity BusMonCore is
     generic (
-        num_comparators : integer := 8;
-        reg_width       : integer := 46;
-        fifo_width      : integer := 72
+        num_comparators   : integer := 8;
+        reg_width         : integer := 46;
+        fifo_width        : integer := 72;
+        avr_data_mem_size : integer := 1024 * 2; -- 2K is the mimimum
+        avr_prog_mem_size : integer := 1024 * 8  -- Default is 8K, 6809 amd Z80 need 9K
     );
     port (
         clock_avr        : in    std_logic;
@@ -141,6 +143,7 @@ architecture behavioral of BusMonCore is
     signal fifo_din        : std_logic_vector(fifo_width - 1 downto 0);
     signal fifo_dout       : std_logic_vector(fifo_width - 1 downto 0);
     signal fifo_empty      : std_logic;
+    signal fifo_empty_n    : std_logic;
     signal fifo_rd         : std_logic;
     signal fifo_rd_en      : std_logic;
     signal fifo_wr         : std_logic;
@@ -178,9 +181,13 @@ begin
         dy_ser         => tcclk,
         dy_rclk        => tmosi
     );
-
     
-    Inst_AVR8: entity work.AVR8 port map(
+    Inst_AVR8: entity work.AVR8
+    generic map(
+        CDATAMEMSIZE         => avr_data_mem_size,
+        CPROGMEMSIZE         => avr_prog_mem_size
+    )
+    port map(
         clk16M               => clock_avr,
         nrst                 => nrst_avr,
 
@@ -228,7 +235,7 @@ begin
         portdin(4)           => '0',
         portdin(5)           => '0',
         portdin(6)           => sw1,
-        portdin(7)           => not fifo_empty,
+        portdin(7)           => fifo_empty_n,
         
         portdout(0)           => muxsel(0),
         portdout(1)           => muxsel(1),
@@ -250,6 +257,7 @@ begin
         rxd                  => avr_RxD,
         txd                  => avr_TxD
     );
+    fifo_empty_n <= not fifo_empty;
 
     WatchEvents_inst : entity work.WatchEvents port map(
         clk    => busmon_clk,
