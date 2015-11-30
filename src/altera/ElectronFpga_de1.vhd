@@ -152,6 +152,7 @@ signal clock_32         : std_logic;
 signal clock_33         : std_logic;
 signal clock_40         : std_logic;
 
+signal i2s_lrclk        : std_logic;
 signal audio_l          : std_logic;
 signal audio_r          : std_logic;
 signal hard_reset_n     : std_logic;
@@ -160,8 +161,16 @@ signal pll_reset        : std_logic;
 signal pll1_locked      : std_logic;
 signal pll2_locked      : std_logic;
 
+signal motor_led        : std_logic;
+signal caps_led         : std_logic;
+
 signal pcm_inl          : std_logic_vector(15 downto 0);
 signal pcm_inr          : std_logic_vector(15 downto 0);
+signal pcm_outl         : std_logic_vector(15 downto 0);
+signal pcm_outr         : std_logic_vector(15 downto 0);
+signal pcm_mono         : std_logic_vector(8 downto 0);
+signal pcm_sign         : std_logic;
+signal pcm_mag          : std_logic_vector(7 downto 0);
 
 signal ext_A            : std_logic_vector (18 downto 0);
 signal ext_Din          : std_logic_vector (7 downto 0);
@@ -175,9 +184,9 @@ signal is_error         : std_logic;
 
 signal cpu_addr         : std_logic_vector (15 downto 0);
 
--- currently not used
-signal casIn            : std_logic;
-signal casOut           : std_logic;
+signal cas_monitor      : std_logic;
+signal cas_in           : std_logic;
+signal cas_out           : std_logic; -- currently not used
 
 function hex_to_seven_seg(hex: std_logic_vector(3 downto 0))
         return std_logic_vector
@@ -211,30 +220,30 @@ begin
 --------------------------------------------------------
 
     pll1: entity work.pll1
-        port map (
-            areset         => pll_reset,
-            inclk0         => CLOCK_24_0,
-            c0             => clock_16,
-            c1             => clock_32,
-            c2             => clock_40,
-            locked         => pll1_locked
-        );
+    port map (
+        areset         => pll_reset,
+        inclk0         => CLOCK_24_0,
+        c0             => clock_16,
+        c1             => clock_32,
+        c2             => clock_40,
+        locked         => pll1_locked
+    );
 
     pll2: entity work.pll2
-        port map (
-            areset         => pll_reset,
-            inclk0         => CLOCK_50,
-            c0             => clock_33,
-            locked         => pll2_locked
-        );
-		  
-	  clock_24 <= CLOCK_24_0;
-        
+    port map (
+        areset         => pll_reset,
+        inclk0         => CLOCK_50,
+        c0             => clock_33,
+        locked         => pll2_locked
+    );
+
+    clock_24 <= CLOCK_24_0;
+
 --------------------------------------------------------
 -- Electron Core
 --------------------------------------------------------
 
-    
+
     electron_core : entity work.ElectronFpga_core
     generic map (
         IncludeICEDebugger => false,
@@ -267,10 +276,10 @@ begin
         SDSS              => SD_nCS,
         SDCLK             => SD_SCLK,
         SDMOSI            => SD_MOSI,
-        caps_led          => LEDR(0),
-        motor_led         => LEDR(1),
-        cassette_in       => casIn,
-        cassette_out      => casOut,
+        caps_led          => caps_led,
+        motor_led         => motor_led,
+        cassette_in       => cas_in,
+        cassette_out      => cas_out,
         vid_mode          => SW(8 downto 7),
         test              => open,
         avr_RxD           => UART_RXD,
@@ -292,38 +301,85 @@ begin
 -- Audio DACs
 --------------------------------------------------------
 
+    -- implement tape monitoring controlled by the motor and SW1
+	 cas_monitor <= motor_led and SW(0);
+	 
+    pcm_outl <= "0" & audio_l & "00000000000000" when cas_monitor <= '0' else pcm_inl;
+    pcm_outr <= "0" & audio_r & "00000000000000" when cas_monitor <= '0' else pcm_inr;
+                
     i2s : entity work.i2s_intf
-        port map (
-            CLK         => clock_32,
-            nRESET      => hard_reset_n,
-            PCM_INL     => pcm_inl,
-            PCM_INR     => pcm_inr,
-            PCM_OUTL    => "0" & audio_l & "00000000000000",
-            PCM_OUTR    => "0" & audio_r & "00000000000000",
-            I2S_MCLK    => AUD_XCK,
-            I2S_LRCLK   => AUD_DACLRCK,
-            I2S_BCLK    => AUD_BCLK,
-            I2S_DOUT    => AUD_DACDAT,
-            I2S_DIN     => AUD_ADCDAT
-            );
-
-    -- This is to avoid a possible conflict if the codec is in master mode
-    AUD_ADCLRCK <= 'Z';
+    port map (
+        CLK         => clock_32,
+        nRESET      => hard_reset_n,
+        PCM_INL     => pcm_inl,
+        PCM_INR     => pcm_inr,
+        PCM_OUTL    => pcm_outl,
+        PCM_OUTR    => pcm_outr,
+        I2S_MCLK    => AUD_XCK,
+        I2S_LRCLK   => i2s_lrclk,
+        I2S_BCLK    => AUD_BCLK,
+        I2S_DOUT    => AUD_DACDAT,
+        I2S_DIN     => AUD_ADCDAT
+    );
+    AUD_DACLRCK <= i2s_lrclk;
+    AUD_ADCLRCK <= i2s_lrclk;
 
     i2c : entity work.i2c_loader
-        generic map (
-            log2_divider => 7
-            )
-        port map (
-            CLK         => clock_32,
-            nRESET      => hard_reset_n,
-            I2C_SCL     => I2C_SCLK,
-            I2C_SDA     => I2C_SDAT,
-            IS_DONE     => is_done,
-            IS_ERROR    => is_error 
-            );
-		LEDR(4) <= is_error;
-		LEDR(5) <= not is_done;
+    generic map (
+        log2_divider => 7
+    )
+    port map (
+        CLK         => clock_32,
+        nRESET      => hard_reset_n,
+        I2C_SCL     => I2C_SCLK,
+        I2C_SDA     => I2C_SDAT,
+        IS_DONE     => is_done,
+        IS_ERROR    => is_error
+    );
+    
+--------------------------------------------------------
+-- Casette Input (from Line In)
+--------------------------------------------------------
+
+    -- generate an 9 bit mono audio signal
+    pcm_mono <= (pcm_INL(15) & pcm_INL(15 downto 8)) + (pcm_INR(15) & pcm_INR(15 downto 8));
+
+    -- convert to sign and 8-bit magnitude
+    pcm_sign <= pcm_mono(8);
+    pcm_mag  <= pcm_mono(7 downto 0) when pcm_mono(8) = '0' else (x"00" - pcm_mono(7 downto 0));
+
+    -- the casette input is driven from the sign of the mono signal
+    cas_in   <= pcm_sign;
+
+--------------------------------------------------------
+-- LEDs
+--------------------------------------------------------
+
+    -- Red LEDs
+    LEDR(0)          <= caps_led;
+    LEDR(1)          <= motor_led;
+    LEDR(3 downto 2) <= (others => '0');
+    LEDR(4)          <= is_error;
+    LEDR(5)          <= not is_done;
+    LEDR(9 downto 6) <= (others => '0');
+
+    -- Green LEDs used as a simple VU meter for the tape input level
+    -- driven from the magnitude of the mono line-in signal. Reversing
+    -- the bits gives a more natural left-to-right appearance.
+    LEDG(0) <= pcm_mag(7) when motor_led = '1' else '0';
+    LEDG(1) <= pcm_mag(6) when motor_led = '1' else '0';
+    LEDG(2) <= pcm_mag(5) when motor_led = '1' else '0';
+    LEDG(3) <= pcm_mag(4) when motor_led = '1' else '0';
+    LEDG(4) <= pcm_mag(3) when motor_led = '1' else '0';
+    LEDG(5) <= pcm_mag(2) when motor_led = '1' else '0';
+    LEDG(6) <= pcm_mag(1) when motor_led = '1' else '0';
+    LEDG(7) <= pcm_mag(0) when motor_led = '1' else '0';
+
+    -- HEX Displays (active low) show current processor address
+    HEX3 <= hex_to_seven_seg(cpu_addr(15 downto 12)) xor "1111111";
+    HEX2 <= hex_to_seven_seg(cpu_addr(11 downto  8)) xor "1111111";
+    HEX1 <= hex_to_seven_seg(cpu_addr( 7 downto  4)) xor "1111111";
+    HEX0 <= hex_to_seven_seg(cpu_addr( 3 downto  0)) xor "1111111";
 
 --------------------------------------------------------
 -- Map external memory bus to SRAM/FLASH
@@ -335,42 +391,33 @@ begin
     -- 0x080000-0x0BFFFF = Electron ROMs
     -- 0x0C0000-0x3FFFFF - Unused
 
-	 -- ext_a(18) selects between FLASH and SRAM
+    -- ext_a(18) selects between FLASH and SRAM
     -- 0x00000-0x3FFFF -> FLASH 0x080000-0x0BFFFF
     -- 0x40000-0x7FFFF -> SRAM
-	 -- we also want to map Rom 4 B600 - BFFF to RAM
-    ext_Dout <= SRAM_DQ(7 downto 0) when ext_a(18) = '1' else FL_DQ;
+    ext_Dout  <= SRAM_DQ(7 downto 0) when ext_a(18) = '1' else FL_DQ;
 
-    FL_RST_N <= hard_reset_n;
-    FL_CE_N <= '0';
-    FL_OE_N <= '0';
-    FL_WE_N <= '1';
+    -- FLASH control signals
+    FL_RST_N  <= hard_reset_n;
+    FL_CE_N   <= ext_nCS;
+    FL_OE_N   <= ext_nOE;
+    FL_WE_N   <= '1';
+
     -- Flash address change every at most every 16 cycles (2MHz)
-    FL_ADDR <= "001" & ext_a;
+    -- 001 maps to FLASH address 0x080000
+    FL_ADDR   <= "001" & ext_a;
 
-    -- SRAM bus
+    -- SRAM control signals
     SRAM_UB_N <= '1';
     SRAM_LB_N <= '0';
-    SRAM_CE_N <= '0';
+    SRAM_CE_N <= ext_nCS;
     SRAM_OE_N <= ext_nOE;
 
     -- Gate the WE with clock to provide more address/data hold time
     SRAM_WE_N <= ext_nWE or not clock_16;
-	 
+
     SRAM_ADDR <= ext_a(17 downto 0);
     SRAM_DQ(15 downto 8) <= (others => 'Z');
     SRAM_DQ(7 downto 0) <= ext_Din when ext_nWE = '0' else (others => 'Z');
-
-    -- HEX Displays (active low)
-    HEX3 <= hex_to_seven_seg(cpu_addr(15 downto 12)) xor "1111111";
-    HEX2 <= hex_to_seven_seg(cpu_addr(11 downto  8)) xor "1111111";
-    HEX1 <= hex_to_seven_seg(cpu_addr( 7 downto  4)) xor "1111111";
-    HEX0 <= hex_to_seven_seg(cpu_addr( 3 downto  0)) xor "1111111";
-
-    -- Unused LEDs (active high)
-    LEDG <= (others => '0');
-    LEDR(3 downto 2) <= (others => '0');
-    LEDR(9 downto 6) <= (others => '0');
 
     -- Unused outputs
     DRAM_ADDR <= (others => 'Z');
