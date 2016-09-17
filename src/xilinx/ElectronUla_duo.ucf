@@ -49,7 +49,11 @@ NET addr<4>     LOC="P58"  | IOSTANDARD=LVTTL;
 NET addr<3>     LOC="P56"  | IOSTANDARD=LVTTL;
 NET addr<2>     LOC="P51"  | IOSTANDARD=LVTTL;
 NET addr<1>     LOC="P48"  | IOSTANDARD=LVTTL;
-NET addr<0>     LOC="P39"  | IOSTANDARD=LVTTL;
+
+# Bit 0 of the input wing is connected to INIT_B
+# and using this causes configuraton problems
+# so instead we connect it so a spare 5V tolerant input
+NET addr<0>     LOC="P134"  | IOSTANDARD=LVTTL;
 
 NET data<7>     LOC="P75"  | IOSTANDARD=LVTTL | DRIVE=8 | SLEW=SLOW;
 NET data<6>     LOC="P67"  | IOSTANDARD=LVTTL | DRIVE=8 | SLEW=SLOW;
