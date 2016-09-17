@@ -87,6 +87,8 @@ architecture behavioral of ElectronULA is
   signal master_irq     : std_logic;
 
   signal power_on_reset : std_logic := '1';
+  signal delayed_clear_reset : std_logic := '0';
+
   signal rtc_counter    : std_logic_vector(18 downto 0);
   signal general_counter: std_logic_vector(15 downto 0);
   signal sound_bit      : std_logic;
@@ -625,11 +627,14 @@ begin
                 
                 -- ULA Writes
                 if (cpu_clken = '1') then
+                    if delayed_clear_reset = '1' then
+                        power_on_reset <= '0';
+                    end if;
                     if (addr(15 downto 8) = x"FE") then
                         if (R_W_n = '1') then
                             -- Clear the power on reset flag on the first read of the ISR (FEx0)
                             if (addr(3 downto 0) = x"0") then
-                                power_on_reset <= '0';
+                                delayed_clear_reset <= '1';
                             end if;
                             -- Clear the RDFull interrupts on reading the data_shift register
                             if (addr(3 downto 0) = x"4") then
