@@ -49,7 +49,7 @@ begin
                 tmp := tmp and keys(i);
             end if;
         end loop;
-        col <= tmp xor "1111";
+        col <= tmp;
     end process;
 
     process(clk, rst_n)

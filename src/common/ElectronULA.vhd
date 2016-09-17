@@ -383,7 +383,7 @@ begin
             dinb  => x"00",
             doutb => screen_data
             );        
-        ram_we <= '1' when addr(15) = '0' and R_W_n = '0' else '0';
+        ram_we <= '1' when addr(15) = '0' and R_W_n = '0' and cpu_clken = '1' else '0';
     end generate;
 
     -- Just screen memory (0x3000-0x7fff) is dual port RAM in the ULA
@@ -403,7 +403,7 @@ begin
             dinb  => x"00",
             doutb => screen_data
             );    
-        ram_we <= '1' when (addr(15 downto 12) = "0011" or addr(15 downto 14) = "01") and R_W_n = '0' else '0';
+        ram_we <= '1' when (addr(15 downto 12) = "0011" or addr(15 downto 14) = "01") and R_W_n = '0' and cpu_clken = '1' else '0';
     end generate;
 
     sound <= sound_bit;
@@ -416,12 +416,12 @@ begin
              '1';
       
     -- ULA Reads + RAM Reads + KBD Reads
-    data_out <= ram_data              when addr(15) = '0' else
-                "0000" & kbd          when addr(15 downto 14) = "10" and page_enable = '1' and page(2 downto 1) = "00" else
-                isr_data              when addr(15 downto 8) = x"FE" and addr(3 downto 0) = x"0" else
-                data_shift            when addr(15 downto 8) = x"FE" and addr(3 downto 0) = x"4" else
-                crtc_do               when crtc_enable = '1' and IncludeJafaMode7 else
-                status_do             when status_enable = '1' and IncludeJafaMode7 else
+    data_out <= ram_data                  when addr(15) = '0' else
+                "0000" & (kbd xor "1111") when addr(15 downto 14) = "10" and page_enable = '1' and page(2 downto 1) = "00" else
+                isr_data                  when addr(15 downto 8) = x"FE" and addr(3 downto 0) = x"0" else
+                data_shift                when addr(15 downto 8) = x"FE" and addr(3 downto 0) = x"4" else
+                crtc_do                   when crtc_enable = '1' and IncludeJafaMode7 else
+                status_do                 when status_enable = '1' and IncludeJafaMode7 else
                 x"F1"; -- todo FIXEME
 
     -- Register FEx0 is the Interrupt Status Register (Read Only)
@@ -468,26 +468,26 @@ begin
             else
                 -- Detect control+caps 1...4 and change video format
                 if (addr = x"9fff" and page_enable = '1' and page(2 downto 1) = "00") then
-                    if (kbd(2 downto 1) = "11") then
+                    if (kbd(2 downto 1) = "00") then
                         ctrl_caps <= '1';
                     else
                         ctrl_caps <= '0';
                     end if;
                 end if;
                 -- Detect "1" being pressed
-                if (addr = x"afff" and page_enable = '1' and page(2 downto 1) = "00" and ctrl_caps = '1' and kbd(0) = '1') then
+                if (addr = x"afff" and page_enable = '1' and page(2 downto 1) = "00" and ctrl_caps = '1' and kbd(0) = '0') then
                     mode <= "00";
                 end if;
                 -- Detect "2" being pressed
-                if (addr = x"b7ff" and page_enable = '1' and page(2 downto 1) = "00" and ctrl_caps = '1' and kbd(0) = '1') then
+                if (addr = x"b7ff" and page_enable = '1' and page(2 downto 1) = "00" and ctrl_caps = '1' and kbd(0) = '0') then
                     mode <= "01";
                 end if;
                 -- Detect "3" being pressed
-                if (addr = x"bbff" and page_enable = '1' and page(2 downto 1) = "00" and ctrl_caps = '1' and kbd(0) = '1') then
+                if (addr = x"bbff" and page_enable = '1' and page(2 downto 1) = "00" and ctrl_caps = '1' and kbd(0) = '0') then
                     mode <= "10";
                 end if;            
                 -- Detect "4" being pressed
-                if (addr = x"bdff" and page_enable = '1' and page(2 downto 1) = "00" and ctrl_caps = '1' and kbd(0) = '1') then
+                if (addr = x"bdff" and page_enable = '1' and page(2 downto 1) = "00" and ctrl_caps = '1' and kbd(0) = '0') then
                     mode <= "11";
                 end if;
                 -- Detect Jumpers being changed
