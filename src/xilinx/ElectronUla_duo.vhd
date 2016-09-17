@@ -1,13 +1,13 @@
 --------------------------------------------------------------------------------
--- Copyright (c) 2015 David Banks
+-- Copyright (c) 2016 David Banks
 --------------------------------------------------------------------------------
 --   ____  ____ 
 --  /   /\/   / 
 -- /___/  \  /    
 -- \   \   \/    
 --  \   \         
---  /   /         Filename  : ElectronFpga_core.vhd
--- /___/   /\     Timestamp : 28/07/2015
+--  /   /         Filename  : ElectronUla_duo.vhd
+-- /___/   /\     Timestamp : 17/09/2016
 -- \   \  /  \ 
 --  \___\/\___\ 
 --
@@ -30,7 +30,7 @@ use ieee.numeric_std.all;
 -- CasOut needs adding
 -- CasMotor needs adding
 -- Contention needs implementing (refector from core?)
---
+-- clock pll currently running out of spec (16MHz, min should be 19MHz)
 
 entity ElectronULA_duo is
     port (
@@ -41,7 +41,7 @@ entity ElectronULA_duo is
         addr      : in    std_logic_vector(15 downto 0);
         data      : inout std_logic_vector(7 downto 0);
         R_W_n     : in  std_logic;
-        RST_n     : in  std_logic;
+        RST_n     : inout  std_logic;
         IRQ_n     : out std_logic;
 
         -- Data Bus Enble
@@ -72,24 +72,27 @@ end;
 architecture behavioral of ElectronULA_duo is
 
 
-signal clock_16      : std_logic;
-signal clock_24      : std_logic;
-signal clock_32      : std_logic;
-signal clock_33      : std_logic;
-signal clock_40      : std_logic;
+signal clock_16        : std_logic;
+signal clock_24        : std_logic;
+signal clock_32        : std_logic;
+signal clock_33        : std_logic;
+signal clock_40        : std_logic;
 
-signal clken_counter : std_logic_vector(3 downto 0);
-signal ula_clken     : std_logic;
+signal clken_counter   : std_logic_vector(3 downto 0);
+signal ula_clken       : std_logic;
 
-signal data_in       : std_logic_vector(7 downto 0);
-signal data_out      : std_logic_vector(7 downto 0);
-signal video_red     : std_logic_vector(3 downto 0);
-signal video_green   : std_logic_vector(3 downto 0);
-signal video_blue    : std_logic_vector(3 downto 0);
-signal video_hsync   : std_logic;
-signal video_vsync   : std_logic;
-signal DBE           : std_logic;
-signal rom_latch     : std_logic_vector(3 downto 0);
+signal data_in         : std_logic_vector(7 downto 0);
+signal data_out        : std_logic_vector(7 downto 0);
+signal video_red       : std_logic_vector(3 downto 0);
+signal video_green     : std_logic_vector(3 downto 0);
+signal video_blue      : std_logic_vector(3 downto 0);
+signal video_hsync     : std_logic;
+signal video_vsync     : std_logic;
+signal DBE             : std_logic;
+signal rom_latch       : std_logic_vector(3 downto 0);
+
+signal powerup_reset_n : std_logic;
+signal reset_counter   : std_logic_vector (15 downto 0);
 
 begin
 
@@ -136,7 +139,7 @@ begin
         clk_32M00 => clock_32,
         clk_33M33 => clock_33,
         clk_40M00 => clock_40,
-
+        
         -- CPU Interface
         cpu_clken => ula_clken,
         addr      => addr,
@@ -192,6 +195,23 @@ begin
     data_in <= data;
     data <= data_out when R_W_n = '1' and DBE = '1' else "ZZZZZZZZ";
     
+--------------------------------------------------------
+-- Power Up Reset Generation
+--------------------------------------------------------
+
+    reset_gen : process(clock_16)
+    begin
+        if rising_edge(clock_16) then
+            if (reset_counter(reset_counter'high) = '0') then
+                reset_counter <= reset_counter + 1;
+            end if;
+            powerup_reset_n <= reset_counter(reset_counter'high);
+        end if;
+    end process;
+
+    -- Reset is open collector to avoid contention when BREAK pressed
+    RST_n <= '0' when powerup_reset_n = '0' else 'Z';
+            
     -- Hold the Duo's Arduino core in reset
     ARDUINO_RESET <= SW1;
 
