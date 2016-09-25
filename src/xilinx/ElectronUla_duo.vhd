@@ -71,7 +71,8 @@ entity ElectronULA_duo is
 
         -- Misc
         ARDUINO_RESET : out std_logic;
-        SW1           : in std_logic
+        SW1           : in std_logic;
+        LED           : out std_logic
         );
 end;
 
@@ -83,8 +84,9 @@ signal clock_32          : std_logic;
 signal clock_33          : std_logic;
 signal clock_40          : std_logic;
 
-signal clken_counter     : std_logic_vector(3 downto 0);
-signal ula_clken         : std_logic;
+signal led_counter       : std_logic_vector(19 downto 0);
+signal clk_counter       : std_logic_vector(2 downto 0);
+signal cpu_clken         : std_logic;
 signal via1_clken        : std_logic;
 signal via4_clken        : std_logic;
 
@@ -125,6 +127,8 @@ signal mc6522_portb_out  : std_logic_vector(7 downto 0);
 signal mc6522_portb_oe_l : std_logic_vector(7 downto 0);
 signal sdclk_int         : std_logic;
 
+signal turbo             : std_logic_vector(1 downto 0);
+
 begin
 
     inst_pll: entity work.pll2 port map(
@@ -146,29 +150,22 @@ begin
         CLKFX_OUT         => clock_33
     );
 
+    -- TODO
+    -- clk_out is not correct as the low time is always 250ns
     clk_gen : process(clock_16)
     begin
         if rising_edge(clock_16) then
-            clken_counter <= clken_counter + 1;
-            clk_out <= clken_counter(3);
-            if clken_counter = "1111" then
-                ula_clken <= '1';
+            if cpu_clken = '1' then
+                clk_counter <= (others => '0');
+                clk_out <= '0';
+            elsif clk_counter(2) = '0' then
+                clk_counter <= clk_counter + 1;
             else
-                ula_clken <= '0';
+                clk_out <= '1';
             end if;
-            if clken_counter = "1111" then
-                via1_clken <= '1';
-            else
-                via1_clken <= '0';
-            end if;
-            if clken_counter(1 downto 0) = "11" then
-                via4_clken <= '1';
-            else
-                via4_clken <= '0';
-            end if;            
         end if;
     end process;
-       
+
     ula : entity work.ElectronULA
     generic map (
         Include32KRAM    => true,
@@ -182,7 +179,6 @@ begin
         clk_40M00 => clock_40,
         
         -- CPU Interface
-        cpu_clken => ula_clken,
         addr      => addr,
         data_in   => data_in,
         data_out  => ula_data,
@@ -219,7 +215,12 @@ begin
 
         mode_init => "00",
 
-        contention => open
+        -- Clock Generation
+        cpu_clken_out  => cpu_clken,
+        via1_clken_out => via1_clken,
+        via4_clken_out => via4_clken,
+        turbo          => turbo,
+        turbo_out      => turbo
     );
 
     red   <= video_red(3);
@@ -248,7 +249,7 @@ begin
 
     rom_enable  <= '1' when addr(15 downto 14) = "10" and rom_latch = "0100" else '0';
 
-    rom_we <= '1' when rom_enable = '1' and ula_clken = '1' else '0';
+    rom_we <= '1' when rom_enable = '1' and cpu_clken = '1' else '0';
               
     rom : entity work.expansion_rom port map(
         clk      => clock_16,
@@ -323,6 +324,20 @@ begin
     -- SDSS is hardwired to 0 (always selected) as there is only one slave attached
     SDSS          <= '0';
 
+--------------------------------------------------------
+-- Speed LED
+--------------------------------------------------------
+    led_gen : process(clock_16)
+    begin
+        if rising_edge(clock_16) then
+            if via1_clken = '1' then
+                led_counter <= led_counter + 1;
+            end if;
+        end if;
+    end process;
+
+    LED <= led_counter(led_counter'high - to_integer(unsigned(turbo)));
+    
 --------------------------------------------------------
 -- Power Up Reset Generation
 --------------------------------------------------------

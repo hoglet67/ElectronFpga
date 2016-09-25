@@ -35,7 +35,6 @@ entity ElectronULA is
         clk_40M00 : in  std_logic;
         
         -- CPU Interface
-        cpu_clken : in  std_logic;
         addr      : in  std_logic_vector(15 downto 0);
         data_in   : in  std_logic_vector(7 downto 0);
         data_out  : out std_logic_vector(7 downto 0);
@@ -71,8 +70,14 @@ entity ElectronULA is
         rom_latch : out std_logic_vector(3 downto 0);
 
         mode_init : in std_logic_vector(1 downto 0);
-        
-        contention: out std_logic
+
+        -- Clock Generation
+        cpu_clken_out  : out std_logic;
+        via1_clken_out : out std_logic;
+        via4_clken_out : out std_logic;         
+        turbo          : in std_logic_vector(1 downto 0);
+        turbo_out      : out std_logic_vector(1 downto 0)
+       
         );
 end;
 
@@ -240,6 +245,31 @@ architecture behavioral of ElectronULA is
   signal clk_40M00_a    :   std_logic;
   signal clk_40M00_b    :   std_logic;
   signal clk_40M00_c    :   std_logic;
+
+  signal ROM_n_int      :   std_logic;
+  
+  -- clock enable generation
+  signal clken_counter     : std_logic_vector (3 downto 0);
+  
+  signal contention     : std_logic;
+  signal contention1    : std_logic;
+  signal contention2    : std_logic;
+  signal rom_access     : std_logic; -- always at 2mhz, no contention
+  signal ram_access     : std_logic; -- 1MHz/2Mhz/Stopped
+
+  signal clk_state      : std_logic_vector(2 downto 0);
+  signal cpu_clken      : std_logic;
+  signal cpu_clken_1    : std_logic;
+  signal cpu_clken_2    : std_logic;
+  signal cpu_clken_4    : std_logic;
+  signal via1_clken     : std_logic;
+  signal via1_clken_1   : std_logic;
+  signal via1_clken_2   : std_logic;
+  signal via1_clken_4   : std_logic;
+  signal via4_clken   : std_logic;
+  signal via4_clken_1   : std_logic;
+  signal via4_clken_2   : std_logic;
+  signal via4_clken_4   : std_logic;
   
 -- Helper function to cast an std_logic value to an integer
 function sl2int (x: std_logic) return integer is
@@ -413,10 +443,12 @@ begin
     -- The external ROM is enabled:
     -- - When the address is C000-FBFF and FF00-FFFF (i.e. OS Rom)
     -- - When the address is 8000-BFFF and the ROM 10 or 11 is paged in (101x)
-    ROM_n <= '0' when addr(15 downto 14) = "11" and addr(15 downto 8) /= x"FC" and addr(15 downto 8) /= x"FD" and addr(15 downto 8) /= x"FE" else
-             '0' when addr(15 downto 14) = "10" and page_enable = '1' and page(2 downto 1) = "01" else
-             '1';
-      
+    ROM_n_int <= '0' when addr(15 downto 14) = "11" and addr(15 downto 8) /= x"FC" and addr(15 downto 8) /= x"FD" and addr(15 downto 8) /= x"FE" else
+                 '0' when addr(15 downto 14) = "10" and page_enable = '1' and page(2 downto 1) = "01" else
+                 '1';
+
+    ROM_n <= ROM_n_int;
+    
     -- ULA Reads + RAM Reads + KBD Reads
     data_out <= ram_data                  when addr(15) = '0' else
                 "0000" & (kbd xor "1111") when addr(15 downto 14) = "10" and page_enable = '1' and page(2 downto 1) = "00" else
@@ -466,32 +498,9 @@ begin
                ctrl_caps       <= '0';
                cindat          <= '0';
                cintone         <= '0';
+               turbo_out       <= "01";
                
             else
-                -- Detect control+caps 1...4 and change video format
-                if (addr = x"9fff" and page_enable = '1' and page(2 downto 1) = "00") then
-                    if (kbd(2 downto 1) = "00") then
-                        ctrl_caps <= '1';
-                    else
-                        ctrl_caps <= '0';
-                    end if;
-                end if;
-                -- Detect "1" being pressed
-                if (addr = x"afff" and page_enable = '1' and page(2 downto 1) = "00" and ctrl_caps = '1' and kbd(0) = '0') then
-                    mode <= "00";
-                end if;
-                -- Detect "2" being pressed
-                if (addr = x"b7ff" and page_enable = '1' and page(2 downto 1) = "00" and ctrl_caps = '1' and kbd(0) = '0') then
-                    mode <= "01";
-                end if;
-                -- Detect "3" being pressed
-                if (addr = x"bbff" and page_enable = '1' and page(2 downto 1) = "00" and ctrl_caps = '1' and kbd(0) = '0') then
-                    mode <= "10";
-                end if;            
-                -- Detect "4" being pressed
-                if (addr = x"bdff" and page_enable = '1' and page(2 downto 1) = "00" and ctrl_caps = '1' and kbd(0) = '0') then
-                    mode <= "11";
-                end if;
                 -- Detect Jumpers being changed
                 if (mode_init_copy /= mode_init) then
                     mode <= mode_init;
@@ -629,6 +638,46 @@ begin
                 if (cpu_clken = '1') then
                     if delayed_clear_reset = '1' then
                         power_on_reset <= '0';
+                    end if;
+                    -- Detect control+caps 1...4 and change video format
+                    if (addr = x"9fff" and page_enable = '1' and page(2 downto 1) = "00") then
+                        if (kbd(2 downto 1) = "00") then
+                            ctrl_caps <= '1';
+                        else
+                            ctrl_caps <= '0';
+                        end if;
+                    end if;
+                    -- Detect "1" being pressed
+                    if (addr = x"afff" and page_enable = '1' and page(2 downto 1) = "00" and ctrl_caps = '1' and kbd(0) = '0') then
+                        mode <= "00";
+                    end if;
+                    -- Detect "2" being pressed
+                    if (addr = x"b7ff" and page_enable = '1' and page(2 downto 1) = "00" and ctrl_caps = '1' and kbd(0) = '0') then
+                        mode <= "01";
+                    end if;
+                    -- Detect "3" being pressed
+                    if (addr = x"bbff" and page_enable = '1' and page(2 downto 1) = "00" and ctrl_caps = '1' and kbd(0) = '0') then
+                        mode <= "10";
+                    end if;            
+                    -- Detect "4" being pressed
+                    if (addr = x"bdff" and page_enable = '1' and page(2 downto 1) = "00" and ctrl_caps = '1' and kbd(0) = '0') then
+                        mode <= "11";
+                    end if;
+                    -- Detect "5" being pressed
+                    if (addr = x"beff" and page_enable = '1' and page(2 downto 1) = "00" and ctrl_caps = '1' and kbd(0) = '0') then
+                        turbo_out <= "00";
+                    end if;
+                    -- Detect "6" being pressed
+                    if (addr = x"bf7f" and page_enable = '1' and page(2 downto 1) = "00" and ctrl_caps = '1' and kbd(0) = '0') then
+                        turbo_out <= "01";
+                    end if;
+                    -- Detect "7" being pressed
+                    if (addr = x"bfbf" and page_enable = '1' and page(2 downto 1) = "00" and ctrl_caps = '1' and kbd(0) = '0') then
+                        turbo_out <= "10";
+                    end if;            
+                    -- Detect "8" being pressed
+                    if (addr = x"bfdf" and page_enable = '1' and page(2 downto 1) = "00" and ctrl_caps = '1' and kbd(0) = '0') then
+                        turbo_out <= "11";
                     end if;
                     if (addr(15 downto 8) = x"FE") then
                         if (R_W_n = '1') then
@@ -984,6 +1033,130 @@ begin
     motor <= motor_int;
     
     casOut <= '0';
+
+--------------------------------------------------------
+-- clock enable generator
+--------------------------------------------------------
+
+    -- ROM accesses always happen at 2Mhz
+    rom_access <= not ROM_n_int;
+    -- RAM accesses always happen at 1Mhz and subber contention
+    ram_access <= not addr(15);
+    -- IO accesses always happen at 1MHz and don't suffer contention
+
+    clk_gen1 : process(clk_16M00, RST_n)
+    begin
+        if rising_edge(clk_16M00) then
+            -- clock state machine
+            if clken_counter(0) = '1' and clken_counter(1) = '1' then
+                case clk_state is
+                when "000" =>
+                    if rom_access = '1' then
+                        -- 2MHz no contention
+                        clk_state <= "001";
+                    else
+                        -- 1MHz, possible contention
+                        clk_state <= "101";
+                    end if;
+                when "001" =>
+                    -- CPU is clocked in this state
+                    clk_state <= "010";
+                when "010" =>
+                    if rom_access = '1' then
+                        -- 2MHz no contention
+                        clk_state <= "011";
+                    else
+                        -- 1MHz, possible contention
+                        clk_state <= "111";
+                    end if;
+                when "011" =>
+                    -- CPU is clocked in this state
+                    clk_state <= "000";
+                when "100" =>
+                    clk_state <= "101";
+                when "101" =>
+                    clk_state <= "110";
+                when "110" =>
+                    if ram_access = '1' and contention2 = '1' then
+                        clk_state <= "111";
+                    else
+                        clk_state <= "011";
+                    end if;
+                when "111" =>
+                    clk_state <= "100";
+                when others => null;
+                end case;
+            end if;
+            -- clken counter
+            clken_counter <= clken_counter + 1;
+            -- Synchronize contention signal
+            contention1 <= contention;
+            contention2 <= contention1;
+            -- 1MHz
+            -- cpu_clken active on cycle 0
+            -- address/data changes on cycle 1
+            cpu_clken_1  <= clken_counter(0) and clken_counter(1) and clken_counter(2) and clken_counter(3);
+            via1_clken_1 <= clken_counter(0) and clken_counter(1) and clken_counter(2) and clken_counter(3);
+            via4_clken_1 <= clken_counter(0) and clken_counter(1);
+            -- 2MHz
+            -- cpu_clken active on cycle 0, 8
+            -- address/data changes on cycle 1, 9
+            cpu_clken_2  <= clken_counter(0) and clken_counter(1) and clken_counter(2);
+            via1_clken_2 <= clken_counter(0) and clken_counter(1) and clken_counter(2);
+            via4_clken_2 <= clken_counter(0);
+            -- 4MHz - no contention
+            -- cpu_clken active on cycle 0, 4, 8, 12
+            -- address/data changes on cycle 1, 5, 9, 13
+            cpu_clken_4  <= clken_counter(0) and clken_counter(1);
+            via1_clken_4 <= clken_counter(0) and clken_counter(1);
+            via4_clken_4 <= '1';
+        end if;
+    end process;
+
+    clk_gen2 : process(turbo, clken_counter, clk_state,
+                       cpu_clken_1, cpu_clken_2, cpu_clken_4,
+                       via1_clken_1, via1_clken_2, via1_clken_4,
+                       via4_clken_1, via4_clken_2, via4_clken_4)
+    begin
+        case (turbo) is
+            when "01" =>
+                -- 2Mhz Contention
+                cpu_clken <= '0';
+                via1_clken <= '0';
+                via4_clken <= '0';
+                if clken_counter(0) = '1' and clken_counter(1) = '1' then
+                    -- 1MHz/2MHz/Stopped
+                    if clk_state = "001" or clk_state = "011" then
+                        cpu_clken <= '1';
+                    end if;
+                    -- 1MHz fixed
+                    if clk_state = "011" or clk_state = "111" then
+                        via1_clken <= '1';
+                    end if;
+                    -- 4MHz fixed
+                    via4_clken <= '1';
+                end if;
+            when "10" =>
+                -- 2Mhz No Contention
+                cpu_clken  <= cpu_clken_2;
+                via1_clken <= via1_clken_2;
+                via4_clken <= via4_clken_2;
+            when "11" =>
+                -- 4MHz No contention
+                cpu_clken  <= cpu_clken_4;
+                via1_clken <= via1_clken_4;
+                via4_clken <= via4_clken_4;
+            when others =>
+                -- 1MHz No Contention
+                cpu_clken  <= cpu_clken_1;
+                via1_clken <= via1_clken_1;
+                via4_clken <= via4_clken_1;
+        end case;
+    end process;
+
+    cpu_clken_out  <= cpu_clken;
+    via1_clken_out <= via1_clken;
+    via4_clken_out <= via4_clken;
 
 --------------------------------------------------------
 -- Optional Jafa Mk1 Compatible Mode 7 Implementation

@@ -105,14 +105,6 @@ architecture behavioral of ElectronFpga_core is
 
     signal ula_data          : std_logic_vector (7 downto 0);
 
-    signal clken_counter     : std_logic_vector (3 downto 0);
-    signal cpu_cycle         : std_logic;
-    signal cpu_clken         : std_logic;
-    signal cpu_clken_r       : std_logic;
-    signal cpu_clken_1       : std_logic;
-    signal cpu_clken_2       : std_logic;
-    signal cpu_clken_4       : std_logic;
-
     signal key_break         : std_logic;
     signal key_turbo         : std_logic_vector(1 downto 0);
     signal sound             : std_logic;
@@ -120,14 +112,11 @@ architecture behavioral of ElectronFpga_core is
 
     signal ula_irq_n         : std_logic;
 
+    signal cpu_clken         : std_logic;
+    signal cpu_clken_r       : std_logic;
     signal via1_clken        : std_logic;
-    signal via1_clken_1      : std_logic;
-    signal via1_clken_2      : std_logic;
-    signal via1_clken_4      : std_logic;
     signal via4_clken        : std_logic;
-    signal via4_clken_1      : std_logic;
-    signal via4_clken_2      : std_logic;
-    signal via4_clken_4      : std_logic;
+
     signal mc6522_enable     : std_logic;
     signal mc6522_data       : std_logic_vector(7 downto 0);
     signal mc6522_irq_n      : std_logic;
@@ -146,13 +135,6 @@ architecture behavioral of ElectronFpga_core is
 
     signal rom_latch         : std_logic_vector(3 downto 0);
 
-    signal contention        : std_logic;
-    signal contention1       : std_logic;
-    signal contention2       : std_logic;
-    signal rom_access        : std_logic; -- always at 2mhz, no contention
-    signal ram_access        : std_logic; -- 1MHz/2Mhz/Stopped
-
-    signal clk_state         : std_logic_vector(2 downto 0);
 
     signal ext_enable        : std_logic;
 
@@ -292,7 +274,6 @@ begin
         clk_40M00 => clk_40M00,
 
         -- CPU Interface
-        cpu_clken => cpu_clken,
         addr      => cpu_a(15 downto 0),
         data_in   => cpu_dout,
         data_out  => ula_data,
@@ -329,7 +310,12 @@ begin
 
         mode_init => vid_mode,
 
-        contention => contention
+        -- Clock Generation
+        cpu_clken_out  => cpu_clken,
+        via1_clken_out => via1_clken,
+        via4_clken_out => via4_clken,        
+        turbo          => key_turbo
+        
     );
 
     input : entity work.keyboard port map(
@@ -376,6 +362,8 @@ begin
             ext_nWE <= '1';
             ext_nOE <= '1';
         elsif rising_edge(clk_16M00) then
+            -- delayed cpu_clken for use as an external write signal
+            cpu_clken_r <= cpu_clken;
             if cpu_a(15) = '0' then
                 -- exteral main memory access
                 ext_A <= "1" & "000" & cpu_a(14 downto 0);
@@ -459,132 +447,9 @@ begin
        abr_hi_bank_lock <= '1';
    end generate;
 
---------------------------------------------------------
--- clock enable generator
---------------------------------------------------------
-
-    -- ROM accesses always happen at 2Mhz
-    rom_access <= not ROM_n;
-    -- RAM accesses always happen at 1Mhz and subber contention
-    ram_access <= not cpu_a(15);
-    -- IO accesses always happen at 1MHz and don't suffer contention
-
-    clk_gen1 : process(clk_16M00, RSTn)
-    begin
-        if RSTn = '0' then
-            clken_counter <= (others => '0');
-        elsif rising_edge(clk_16M00) then
-            -- delayed cpu_clken for use as an external write signal
-            cpu_clken_r <= cpu_clken;
-            -- clock state machine
-            if clken_counter(0) = '1' and clken_counter(1) = '1' then
-                case clk_state is
-                when "000" =>
-                    if rom_access = '1' then
-                        -- 2MHz no contention
-                        clk_state <= "001";
-                    else
-                        -- 1MHz, possible contention
-                        clk_state <= "101";
-                    end if;
-                when "001" =>
-                    -- CPU is clocked in this state
-                    clk_state <= "010";
-                when "010" =>
-                    if rom_access = '1' then
-                        -- 2MHz no contention
-                        clk_state <= "011";
-                    else
-                        -- 1MHz, possible contention
-                        clk_state <= "111";
-                    end if;
-                when "011" =>
-                    -- CPU is clocked in this state
-                    clk_state <= "000";
-                when "100" =>
-                    clk_state <= "101";
-                when "101" =>
-                    clk_state <= "110";
-                when "110" =>
-                    if ram_access = '1' and contention2 = '1' then
-                        clk_state <= "111";
-                    else
-                        clk_state <= "011";
-                    end if;
-                when "111" =>
-                    clk_state <= "100";
-                when others => null;
-                end case;
-            end if;
-            -- clken counter
-            clken_counter <= clken_counter + 1;
-            -- Synchronize contention signal
-            contention1 <= contention;
-            contention2 <= contention1;
-            -- 1MHz
-            -- cpu_clken active on cycle 0
-            -- address/data changes on cycle 1
-            cpu_clken_1  <= clken_counter(0) and clken_counter(1) and clken_counter(2) and clken_counter(3);
-            via1_clken_1 <= clken_counter(0) and clken_counter(1) and clken_counter(2) and clken_counter(3);
-            via4_clken_1 <= clken_counter(0) and clken_counter(1);
-            -- 2MHz
-            -- cpu_clken active on cycle 0, 8
-            -- address/data changes on cycle 1, 9
-            cpu_clken_2  <= clken_counter(0) and clken_counter(1) and clken_counter(2);
-            via1_clken_2 <= clken_counter(0) and clken_counter(1) and clken_counter(2);
-            via4_clken_2 <= clken_counter(0);
-            -- 4MHz - no contention
-            -- cpu_clken active on cycle 0, 4, 8, 12
-            -- address/data changes on cycle 1, 5, 9, 13
-            cpu_clken_4  <= clken_counter(0) and clken_counter(1);
-            via1_clken_4 <= clken_counter(0) and clken_counter(1);
-            via4_clken_4 <= '1';
-        end if;
-    end process;
-
-    clk_gen2 : process(key_turbo, clken_counter, clk_state,
-                       cpu_clken_1, cpu_clken_2, cpu_clken_4,
-                       via1_clken_1, via1_clken_2, via1_clken_4,
-                       via4_clken_1, via4_clken_2, via4_clken_4)
-    begin
-        case (key_turbo) is
-            when "01" =>
-                -- 2Mhz Contention
-                cpu_clken <= '0';
-                via1_clken <= '0';
-                via4_clken <= '0';
-                if clken_counter(0) = '1' and clken_counter(1) = '1' then
-                    -- 1MHz/2MHz/Stopped
-                    if clk_state = "001" or clk_state = "011" then
-                        cpu_clken <= '1';
-                    end if;
-                    -- 1MHz fixed
-                    if clk_state = "011" or clk_state = "111" then
-                        via1_clken <= '1';
-                    end if;
-                    -- 4MHz fixed
-                    via4_clken <= '1';
-                end if;
-            when "10" =>
-                -- 2Mhz No Contention
-                cpu_clken  <= cpu_clken_2;
-                via1_clken <= via1_clken_2;
-                via4_clken <= via4_clken_2;
-            when "11" =>
-                -- 4MHz No contention
-                cpu_clken  <= cpu_clken_4;
-                via1_clken <= via1_clken_4;
-                via4_clken <= via4_clken_4;
-            when others =>
-                -- 1MHz No Contention
-                cpu_clken  <= cpu_clken_1;
-                via1_clken <= via1_clken_1;
-                via4_clken <= via4_clken_1;
-        end case;
-    end process;
 
     cpu_addr <= cpu_a(15 downto 0);
 
-    test <= cpu_clken & cpu_clken_1 & cpu_clken_2 & contention2 & cpu_a(15) & CPU_IRQ_n & "00";
+    test <= (others => '0');
 
 end behavioral;
