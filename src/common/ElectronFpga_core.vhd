@@ -104,37 +104,17 @@ architecture behavioral of ElectronFpga_core is
     signal ROM_n             : std_logic;
 
     signal ula_data          : std_logic_vector (7 downto 0);
+    signal ula_enable        : std_logic;
 
     signal key_break         : std_logic;
     signal key_turbo         : std_logic_vector(1 downto 0);
     signal sound             : std_logic;
     signal kbd_data          : std_logic_vector(3 downto 0);
 
-    signal ula_irq_n         : std_logic;
-
     signal cpu_clken         : std_logic;
     signal cpu_clken_r       : std_logic;
-    signal via1_clken        : std_logic;
-    signal via4_clken        : std_logic;
-
-    signal mc6522_enable     : std_logic;
-    signal mc6522_data       : std_logic_vector(7 downto 0);
-    signal mc6522_irq_n      : std_logic;
-    -- Port A is not really used, so signals directly loop back out to in
-    signal mc6522_ca2        : std_logic;
-    signal mc6522_porta      : std_logic_vector(7 downto 0);
-    -- Port B is used for the MMBEEB style SDCard Interface
-    signal mc6522_cb1_in     : std_logic;
-    signal mc6522_cb1_out    : std_logic;
-    signal mc6522_cb1_oe_l   : std_logic;
-    signal mc6522_cb2_in     : std_logic;
-    signal mc6522_portb_in   : std_logic_vector(7 downto 0);
-    signal mc6522_portb_out  : std_logic_vector(7 downto 0);
-    signal mc6522_portb_oe_l : std_logic_vector(7 downto 0);
-    signal sdclk_int         : std_logic;
 
     signal rom_latch         : std_logic_vector(3 downto 0);
-
 
     signal ext_enable        : std_logic;
 
@@ -213,56 +193,9 @@ begin
     end generate;
 
 
-    via : entity work.M6522 port map(
-        I_RS       => cpu_a(3 downto 0),
-        I_DATA     => cpu_dout(7 downto 0),
-        O_DATA     => mc6522_data(7 downto 0),
-        I_RW_L     => cpu_R_W_n,
-        I_CS1      => mc6522_enable,
-        I_CS2_L    => '0',
-        O_IRQ_L    => mc6522_irq_n,
-        I_CA1      => '0',
-        I_CA2      => mc6522_ca2,
-        O_CA2      => mc6522_ca2,
-        O_CA2_OE_L => open,
-        I_PA       => mc6522_porta,
-        O_PA       => mc6522_porta,
-        O_PA_OE_L  => open,
-        I_CB1      => mc6522_cb1_in,
-        O_CB1      => mc6522_cb1_out,
-        O_CB1_OE_L => mc6522_cb1_oe_l,
-        I_CB2      => mc6522_cb2_in,
-        O_CB2      => open,
-        O_CB2_OE_L => open,
-        I_PB       => mc6522_portb_in,
-        O_PB       => mc6522_portb_out,
-        O_PB_OE_L  => mc6522_portb_oe_l,
-        RESET_L    => RSTn,
-        I_P2_H     => via1_clken,
-        ENA_4      => via4_clken,
-        CLK        => clk_16M00);
-
-    -- loop back data port
-    mc6522_portb_in <= mc6522_portb_out;
-
-    -- SDCLK is driven from either PB1 or CB1 depending on the SR Mode
-    sdclk_int     <= mc6522_portb_out(1) when mc6522_portb_oe_l(1) = '0' else
-                     mc6522_cb1_out      when mc6522_cb1_oe_l = '0' else
-                     '1';
-    SDCLK         <= sdclk_int;
-    mc6522_cb1_in <= sdclk_int;
-
-    -- SDMOSI is always driven from PB0
-    SDMOSI        <= mc6522_portb_out(0) when mc6522_portb_oe_l(0) = '0' else
-                     '1';
-    -- SDMISO is always read from CB2
-    mc6522_cb2_in <= SDMISO;
-
-    -- SDSS is hardwired to 0 (always selected) as there is only one slave attached
-    SDSS          <= '0';
-
     ula : entity work.ElectronULA
     generic map (
+        IncludeMMC       => true,
         Include32KRAM    => false,
         IncludeJafaMode7 => IncludeJafaMode7
     )
@@ -277,9 +210,10 @@ begin
         addr      => cpu_a(15 downto 0),
         data_in   => cpu_dout,
         data_out  => ula_data,
+        data_en   => ula_enable,
         R_W_n     => cpu_R_W_n,
         RST_n     => RSTn,
-        IRQ_n     => ula_irq_n,
+        IRQ_n     => cpu_IRQ_n,
         NMI_n     => cpu_NMI_n,
 
         -- Rom Enable
@@ -294,6 +228,12 @@ begin
 
         -- Audio
         sound     => sound,
+
+        -- SD Card
+        SDMISO    => SDMISO,
+        SDSS      => SDSS,
+        SDCLK     => SDCLK,
+        SDMOSI    => SDMOSI,
 
         -- Casette
         casIn     => cassette_in,
@@ -312,10 +252,8 @@ begin
 
         -- Clock Generation
         cpu_clken_out  => cpu_clken,
-        via1_clken_out => via1_clken,
-        via4_clken_out => via4_clken,        
         turbo          => key_turbo
-        
+
     );
 
     input : entity work.keyboard port map(
@@ -329,8 +267,6 @@ begin
         turbo      => key_turbo
     );
 
-    mc6522_enable  <= '1' when cpu_a(15 downto 4) = x"fcb" else '0';
-    cpu_IRQ_n      <= mc6522_irq_n AND ula_irq_n;
     cpu_NMI_n      <= '1';
 
     RSTn    <= hard_reset_n and key_break;
@@ -346,8 +282,8 @@ begin
                   (cpu_a(15 downto 14) = "10" and rom_latch(3 downto 1) /= "100") else '0';
 
     cpu_din <= ext_Dout       when ext_enable = '1' else
-               mc6522_data    when mc6522_enable = '1' else
-               ula_data;
+               ula_data       when ula_enable = '1' else
+               x"F1";
 
     -- Pipeline external memory interface
      -- External addresses 00000-3FFFF are routed to FLASH 80000-DFFFFF
@@ -377,8 +313,8 @@ begin
             elsif cpu_a(15 downto 14) = "10" and rom_latch(3 downto 0) = "0100" and cpu_a(13 downto 8) >= "110110" then
                 -- Slots 4 (MMFS) has B600 onwards as writeable for private workspace so mapped to SRAM
                 ext_A <= "1" & rom_latch & cpu_a(13 downto 0);
-				else
-					 -- everyting else is ROM
+            else
+                -- everyting else is ROM
                 ext_A <= "0" & rom_latch & cpu_a(13 downto 0);
             end if;
 
@@ -448,8 +384,8 @@ begin
    end generate;
 
 
-    cpu_addr <= cpu_a(15 downto 0);
+   cpu_addr <= cpu_a(15 downto 0);
 
-    test <= (others => '0');
+   test <= (others => '0');
 
 end behavioral;

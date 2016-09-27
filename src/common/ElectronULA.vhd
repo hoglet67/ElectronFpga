@@ -1,15 +1,15 @@
 --------------------------------------------------------------------------------
 -- Copyright (c) 2015 David Banks
 --------------------------------------------------------------------------------
---   ____  ____ 
---  /   /\/   / 
--- /___/  \  /    
--- \   \   \/    
---  \   \         
+--   ____  ____
+--  /   /\/   /
+-- /___/  \  /
+-- \   \   \/
+--  \   \
 --  /   /         Filename  : ElectronFpga_core.vhd
 -- /___/   /\     Timestamp : 28/07/2015
--- \   \  /  \ 
---  \___\/\___\ 
+-- \   \  /  \
+--  \___\/\___\
 --
 --Design Name: ElectronFpga_core
 
@@ -24,6 +24,7 @@ use ieee.numeric_std.all;
 
 entity ElectronULA is
     generic (
+        IncludeMMC       : boolean := true;
         Include32KRAM    : boolean := true;
         IncludeJafaMode7 : boolean := false
     );
@@ -33,11 +34,12 @@ entity ElectronULA is
         clk_32M00 : in  std_logic;
         clk_33M33 : in  std_logic;
         clk_40M00 : in  std_logic;
-        
+
         -- CPU Interface
         addr      : in  std_logic_vector(15 downto 0);
         data_in   : in  std_logic_vector(7 downto 0);
         data_out  : out std_logic_vector(7 downto 0);
+        data_en   : out std_logic;
         R_W_n     : in  std_logic;
         RST_n     : in  std_logic;
         IRQ_n     : out std_logic;
@@ -45,7 +47,7 @@ entity ElectronULA is
 
         -- Rom Enable
         ROM_n     : out std_logic;
-        
+
         -- Video
         red       : out std_logic_vector(3 downto 0);
         green     : out std_logic_vector(3 downto 0);
@@ -59,6 +61,12 @@ entity ElectronULA is
         -- Keyboard
         kbd       : in  std_logic_vector(3 downto 0);
 
+        -- SD Card
+        SDMISO    : in  std_logic;
+        SDSS      : out std_logic;
+        SDCLK     : out std_logic;
+        SDMOSI    : out std_logic;
+
         -- Casette
         casIn     : in  std_logic;
         casOut    : out std_logic;
@@ -66,18 +74,16 @@ entity ElectronULA is
         -- MISC
         caps      : out std_logic;
         motor     : out std_logic;
-        
+
         rom_latch : out std_logic_vector(3 downto 0);
 
         mode_init : in std_logic_vector(1 downto 0);
 
         -- Clock Generation
         cpu_clken_out  : out std_logic;
-        via1_clken_out : out std_logic;
-        via4_clken_out : out std_logic;         
         turbo          : in std_logic_vector(1 downto 0);
         turbo_out      : out std_logic_vector(1 downto 0)
-       
+
         );
 end;
 
@@ -98,7 +104,7 @@ architecture behavioral of ElectronULA is
   signal general_counter: std_logic_vector(15 downto 0);
   signal sound_bit      : std_logic;
   signal isr_data       : std_logic_vector(7 downto 0);
-  
+
   -- ULA Registers
   signal isr            : std_logic_vector(6 downto 2);
   signal ier            : std_logic_vector(6 downto 2);
@@ -109,8 +115,8 @@ architecture behavioral of ElectronULA is
   signal counter        : std_logic_vector(7 downto 0);
   signal display_mode   : std_logic_vector(2 downto 0);
   signal comms_mode     : std_logic_vector(1 downto 0);
-  
-  type palette_type is array (0 to 7) of std_logic_vector (7 downto 0);  
+
+  type palette_type is array (0 to 7) of std_logic_vector (7 downto 0);
   signal palette        : palette_type;
 
   signal hsync_start    : std_logic_vector(10 downto 0);
@@ -129,32 +135,32 @@ architecture behavioral of ElectronULA is
 
   signal v_rtc          : std_logic_vector(9 downto 0);
   signal v_display      : std_logic_vector(9 downto 0);
-  
+
   signal char_row       : std_logic_vector(3 downto 0);
   signal row_offset     : std_logic_vector(14 downto 0);
   signal col_offset     : std_logic_vector(9 downto 0);
   signal screen_addr    : std_logic_vector(14 downto 0);
   signal screen_data    : std_logic_vector(7 downto 0);
-  
+
   -- Screen Mode Registers
 
   signal mode           : std_logic_vector(1 downto 0);
 
   -- the 256 byte page that the mode starts at
   signal mode_base      : std_logic_vector(7 downto 0);
-  
+
   -- the number of bits per pixel (0 = 1BPP, 1 = 2BPP, 2=4BPP)
   signal mode_bpp       : std_logic_vector(1 downto 0);
-  
+
    -- a '1' indicates a text mode (modes 3 and 6)
   signal mode_text      : std_logic;
-  
+
   -- a '1' indicates a 40-col mode (modes 4, 5 and 6)
   signal mode_40        : std_logic;
-  
+
   -- the number of bytes to increment row_offset when moving from one char row to the next
   signal mode_rowstep   : std_logic_vector(9 downto 0);
-  
+
   signal display_intr   : std_logic;
   signal display_intr1  : std_logic;
   signal display_intr2  : std_logic;
@@ -164,14 +170,14 @@ architecture behavioral of ElectronULA is
   signal rtc_intr2      : std_logic;
 
   signal clk_video      : std_logic;
-  
+
   signal ctrl_caps      : std_logic;
 
   signal field          : std_logic;
 
   signal caps_int       : std_logic;
   signal motor_int      : std_logic;
-  
+
   -- Supports changing the jumpers
   signal mode_init_copy : std_logic_vector(1 downto 0);
 
@@ -192,7 +198,7 @@ architecture behavioral of ElectronULA is
   signal red_int        : std_logic_vector(3 downto 0);
   signal green_int      : std_logic_vector(3 downto 0);
   signal blue_int       : std_logic_vector(3 downto 0);
-  
+
   -- CRTC signals (only used when Jafa Mode 7 is enabled)
   signal crtc_enable    :   std_logic;
   signal crtc_clken     :   std_logic;
@@ -209,7 +215,7 @@ architecture behavioral of ElectronULA is
   signal crtc_ra        :   std_logic_vector(4 downto 0);
   signal status_enable  :   std_logic;
   signal status_do      :   std_logic_vector(7 downto 0);
-  
+
   -- SAA5050 signals (only used when Jafa Mode 7 is enabled)
   signal ttxt_clken     :   std_logic;
   signal ttxt_glr       :   std_logic;
@@ -247,10 +253,10 @@ architecture behavioral of ElectronULA is
   signal clk_40M00_c    :   std_logic;
 
   signal ROM_n_int      :   std_logic;
-  
+
   -- clock enable generation
   signal clken_counter     : std_logic_vector (3 downto 0);
-  
+
   signal contention     : std_logic;
   signal contention1    : std_logic;
   signal contention2    : std_logic;
@@ -270,7 +276,26 @@ architecture behavioral of ElectronULA is
   signal via4_clken_1   : std_logic;
   signal via4_clken_2   : std_logic;
   signal via4_clken_4   : std_logic;
-  
+
+  signal mc6522_enable     : std_logic;
+  signal mc6522_data       : std_logic_vector(7 downto 0);
+  signal mc6522_data_r     : std_logic_vector(7 downto 0);
+  signal mc6522_irq_n      : std_logic;
+  -- Port A is not really used, so signals directly loop back out to in
+  signal mc6522_ca2        : std_logic;
+  signal mc6522_porta      : std_logic_vector(7 downto 0);
+  -- Port B is used for the MMBEEB style SDCard Interface
+  signal mc6522_cb1_in     : std_logic;
+  signal mc6522_cb1_out    : std_logic;
+  signal mc6522_cb1_oe_l   : std_logic;
+  signal mc6522_cb2_in     : std_logic;
+  signal mc6522_portb_in   : std_logic_vector(7 downto 0);
+  signal mc6522_portb_out  : std_logic_vector(7 downto 0);
+  signal mc6522_portb_oe_l : std_logic_vector(7 downto 0);
+  signal sdclk_int         : std_logic;
+
+  signal ula_irq_n         : std_logic;
+
 -- Helper function to cast an std_logic value to an integer
 function sl2int (x: std_logic) return integer is
 begin
@@ -286,7 +311,7 @@ function slv2int (x: std_logic_vector) return integer is
 begin
     return to_integer(unsigned(x));
 end;
-    
+
 begin
 
     -- video timing constants
@@ -348,40 +373,40 @@ begin
     end process;
 
     clk_40M00_c <= clk_40M00_a xor clk_40M00_b;
-        
-            
+
+
     clk_video    <= clk_40M00_c when mode = "11" else
                     clk_33M33_c when mode = "10" else
                     clk_16M00_c;
-    
-    
+
+
     hsync_start  <= std_logic_vector(to_unsigned(759, 11)) when mode = "11" else
                     std_logic_vector(to_unsigned(759, 11)) when mode = "10" else
-                    std_logic_vector(to_unsigned(762, 11));    
+                    std_logic_vector(to_unsigned(762, 11));
 
     hsync_end    <= std_logic_vector(to_unsigned(887, 11)) when mode = "11" else
                     std_logic_vector(to_unsigned(887, 11)) when mode = "10" else
-                    std_logic_vector(to_unsigned(837, 11));    
-    
+                    std_logic_vector(to_unsigned(837, 11));
+
     h_total      <= std_logic_vector(to_unsigned(1055, 11)) when mode = "11" else
                     std_logic_vector(to_unsigned(1055, 11)) when mode = "10" else
-                    std_logic_vector(to_unsigned(1023, 11));    
-    
+                    std_logic_vector(to_unsigned(1023, 11));
+
     h_active     <= std_logic_vector(to_unsigned(640, 11));
 
     vsync_start  <= std_logic_vector(to_unsigned(556, 10)) when mode = "11" else
                     std_logic_vector(to_unsigned(556, 10)) when mode = "10" else
-                    std_logic_vector(to_unsigned(274, 10));    
+                    std_logic_vector(to_unsigned(274, 10));
 
     vsync_end    <= std_logic_vector(to_unsigned(560, 10)) when mode = "11" else
                     std_logic_vector(to_unsigned(560, 10)) when mode = "10" else
-                    std_logic_vector(to_unsigned(277, 10));    
+                    std_logic_vector(to_unsigned(277, 10));
 
     v_total      <= std_logic_vector(to_unsigned(627, 10)) when mode = "11" else
                     std_logic_vector(to_unsigned(627, 10)) when mode = "10" else
                     std_logic_vector(to_unsigned(311, 10)) when field = '0' else
                     std_logic_vector(to_unsigned(312, 10));
-                    
+
     v_active_gph <= std_logic_vector(to_unsigned(512, 10)) when mode = "11" else
                     std_logic_vector(to_unsigned(512, 10)) when mode = "10" else
                     std_logic_vector(to_unsigned(256, 10));
@@ -414,7 +439,7 @@ begin
             addrb => screen_addr,
             dinb  => x"00",
             doutb => screen_data
-            );        
+            );
         ram_we <= '1' when addr(15) = '0' and R_W_n = '0' and cpu_clken = '1' else '0';
     end generate;
 
@@ -434,12 +459,12 @@ begin
             addrb => screen_addr xor "111000000000000",
             dinb  => x"00",
             doutb => screen_data
-            );    
+            );
         ram_we <= '1' when (addr(15 downto 12) = "0011" or addr(15 downto 14) = "01") and R_W_n = '0' and cpu_clken = '1' else '0';
     end generate;
 
     sound <= sound_bit;
-    
+
     -- The external ROM is enabled:
     -- - When the address is C000-FBFF and FF00-FFFF (i.e. OS Rom)
     -- - When the address is 8000-BFFF and the ROM 10 or 11 is paged in (101x)
@@ -448,7 +473,7 @@ begin
                  '1';
 
     ROM_n <= ROM_n_int;
-    
+
     -- ULA Reads + RAM Reads + KBD Reads
     data_out <= ram_data                  when addr(15) = '0' else
                 "0000" & (kbd xor "1111") when addr(15 downto 14) = "10" and page_enable = '1' and page(2 downto 1) = "00" else
@@ -456,30 +481,41 @@ begin
                 data_shift                when addr(15 downto 8) = x"FE" and addr(3 downto 0) = x"4" else
                 crtc_do                   when crtc_enable = '1' and IncludeJafaMode7 else
                 status_do                 when status_enable = '1' and IncludeJafaMode7 else
+                mc6522_data_r             when mc6522_enable = '1' and IncludeMMC else
                 x"F1"; -- todo FIXEME
+
+    data_en  <= '1'                       when addr(15) = '0' else
+                '1'                       when addr(15 downto 14) = "10" and page_enable = '1' and page(2 downto 1) = "00" else
+                '1'                       when addr(15 downto 8) = x"FE" else
+                '1'                       when crtc_enable = '1' and IncludeJafaMode7 else
+                '1'                       when status_enable = '1' and IncludeJafaMode7 else
+                '1'                       when mc6522_enable = '1' and IncludeMMC else
+                '0';
 
     -- Register FEx0 is the Interrupt Status Register (Read Only)
     -- Bit 7 always reads as 1
     -- Bits 6..2 refect in interrups status regs
     -- Bit 1 is the power up reset bit, cleared by the first read after power up
     -- Bit 0 is the OR of bits 6..2
-    master_irq <= (isr(6) and ier(6)) or 
+    master_irq <= (isr(6) and ier(6)) or
                   (isr(5) and ier(5)) or
                   (isr(4) and ier(4)) or
                   (isr(3) and ier(3)) or
                   (isr(2) and ier(2));
-    IRQ_n      <= not master_irq; 
+
+    ula_irq_n  <= not master_irq;
+
     isr_data   <= '1' & isr(6 downto 2) & power_on_reset & master_irq;
-    
+
     rom_latch  <= page_enable & page;
-   
+
     process (clk_16M00, RST_n)
     begin
-           
+
         if rising_edge(clk_16M00) then
-        
+
             if (RST_n = '0') then
-            
+
                isr             <= (others => '0');
                ier             <= (others => '0');
                screen_base     <= (others => '0');
@@ -492,14 +528,14 @@ begin
                caps_int        <= '0';
                rtc_counter     <= (others => '0');
                general_counter <= (others => '0');
-               sound_bit       <= '0';           
+               sound_bit       <= '0';
                mode            <= mode_init;
                mode_init_copy  <= mode_init;
                ctrl_caps       <= '0';
                cindat          <= '0';
                cintone         <= '0';
                turbo_out       <= "01";
-               
+
             else
                 -- Detect Jumpers being changed
                 if (mode_init_copy /= mode_init) then
@@ -533,7 +569,7 @@ begin
                     -- Generate the rtc interrupt on the rising edge (line 100 of the screen)
                     if (rtc_intr2 = '0' and rtc_intr1 = '1') then
                         isr(3) <= '1';
-                    end if;            
+                    end if;
                 end if;
                 if (comms_mode = "00") then
                     if (casIn2 = '0') then
@@ -548,10 +584,10 @@ begin
                         sound_bit <= not sound_bit;
                     else
                         general_counter <= general_counter - 1;
-                    end if;            
+                    end if;
                 end if;
-                
-                
+
+
                 -- Tape Interface Receive
                 casIn1 <= casIn;
                 casIn2 <= casIn1;
@@ -582,7 +618,7 @@ begin
                             cindat  <= '1';
                             cintone <= '0';
                             databits <= (others => '0');
-                            
+
                         elsif (cindat = '1' and ignore_next = '1') then
                             -- Ignoring the second pulse in a bit at 2400Hz
                             ignore_next <= '0';
@@ -611,7 +647,7 @@ begin
                             end if;
                             -- Move on to the next data bit
                             databits <= databits + 1;
-                        elsif (cindat = '1' and databits = 9) then                         
+                        elsif (cindat = '1' and databits = 9) then
                             if (general_counter > 5000) then
                                 -- Found next start bit...
                                 cindat  <= '1';
@@ -624,7 +660,7 @@ begin
                                 databits <= (others => '0');
                                 -- Generate the high tone detect interrupt
                                 isr(6) <= '1';
-                           end if;                           
+                           end if;
                        end if;
                     end if;
                 else
@@ -633,7 +669,7 @@ begin
                     databits    <= (others => '0');
                     ignore_next <= '0';
                 end if;
-                
+
                 -- ULA Writes
                 if (cpu_clken = '1') then
                     if delayed_clear_reset = '1' then
@@ -658,7 +694,7 @@ begin
                     -- Detect "3" being pressed
                     if (addr = x"bbff" and page_enable = '1' and page(2 downto 1) = "00" and ctrl_caps = '1' and kbd(0) = '0') then
                         mode <= "10";
-                    end if;            
+                    end if;
                     -- Detect "4" being pressed
                     if (addr = x"bdff" and page_enable = '1' and page(2 downto 1) = "00" and ctrl_caps = '1' and kbd(0) = '0') then
                         mode <= "11";
@@ -674,7 +710,7 @@ begin
                     -- Detect "7" being pressed
                     if (addr = x"bfbf" and page_enable = '1' and page(2 downto 1) = "00" and ctrl_caps = '1' and kbd(0) = '0') then
                         turbo_out <= "10";
-                    end if;            
+                    end if;
                     -- Detect "8" being pressed
                     if (addr = x"bfdf" and page_enable = '1' and page(2 downto 1) = "00" and ctrl_caps = '1' and kbd(0) = '0') then
                         turbo_out <= "11";
@@ -688,7 +724,7 @@ begin
                             -- Clear the RDFull interrupts on reading the data_shift register
                             if (addr(3 downto 0) = x"4") then
                                 isr(4) <= '0';
-                            end if;                    
+                            end if;
                         else
                             case addr(3 downto 0) is
                             when x"0" =>
@@ -725,7 +761,7 @@ begin
                                 else
                                     -- Roms 0-7 or 12-15 currently selected, so anything goes
                                     page_enable <= data_in(3);
-                                    page <= data_in(2 downto 0);                            
+                                    page <= data_in(2 downto 0);
                                 end if;
                             when x"6" =>
                                 counter <= data_in;
@@ -783,7 +819,7 @@ begin
                                     mode_text    <= '0';
                                     mode_rowstep <= std_logic_vector(to_unsigned(313, 10)); -- 320 - 7
                                 when others =>
-                                end case;                            
+                                end case;
                                 comms_mode   <= data_in(2 downto 1);
                             when others =>
                                 -- A '1' in the palatte data means disable the colour
@@ -791,7 +827,7 @@ begin
                                 palette(slv2int(addr(2 downto 0))) <= data_in xor "11111111";
                             end case;
                         end if;
-                    end if;          
+                    end if;
                 end if;
             end if;
         end if;
@@ -807,7 +843,7 @@ begin
     -- RGBs timing at 50Hz with a 16.000MHz Pixel Clock
     -- Horizontal 640 + (96 + 26) +  75 + (91 + 96) = total 1024
     -- Vertical   256 + (16 +  2) +   3 + (19 + 16) = total 312
-     
+
     process (clk_video)
     variable pixel : std_logic_vector(3 downto 0);
     begin
@@ -958,11 +994,11 @@ begin
                     blue_int  <= (others => palette(4)(7));
                 when others =>
                 end case;
-            end if;              
+            end if;
             -- Vertical Sync
             if (field = '0') then
                 -- first field of interlaced scanning (or non interlaced)
-                -- vsync starts at the begging of the line            
+                -- vsync starts at the begging of the line
                 if (h_count1 = 0) then
                     if (v_count = vsync_start) then
                         vsync_int <= '0';
@@ -974,7 +1010,7 @@ begin
                 -- second field of intelaced scanning
                 -- vsync starts half way through the line
                 if (h_count1 = ('0' & h_total(10 downto 1))) then
-                    if (v_count = vsync_start) then 
+                    if (v_count = vsync_start) then
                         vsync_int <= '0';
                     elsif (v_count = vsync_end) then
                         vsync_int <= '1';
@@ -995,9 +1031,9 @@ begin
                 display_intr <= '0';
                 rtc_intr     <= '0';
             end if;
-        end if;        
+        end if;
     end process;
-    
+
     process (screen_base1, mode_base1, row_offset, col_offset, crtc_ma, mode7_enable)
         variable tmp: std_logic_vector(15 downto 0);
     begin
@@ -1011,7 +1047,7 @@ begin
             screen_addr <= tmp(14 downto 0);
         end if;
     end process;
-    
+
     red   <= (others => ttxt_r_out) when mode7_enable = '1' else
              red_int;
 
@@ -1020,7 +1056,7 @@ begin
 
     blue  <= (others => ttxt_b_out) when mode7_enable = '1' else
              blue_int;
-    
+
     vsync <= ttxt_vs_out when mode7_enable = '1' else
              '1' when mode(1) = '0' else
              vsync_int;
@@ -1031,7 +1067,7 @@ begin
 
     caps  <= caps_int;
     motor <= motor_int;
-    
+
     casOut <= '0';
 
 --------------------------------------------------------
@@ -1096,19 +1132,19 @@ begin
             -- cpu_clken active on cycle 0
             -- address/data changes on cycle 1
             cpu_clken_1  <= clken_counter(0) and clken_counter(1) and clken_counter(2) and clken_counter(3);
-            via1_clken_1 <= clken_counter(0) and clken_counter(1) and clken_counter(2) and clken_counter(3);
+            via1_clken_1 <= clken_counter(3);
             via4_clken_1 <= clken_counter(0) and clken_counter(1);
             -- 2MHz
             -- cpu_clken active on cycle 0, 8
             -- address/data changes on cycle 1, 9
             cpu_clken_2  <= clken_counter(0) and clken_counter(1) and clken_counter(2);
-            via1_clken_2 <= clken_counter(0) and clken_counter(1) and clken_counter(2);
+            via1_clken_2 <= clken_counter(2);
             via4_clken_2 <= clken_counter(0);
             -- 4MHz - no contention
             -- cpu_clken active on cycle 0, 4, 8, 12
             -- address/data changes on cycle 1, 5, 9, 13
             cpu_clken_4  <= clken_counter(0) and clken_counter(1);
-            via1_clken_4 <= clken_counter(0) and clken_counter(1);
+            via1_clken_4 <= clken_counter(1);
             via4_clken_4 <= '1';
         end if;
     end process;
@@ -1130,9 +1166,10 @@ begin
                         cpu_clken <= '1';
                     end if;
                     -- 1MHz fixed
-                    if clk_state = "011" or clk_state = "111" then
-                        via1_clken <= '1';
-                    end if;
+                    --if clk_state = "011" or clk_state = "111" then
+                    --    via1_clken <= '1';
+                    --end if;
+                    via1_clken <= clk_state(1);
                     -- 4MHz fixed
                     via4_clken <= '1';
                 end if;
@@ -1155,13 +1192,88 @@ begin
     end process;
 
     cpu_clken_out  <= cpu_clken;
-    via1_clken_out <= via1_clken;
-    via4_clken_out <= via4_clken;
+
+--------------------------------------------------------
+-- Optional MMC Filing System
+--------------------------------------------------------
+
+    MMCIncluded: if IncludeMMC generate
+
+        mc6522_enable  <= '1' when addr(15 downto 4) = x"fcb" else '0';
+
+        via : entity work.M6522 port map(
+            I_RS       => addr(3 downto 0),
+            I_DATA     => data_in(7 downto 0),
+            O_DATA     => mc6522_data(7 downto 0),
+            I_RW_L     => R_W_n,
+            I_CS1      => mc6522_enable,
+            I_CS2_L    => '0',
+            O_IRQ_L    => mc6522_irq_n,
+            I_CA1      => '0',
+            I_CA2      => mc6522_ca2,
+            O_CA2      => mc6522_ca2,
+            O_CA2_OE_L => open,
+            I_PA       => mc6522_porta,
+            O_PA       => mc6522_porta,
+            O_PA_OE_L  => open,
+            I_CB1      => mc6522_cb1_in,
+            O_CB1      => mc6522_cb1_out,
+            O_CB1_OE_L => mc6522_cb1_oe_l,
+            I_CB2      => mc6522_cb2_in,
+            O_CB2      => open,
+            O_CB2_OE_L => open,
+            I_PB       => mc6522_portb_in,
+            O_PB       => mc6522_portb_out,
+            O_PB_OE_L  => mc6522_portb_oe_l,
+            RESET_L    => RST_n,
+            I_P2_H     => via1_clken,
+            ENA_4      => via4_clken,
+            CLK        => clk_16M00);
+
+        -- This is needed as in v003 of the 6522 data out is only valid while I_P2_H is asserted
+        -- I_P2_H is driven from via1_clken
+        data_latch: process(clk_16M00)
+        begin
+            if rising_edge(clk_16M00) then
+                if via1_clken = '1' then
+                    mc6522_data_r <= mc6522_data;
+                end if;
+            end if;
+        end process;
+
+        -- loop back data port
+        mc6522_portb_in <= mc6522_portb_out;
+
+        -- SDCLK is driven from either PB1 or CB1 depending on the SR Mode
+        sdclk_int     <= mc6522_portb_out(1) when mc6522_portb_oe_l(1) = '0' else
+                         mc6522_cb1_out      when mc6522_cb1_oe_l = '0' else
+                         '1';
+        SDCLK         <= sdclk_int;
+        mc6522_cb1_in <= sdclk_int;
+
+        -- SDMOSI is always driven from PB0
+        SDMOSI        <= mc6522_portb_out(0) when mc6522_portb_oe_l(0) = '0' else
+                     '1';
+        -- SDMISO is always read from CB2
+        mc6522_cb2_in <= SDMISO;
+
+        -- SDSS is hardwired to 0 (always selected) as there is only one slave attached
+        SDSS          <= '0';
+
+        IRQ_n <= ula_irq_n and mc6522_irq_n;
+
+    end generate;
+
+    MMCNotIncluded: if not IncludeMMC generate
+
+        IRQ_n <= ula_irq_n;
+
+    end generate;
 
 --------------------------------------------------------
 -- Optional Jafa Mk1 Compatible Mode 7 Implementation
 --------------------------------------------------------
-    
+
     JafaIncluded: if IncludeJafaMode7 generate
         -- FC1C - Write address register
         -- FC1D - Write data register
@@ -1192,16 +1304,16 @@ begin
                 ttxt_clken <= not ttxt_clken;
             end if;
         end process;
-        
+
         crtc_enable <= '1' when addr(15 downto 0) = x"fc1c" or
                                 addr(15 downto 0) = x"fc1d" or
                                 addr(15 downto 0) = x"fc1f"
                            else '0';
-                           
+
         status_enable <= '1' when addr(15 downto 0) = x"fc1e" else '0';
 
         status_do <= "00" & crtc_vsync & "00000";
-        
+
         crtc : entity work.mc6845 port map (
             -- inputs
             CLOCK  => clk_16M00,
@@ -1224,7 +1336,7 @@ begin
 
         crtc_hsync_n <= not crtc_hsync;
         crtc_vsync_n <= not crtc_vsync;
-        
+
         ttxt_glr <= crtc_hsync_n;
         ttxt_dew <= crtc_vsync;
         ttxt_crs <= not crtc_ra(0);
@@ -1247,12 +1359,12 @@ begin
             G        => ttxt_g_int,
             B        => ttxt_b_int
         );
-        
+
         -- make the cursor visible
         ttxt_r <= ttxt_r_int xor crtc_cursor2;
         ttxt_g <= ttxt_g_int xor crtc_cursor2;
         ttxt_b <= ttxt_b_int xor crtc_cursor2;
-        
+
         -- Scan Doubler from the MIST project
         inst_mist_scandoubler: entity work.mist_scandoubler port map (
             clk       => clk_32M00,
@@ -1285,6 +1397,6 @@ begin
         -- disable mode 7
         mode7_enable <= '0';
     end generate;
-    
-    
+
+
 end behavioral;
