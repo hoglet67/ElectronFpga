@@ -144,7 +144,7 @@ begin
     generic map (
         IncludeMMC       => true,
         Include32KRAM    => true,
-        IncludeJafaMode7 => false
+        IncludeJafaMode7 => true
     )
     port map (
         clk_16M00 => clock_16,
@@ -224,14 +224,14 @@ begin
 -- Paged ROM
 --------------------------------------------------------
 
-    rom_enable  <= '1' when addr(15 downto 14) = "10" and rom_latch = "0100" else '0';
+    rom_enable  <= '1' when addr(15 downto 14) = "10" and rom_latch(3 downto 1) = "111" else '0';
 
     rom_we <= '1' when rom_enable = '1' and cpu_clken = '1' else '0';
 
     rom : entity work.expansion_rom port map(
         clk      => clock_16,
         we       => rom_we,
-        addr     => addr(13 downto 0),
+        addr     => rom_latch(0) & addr(13 downto 0),
         data_in  => data_in,
         data_out => rom_data
     );
