@@ -674,7 +674,7 @@ begin
                        end if;
                     end if;
                     casOut      <= '0';
-                elsif (comms_mode = "10" and motor_int = '1') then
+                elsif (comms_mode = "10") then
                     -- Update the state at 1200Hz
                     if general_counter(13 downto 0) = 0 then                            
                         -- wait to TDEmpty interrupt to be cleared before starting
