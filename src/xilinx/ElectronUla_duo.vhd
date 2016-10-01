@@ -21,47 +21,50 @@ use ieee.numeric_std.all;
 -- TODO:
 -- NMI_n needs adding
 -- HS_n  needs adding
--- CasIn needs adding
--- CasOut needs adding
--- CasMotor needs adding
+-- RAM lines need adding (RA7..0, RD3..0, RAS, CAS, WE)
 -- clock pll currently running out of spec (16MHz, min should be 19MHz)
 
 entity ElectronULA_duo is
     port (
-        clk_in    : in  std_logic;
+        clk_in        : in  std_logic;
 
         -- CPU Interface
-        clk_out   : out   std_logic;
-        addr      : in    std_logic_vector(15 downto 0);
-        data      : inout std_logic_vector(7 downto 0);
-        R_W_n     : in  std_logic;
-        RST_n     : inout  std_logic;
-        IRQ_n     : out std_logic;
+        clk_out       : out   std_logic;
+        addr          : in    std_logic_vector(15 downto 0);
+        data          : inout std_logic_vector(7 downto 0);
+        R_W_n         : in  std_logic;
+        RST_n         : inout  std_logic;
+        IRQ_n         : out std_logic;
 
         -- Data Bus Enble
-        DBE_n     : out std_logic;
+        DBE_n         : out std_logic;
 
         -- Rom Enable
-        ROM_n     : out std_logic;
+        ROM_n         : out std_logic;
 
         -- Video
-        red       : out std_logic;
-        green     : out std_logic;
-        blue      : out std_logic;
-        csync     : out std_logic;
+        red           : out std_logic;
+        green         : out std_logic;
+        blue          : out std_logic;
+        csync         : out std_logic;
 
         -- Audio
-        sound     : out std_logic;
+        sound         : out std_logic;
 
         -- Keyboard
-        kbd       : in  std_logic_vector(3 downto 0);
-        caps      : out std_logic;
+        kbd           : in  std_logic_vector(3 downto 0);
+        caps          : out std_logic;
+        
+        -- Cassette
+        casIn         : in  std_logic;
+        casOut        : out std_logic;
+        casMO         : out std_logic;
 
         -- SD Card
-        SDMISO         : in  std_logic;
-        SDSS           : out std_logic;
-        SDCLK          : out std_logic;
-        SDMOSI         : out std_logic;
+        SDMISO        : in  std_logic;
+        SDSS          : out std_logic;
+        SDCLK         : out std_logic;
+        SDMOSI        : out std_logic;
 
         -- Misc
         ARDUINO_RESET : out std_logic;
@@ -183,15 +186,15 @@ begin
         SDMOSI    => SDMOSI,
 
         -- Casette
-        casIn     => '1',
-        casOut    => open,
+        casIn     => casIn,
+        casOut    => casOut,
 
         -- Keyboard
         kbd       => kbd,
 
         -- MISC
         caps      => caps,
-        motor     => open,
+        motor     => casMO,
 
         rom_latch => rom_latch,
 
