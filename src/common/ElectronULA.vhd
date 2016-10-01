@@ -572,18 +572,28 @@ begin
                     end if;
                 end if;
                 if (comms_mode = "00") then
+                    -- Cassette In Mode
                     if (casIn2 = '0') then
                         general_counter <= (others => '0');
                     else
                         general_counter <= general_counter + 1;
                     end if;
                 elsif (comms_mode = "01") then
-                    -- Sound Frequency = 1MHz / [16 * (S + 1)]
+                    -- Sound Mode - Frequency = 1MHz / [16 * (S + 1)]
                     if (general_counter = 0) then
                         general_counter <= counter & "00000000";
                         sound_bit <= not sound_bit;
                     else
                         general_counter <= general_counter - 1;
+                    end if;
+                elsif (comms_mode = "10") then
+                    -- Cassette Out Mode
+                    -- Bit 12 is at 2404Hz
+                    -- Bit 13 is at 1202Hz
+                    if (general_counter(11 downto 0) = 0) then
+                        general_counter <= general_counter - x"301";
+                    else
+                        general_counter <= general_counter - x"001";
                     end if;
                 end if;
 
@@ -663,11 +673,43 @@ begin
                            end if;
                        end if;
                     end if;
+                    casOut      <= '0';
+                elsif (comms_mode = "10" and motor_int = '1') then
+                    -- Update the state at 1200Hz
+                    if general_counter(13 downto 0) = 0 then                            
+                        -- wait to TDEmpty interrupt to be cleared before starting
+                        if databits = 0 then
+                            if isr(5) = '0' then
+                                databits <= x"9";
+                            end if;
+                        else
+                            -- set the TDEmpty interrpt after the last data bit is sent
+                            if databits = 1 then
+                                isr(5) <= '1';
+                            end if;
+                            -- shift the data shift register if not the start bit
+                            -- shifting a 1 at the top end gives us the correct stop bit
+                            if databits /= 9 then
+                                data_shift <= '1' & data_shift(7 downto 1);
+                            end if;
+                            -- move to the next state
+                            databits <= databits - 1;
+                        end if;
+                    end if;
+                    -- Generate the cassette out tone based on the current state
+                    if databits = 9 or (databits > 0 and data_shift(0) = '0') then
+                        -- start bit or data bit "0" = 1200Hz
+                        casOut <= general_counter(13);
+                    else
+                        -- stop bit or data bit "1" or any other time= 2400Hz
+                        casOut <= general_counter(12);
+                    end if;
                 else
                     cindat      <= '0';
                     cintone     <= '0';
                     databits    <= (others => '0');
                     ignore_next <= '0';
+                    casOut      <= '0';
                 end if;
 
                 -- ULA Writes
@@ -1067,8 +1109,6 @@ begin
 
     caps  <= caps_int;
     motor <= motor_int;
-
-    casOut <= '0';
 
 --------------------------------------------------------
 -- clock enable generator
