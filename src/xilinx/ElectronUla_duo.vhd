@@ -22,7 +22,6 @@ use ieee.numeric_std.all;
 -- NMI_n needs adding
 -- HS_n  needs adding
 -- RAM lines need adding (RA7..0, RD3..0, RAS, CAS, WE)
--- clock pll currently running out of spec (16MHz, min should be 19MHz)
 
 entity ElectronULA_duo is
     port (
@@ -75,6 +74,7 @@ end;
 
 architecture behavioral of ElectronULA_duo is
 
+signal clock_x           : std_logic;
 signal clock_16          : std_logic;
 signal clock_24          : std_logic;
 signal clock_32          : std_logic;
@@ -108,9 +108,15 @@ signal turbo             : std_logic_vector(1 downto 0);
 
 begin
 
+    inst_dcm_16_32 : entity work.dcm3 port map(
+        CLKIN_IN          => clk_in,
+        -- used as a video clock when the ULA is in 50Hz VGA Mode
+        CLKFX_OUT         => clock_x
+    );
+
     inst_pll: entity work.pll2 port map(
         -- 16 MHz input clock
-        CLKIN_IN => clk_in,
+        CLKIN_IN => clock_x,
         -- the main system clock, and also the video clock in sRGB mode
         CLK0_OUT => clock_16,
         -- used as a 24.00MHz for the SAA5050 in Mode 7
@@ -121,7 +127,7 @@ begin
         CLK3_OUT  => clock_40
     );
 
-    inst_dcm : entity work.dcm2 port map(
+    inst_dcm_16_33 : entity work.dcm2 port map(
         CLKIN_IN          => clk_in,
         -- used as a video clock when the ULA is in 50Hz VGA Mode
         CLKFX_OUT         => clock_33

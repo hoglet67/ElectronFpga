@@ -37,13 +37,6 @@ architecture xilinx of pll2 is
 begin
 
     GND_BIT <= '0';
-    
-    -- This PLL completely de-skews the clock network wrt the input pin
-    -- Note: the BUFIO2 instance needed manually placing in the .ucf file
-    
-    -- Clock input io2 buffer
-    CLKIN_BUFIO2_INST : BUFIO2
-        port map (I => CLKIN_IN, DIVCLK => CLKIN);
 
     -- Clock feedback output buffer
     CLKFB_BUFG_INST : BUFG
@@ -80,7 +73,7 @@ begin
         CLK_FEEDBACK         => "CLKFBOUT",
         COMPENSATION         => "SYSTEM_SYNCHRONOUS", -- not sure this is correct
         DIVCLK_DIVIDE        => 1,
-        CLKFBOUT_MULT        => 30,         -- 16 x 30 = 480MHz
+        CLKFBOUT_MULT        => 15,         -- 32 x 15 = 480MHz
         CLKFBOUT_PHASE       => 0.000,
         CLKOUT0_DIVIDE       => 30,         -- 480 / 30 = 16MHz
         CLKOUT0_PHASE        => 0.000,
@@ -94,11 +87,11 @@ begin
         CLKOUT3_DIVIDE       => 12,         -- 480 / 12 = 40 MHZ
         CLKOUT3_PHASE        => 0.000,
         CLKOUT3_DUTY_CYCLE   => 0.500,
-        CLKIN_PERIOD         => 50.000,     -- WARNING, this is 20MHz, should be 16MHz, but this is < min of 19MHz
+        CLKIN_PERIOD         => 31.250,
         REF_JITTER           => 0.010)
     port map (
         -- Input clock control
-        CLKIN               => CLKIN,
+        CLKIN               => CLKIN_IN,
         CLKFBIN             => CLKFBIN,
         -- Output clocks
         CLKFBOUT            => CLKFBOUT,

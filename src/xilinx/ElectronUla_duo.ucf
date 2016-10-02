@@ -8,7 +8,7 @@ CONFIG PROHIBIT=P69;
 CONFIG PROHIBIT=P60;
 
 NET "clk_in" TNM_NET = clk_period_grp1;
-TIMESPEC TS_clk_period1 = PERIOD "clk_period_grp1" 50.00ns HIGH;
+TIMESPEC TS_clk_period1 = PERIOD "clk_period_grp1" 62.50ns HIGH;
 
 #####################################
 # Pin placements
