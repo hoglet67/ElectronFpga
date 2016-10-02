@@ -197,6 +197,7 @@ begin
     generic map (
         IncludeMMC       => true,
         Include32KRAM    => false,
+        IncludeVGA       => true,
         IncludeJafaMode7 => IncludeJafaMode7
     )
     port map (
