@@ -189,7 +189,8 @@ architecture behavioral of ElectronULA is
   -- Tape Interface
   signal cintone        : std_logic;
   signal cindat         : std_logic;
-  signal databits       : std_logic_vector(3 downto 0);
+  signal cinbits        : std_logic_vector(3 downto 0);
+  signal coutbits       : std_logic_vector(3 downto 0);
   signal casIn1         : std_logic;
   signal casIn2         : std_logic;
   signal casIn3         : std_logic;
@@ -620,7 +621,7 @@ begin
                             -- High Tone detected
                             cindat  <= '0';
                             cintone <= '1';
-                            databits <= (others => '0');
+                            cinbits <= (others => '0');
                             -- Generate the high tone detect interrupt
                             isr(6) <= '1';
 
@@ -628,15 +629,15 @@ begin
                             -- Start bit detected
                             cindat  <= '1';
                             cintone <= '0';
-                            databits <= (others => '0');
+                            cinbits <= (others => '0');
 
                         elsif (cindat = '1' and ignore_next = '1') then
                             -- Ignoring the second pulse in a bit at 2400Hz
                             ignore_next <= '0';
 
-                        elsif (cindat = '1' and databits < 9) then
+                        elsif (cindat = '1' and cinbits < 9) then
 
-                            if (databits < 8) then
+                            if (cinbits < 8) then
                                 if (general_counter > 5000) then
                                     -- shift in a zero
                                     data_shift <= '0' & data_shift(7 downto 1);
@@ -646,7 +647,7 @@ begin
                                 end if;
                                 -- Generate the receive data int as soon as the
                                 -- last bit has been shifted in.
-                                if (databits = 7) then
+                                if (cinbits = 7) then
                                     isr(4) <= '1';
                                 end if;
                             end if;
@@ -657,61 +658,60 @@ begin
                                 ignore_next <= '1';
                             end if;
                             -- Move on to the next data bit
-                            databits <= databits + 1;
-                        elsif (cindat = '1' and databits = 9) then
+                            cinbits <= cinbits + 1;
+                        elsif (cindat = '1' and cinbits = 9) then
                             if (general_counter > 5000) then
                                 -- Found next start bit...
                                 cindat  <= '1';
                                 cintone <= '0';
-                                databits <= (others => '0');
+                                cinbits <= (others => '0');
                             else
                                 -- Back in tone again
                                 cindat  <= '0';
                                 cintone <= '1';
-                                databits <= (others => '0');
+                                cinbits <= (others => '0');
                                 -- Generate the high tone detect interrupt
                                 isr(6) <= '1';
                            end if;
                        end if;
                     end if;
-                    casOut      <= '0';
-                elsif (comms_mode = "10") then
-                    -- Update the state at 1200Hz
-                    if general_counter(13 downto 0) = 0 then                            
-                        -- wait to TDEmpty interrupt to be cleared before starting
-                        if databits = 0 then
-                            if isr(5) = '0' then
-                                databits <= x"9";
-                            end if;
-                        else
-                            -- set the TDEmpty interrpt after the last data bit is sent
-                            if databits = 1 then
-                                isr(5) <= '1';
-                            end if;
-                            -- shift the data shift register if not the start bit
-                            -- shifting a 1 at the top end gives us the correct stop bit
-                            if databits /= 9 then
-                                data_shift <= '1' & data_shift(7 downto 1);
-                            end if;
-                            -- move to the next state
-                            databits <= databits - 1;
-                        end if;
-                    end if;
-                    -- Generate the cassette out tone based on the current state
-                    if databits = 9 or (databits > 0 and data_shift(0) = '0') then
-                        -- start bit or data bit "0" = 1200Hz
-                        casOut <= general_counter(13);
-                    else
-                        -- stop bit or data bit "1" or any other time= 2400Hz
-                        casOut <= general_counter(12);
-                    end if;
                 else
                     cindat      <= '0';
                     cintone     <= '0';
-                    databits    <= (others => '0');
+                    cinbits     <= (others => '0');
                     ignore_next <= '0';
                     casOut      <= '0';
                 end if;
+
+                -- regardless of the comms mode, update coutbits state (at 1200Hz)
+                if general_counter(13 downto 0) = 0 then                            
+                    -- wait to TDEmpty interrupt to be cleared before starting
+                    if coutbits = 0 then
+                        if isr(5) = '0' then
+                            coutbits <= x"9";
+                        end if;
+                    else
+                        -- set the TDEmpty interrpt after the last data bit is sent
+                        if coutbits = 1 then
+                            isr(5) <= '1';
+                        end if;
+                        -- shift the data shift register if not the start bit
+                        -- shifting a 1 at the top end gives us the correct stop bit
+                        if comms_mode = "10" and coutbits /= 9 then
+                            data_shift <= '1' & data_shift(7 downto 1);
+                        end if;
+                        -- move to the next state
+                        coutbits <= coutbits - 1;
+                    end if;
+                end if;
+                -- Generate the cassette out tone based on the current state
+                if coutbits = 9 or (coutbits > 0 and data_shift(0) = '0') then
+                    -- start bit or data bit "0" = 1200Hz
+                    casOut <= general_counter(13);
+                else
+                    -- stop bit or data bit "1" or any other time= 2400Hz
+                    casOut <= general_counter(12);
+                end if;                
 
                 -- ULA Writes
                 if (cpu_clken = '1') then
