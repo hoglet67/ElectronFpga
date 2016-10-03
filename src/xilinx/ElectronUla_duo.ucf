@@ -54,7 +54,7 @@ NET addr<1>     LOC="P48"  | IOSTANDARD=LVTTL;
 # and using this causes configuraton problems
 # so instead we connect it so a spare input
 NET addr<0>     LOC="P100" | IOSTANDARD=LVTTL;
-NET casIn       LOC="P101" | IOSTANDARD=LVCMOS25;
+NET casIn       LOC="P101" | IOSTANDARD=LVCMOS33;
 NET casOut      LOC="P102" | IOSTANDARD=LVTTL | DRIVE=8 | SLEW=SLOW;
 NET casMO       LOC="P105" | IOSTANDARD=LVTTL | DRIVE=8 | SLEW=SLOW;
 
