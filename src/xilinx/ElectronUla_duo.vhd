@@ -106,6 +106,8 @@ signal rom_we            : std_logic;
 
 signal turbo             : std_logic_vector(1 downto 0);
 
+signal caps_led          : std_logic;
+
 begin
 
     inst_dcm_16_32 : entity work.dcm3 port map(
@@ -200,7 +202,7 @@ begin
         kbd       => kbd,
 
         -- MISC
-        caps      => caps,
+        caps      => caps_led,
         motor     => casMO,
 
         rom_latch => rom_latch,
@@ -217,7 +219,8 @@ begin
     green <= video_green(3);
     blue  <= video_blue(3);
     csync <= video_hsync;
-
+    caps  <= not caps_led;
+    
     -- IRQ is open collector to avoid contention with the expansion bus
     IRQ_n <= '0' when ula_irq_n = '0' else 'Z';
 
