@@ -680,7 +680,6 @@ begin
                     cintone     <= '0';
                     cinbits     <= (others => '0');
                     ignore_next <= '0';
-                    casOut      <= '0';
                 end if;
 
                 -- regardless of the comms mode, update coutbits state (at 1200Hz)
