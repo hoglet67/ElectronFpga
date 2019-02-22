@@ -12,6 +12,7 @@ nohup.out
 not_in_git/
 roms/tmp/
 *.bak
+.DS_Store
 
 src/xilinx/CpuMon_bd.bmm
 
