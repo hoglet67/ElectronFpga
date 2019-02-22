@@ -9,11 +9,12 @@ https://stardot.org.uk/forums/viewtopic.php?f=3&t=9223
 TO DO
 -----
 
-- Make a KiCad footprint for the ULA, referring to dimensions in Dave Hitchins' DXF -- https://stardot.org.uk/forums/viewtopic.php?f=3&t=9223&start=180#p208507
+- ~~Make a KiCad footprint for the ULA, referring to dimensions in Dave Hitchins' DXF -- https://stardot.org.uk/forums/viewtopic.php?f=3&t=9223&start=180#p208507~~
 
-- Check that the bounding box is OK.  Right now it's 50 mm x 50 mm, to keep costs down (JLCPCB will do a 4-layer prototype run for $12 at this size).
+- Check that the bounding box is OK.  Right now it's 50 mm x 50 mm, to keep costs down (JLCPCB will do a 4-layer prototype run for $12 at this size).  Looks like the ULA will use up most of this!
 
 - Add ULA to the netlist file (max10_electron_ula.py) -- refer to Electron schematic at http://www.acornatom.nl/hardware/Electron-iss4.png
+  - Partly done: need to add all the signal names and copy over jms2's classifications
 
 - Figure out what buffers we need.  Which ULA pins are inputs, outputs, open collector?
 
