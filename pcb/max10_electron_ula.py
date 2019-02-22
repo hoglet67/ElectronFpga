@@ -31,6 +31,106 @@ import myelin_kicad_pcb
 Pin = myelin_kicad_pcb.Pin
 
 
+# Electron ULA header -- this will plug into the PGA socket once one has been
+# installed, as shown in Dave Hitchins' post:
+# https://stardot.org.uk/forums/viewtopic.php?f=3&t=9223&start=60#p118234
+
+# The ULA came in various different forms over the years, but in all cases the
+# PCB can take a standard 68-pin PGA socket once the ULA socket (Issue 4) or
+# ULA carrier board (Issue 6) is desoldered.  Details by Hoglet here:
+# https://stardot.org.uk/forums/viewtopic.php?f=3&t=9223&start=90#p149175
+
+# The following list of signal details was collated by jmw2:
+# https://stardot.org.uk/forums/viewtopic.php?f=3&t=9223&start=30#p105883
+#
+# 16 address lines (inputs only)
+# 8 processor data lines (bi-directional)
+# 4 keyboard lines, CAPS LK, RST (inputs only)
+# IRQ, NMI, Phi0, RnW (outputs only)
+# Clock and Divide-by-13 (inputs)
+# R, G, B & sync (outputs)
+# 4 cassette lines (CASOUT, CASRC and CASMO outputs, CASIN input)
+# Sound (output)
+# nPOR (power-on reset)
+
+ula = myelin_kicad_pcb.Component(
+    footprint="Package_LCC:PLCC-68_THT-Socket",
+    identifier="ULA",
+    value="ULA header",
+    desc="Set of pin headers to plug into an Acorn Electron ULA socket",
+    pins=[
+        Pin( 1, "", ""),
+        Pin( 2, "", ""),
+        Pin( 3, "", ""),
+        Pin( 4, "", ""),
+        Pin( 5, "", ""),
+        Pin( 6, "", ""),
+        Pin( 7, "", ""),
+        Pin( 8, "", ""),
+        Pin( 9, "", ""),
+        Pin(10, "", ""),
+        Pin(11, "", ""),
+        Pin(12, "", ""),
+        Pin(13, "", ""),
+        Pin(14, "", ""),
+        Pin(15, "", ""),
+        Pin(16, "", ""),
+        Pin(17, "", ""),
+        Pin(18, "", ""),
+        Pin(19, "", ""),
+        Pin(20, "", ""),
+        Pin(21, "", ""),
+        Pin(22, "", ""),
+        Pin(23, "", ""),
+        Pin(24, "", ""),
+        Pin(25, "", ""),
+        Pin(26, "", ""),
+        Pin(27, "", ""),
+        Pin(28, "", ""),
+        Pin(29, "", ""),
+        Pin(30, "", ""),
+        Pin(31, "", ""),
+        Pin(32, "", ""),
+        Pin(33, "", ""),
+        Pin(34, "", ""),
+        Pin(35, "", ""),
+        Pin(36, "", ""),
+        Pin(37, "", ""),
+        Pin(38, "", ""),
+        Pin(39, "", ""),
+        Pin(40, "", ""),
+        Pin(41, "", ""),
+        Pin(42, "", ""),
+        Pin(43, "", ""),
+        Pin(44, "", ""),
+        Pin(45, "", ""),
+        Pin(46, "", ""),
+        Pin(47, "", ""),
+        Pin(48, "", ""),
+        Pin(49, "", ""),
+        Pin(50, "", ""),
+        Pin(51, "", ""),
+        Pin(52, "", ""),
+        Pin(53, "", ""),
+        Pin(54, "", ""),
+        Pin(55, "", ""),
+        Pin(56, "", ""),
+        Pin(57, "", ""),
+        Pin(58, "", ""),
+        Pin(59, "", ""),
+        Pin(60, "", ""),
+        Pin(61, "", ""),
+        Pin(62, "", ""),
+        Pin(63, "", ""),
+        Pin(64, "", ""),
+        Pin(65, "", ""),
+        Pin(66, "", ""),
+        Pin(67, "", ""),
+        Pin(68, "", ""),
+    ],
+)
+
+
 fpga = myelin_kicad_pcb.Component(
     footprint="myelin-kicad:intel_ubga169",
     identifier="FPGA",
