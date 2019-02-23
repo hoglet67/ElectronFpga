@@ -61,74 +61,97 @@ ula = myelin_kicad_pcb.Component(
     value="ULA header",
     desc="Set of pin headers to plug into an Acorn Electron ULA socket",
     pins=[
-        Pin( 1, "", ""),
-        Pin( 2, "", ""),
-        Pin( 3, "", ""),
-        Pin( 4, "", ""),
-        Pin( 5, "", ""),
-        Pin( 6, "", ""),
-        Pin( 7, "", ""),
-        Pin( 8, "", ""),
-        Pin( 9, "", ""),
-        Pin(10, "", ""),
-        Pin(11, "", ""),
-        Pin(12, "", ""),
-        Pin(13, "", ""),
-        Pin(14, "", ""),
-        Pin(15, "", ""),
-        Pin(16, "", ""),
-        Pin(17, "", ""),
-        Pin(18, "", ""),
-        Pin(19, "", ""),
-        Pin(20, "", ""),
-        Pin(21, "", ""),
-        Pin(22, "", ""),
-        Pin(23, "", ""),
-        Pin(24, "", ""),
-        Pin(25, "", ""),
-        Pin(26, "", ""),
-        Pin(27, "", ""),
-        Pin(28, "", ""),
-        Pin(29, "", ""),
-        Pin(30, "", ""),
-        Pin(31, "", ""),
-        Pin(32, "", ""),
-        Pin(33, "", ""),
-        Pin(34, "", ""),
-        Pin(35, "", ""),
-        Pin(36, "", ""),
-        Pin(37, "", ""),
-        Pin(38, "", ""),
-        Pin(39, "", ""),
-        Pin(40, "", ""),
-        Pin(41, "", ""),
-        Pin(42, "", ""),
-        Pin(43, "", ""),
-        Pin(44, "", ""),
-        Pin(45, "", ""),
-        Pin(46, "", ""),
-        Pin(47, "", ""),
-        Pin(48, "", ""),
-        Pin(49, "", ""),
-        Pin(50, "", ""),
-        Pin(51, "", ""),
-        Pin(52, "", ""),
-        Pin(53, "", ""),
-        Pin(54, "", ""),
-        Pin(55, "", ""),
-        Pin(56, "", ""),
-        Pin(57, "", ""),
-        Pin(58, "", ""),
-        Pin(59, "", ""),
-        Pin(60, "", ""),
-        Pin(61, "", ""),
-        Pin(62, "", ""),
-        Pin(63, "", ""),
-        Pin(64, "", ""),
-        Pin(65, "", ""),
-        Pin(66, "", ""),
-        Pin(67, "", ""),
-        Pin(68, "", ""),
+        # Ordered counter-clockwise, as shown in Appendix F of the Electron AUG
+
+        # DRAM (not connected to FPGA)
+        Pin(34, "RAM0", ""),     # IO
+        Pin(37, "RAM1", ""),     # IO
+        Pin(40, "RAM2", ""),     # IO
+        Pin(44, "RAM3", ""),     # IO
+        Pin(29, "nWE",  "3V3"),  # O
+        Pin(52, "nRAS", "3V3"),  # O
+        Pin(53, "nCAS", "3V3"),  # O
+        Pin(22, "RA0",  "3V3"),  # O
+        Pin(19, "RA1",  "3V3"),  # O
+        Pin(18, "RA2",  "3V3"),  # O
+        Pin(16, "RA3",  "3V3"),  # O
+        Pin(11, "RA4",  "3V3"),  # O
+        Pin( 8, "RA5",  "3V3"),  # O
+        Pin( 7, "RA6",  "3V3"),  # O
+        Pin( 6, "RA7",  "3V3"),  # O
+
+        # Keyboard
+        Pin(27, "KBD0",      "KBD0_5V"),  # I
+        Pin(28, "KBD1",      "KBD1_5V"),  # I
+        Pin(31, "KBD2",      "KBD2_5V"),  # I
+        Pin(32, "KBD3",      "KBD3_5V"),  # I
+        Pin(63, "CAPS_LOCK", "CAPS_LOCK"),  # OC O, drives caps LED via 470R (~6mA)
+
+        Pin(58, "nRST", "nRESET"),  # OC IO
+        Pin(61, "nROM", "nROM"),    # O
+
+        # Address bus: input
+        Pin( 5, "A0",  "A0_5V"),   # I
+        Pin( 1, "A1",  "A1_5V"),   # I
+        Pin(12, "A2",  "A2_5V"),   # I
+        Pin(24, "A3",  "A3_5V"),   # I
+        Pin(21, "A4",  "A4_5V"),   # I
+        Pin(20, "A5",  "A5_5V"),   # I
+        Pin(17, "A6",  "A6_5V"),   # I
+        Pin(15, "A7",  "A7_5V"),   # I
+        Pin( 2, "A8",  "A8_5V"),   # I
+        Pin(26, "A9",  "A9_5V"),   # I
+        Pin(25, "A10", "A10_5V"),  # I
+        Pin(23, "A11", "A11_5V"),  # I
+        Pin(13, "A12", "A12_5V"),  # I
+        Pin(14, "A13", "A13_5V"),  # I
+        Pin(10, "A14", "A14_5V"),  # I
+        Pin(56, "A15", "A15_5V"),  # I
+
+        # Data bus: input/output
+        Pin(33, "PD0", "PD0_5V"),  # IO
+        Pin(35, "PD1", "PD1_5V"),  # IO
+        Pin(36, "PD2", "PD2_5V"),  # IO
+        Pin(38, "PD3", "PD3_5V"),  # IO
+        Pin(39, "PD4", "PD4_5V"),  # IO
+        Pin(41, "PD5", "PD5_5V"),  # IO
+        Pin(42, "PD6", "PD6_5V"),  # IO
+        Pin(45, "PD7", "PD7_5V"),  # IO
+
+        Pin(57, "nNMI",    "nNMI_5V"),     # OC IO
+        Pin(60, "PHI_OUT", "PHI_OUT_5V"),  # O
+        Pin(30, "nIRQ",    "nIRQ_5V"),     # OC IO
+        Pin(46, "RnW",     "RnW_5V"),      # I
+
+        # Clocks and ground
+        Pin(55, "DIV13_IN", "CLK_DIV13_5V"),  # I
+        Pin(68, "GND", "GND"),
+        Pin(51, "GND", "GND"),
+        Pin(49, "CLOCK_IN", "CLK_16MHZ_5V"),  # I
+
+        # Video
+        Pin(67, "nHS",    "nHS_5V"),     # O: horizontal sync
+        Pin( 3, "RED",    "RED_5V"),     # O
+        Pin( 4, "GREEN",  "GREEN_5V"),   # O
+        Pin(66, "BLUE",   "BLUE_5V"),    # O
+        Pin(65, "nCSYNC", "nCSYNC_5V"),  # O: composite sync
+
+        # Power-on reset
+        Pin(54, "nPOR", "nPOR_5V"),  # I: power-on reset
+
+        # Audio
+        Pin(62, "SOUND_OUT", "SOUND_OUT_5V"),  # O
+
+        # Cassettte
+        Pin(59, "CAS_IN",  "CAS_IN_5V"),   # I
+        Pin(64, "CAS_MO",  "CAS_MO_5V"),   # O: motor relay
+        Pin(47, "CAS_RC",  "CAS_RC_5V"),   # TODO O?  RC filter?  NC?
+        Pin(50, "CAS_OUT", "CAS_OUT_5V"),  # O
+
+        # Power
+        Pin(48, "VCC1", "5V"),  # direct to 5V
+        Pin( 9, "VCC2", "5V"),  # 5V via 24R
+        Pin(43, "VCC2", "5V"),  # 5V via 24R
     ],
 )
 
@@ -373,6 +396,10 @@ reg_out_cap = myelin_kicad_pcb.C0805("1u", "3V3", "GND", ref="C3")
 # to have 16-bit access, I can easily revert the pinout here to the Arcflash
 # one.
 
+# Alternatively we could switch this out for a serial flash chip (cmorley
+# suggests QSPI) and either use it directly or copy it to RAM before use.
+# This might make room for more pins to use for RAM.
+
 flash = [
     myelin_kicad_pcb.Component(
         footprint="myelin-kicad:cypress_lae064_fbga",
@@ -449,6 +476,17 @@ flash_caps = [
 
 # Datasheet:
 # https://media.digikey.com/pdf/Data%20Sheets/Alliance%20Memory%20PDFs/MT48LC64M4A2,%2032M8A2,%2016M16A2.pdf
+
+# A simpler to use alternative would be the AS1C512K16P PSRAM, which is a DRAM
+# which handles all the DRAM details internally and provides an SRAM-like
+# interface.  1MB (512kb x 16) using 40 pins, or 512kB (512kb x 8) using 30
+# pins.  6 x 7 mm BGA, 0.75 mm pitch. ($1.65)
+
+# Another option: AS1C1M16P, 6 x 7 mm BGA, 0.75mm pitch, 1M x 16 PSRAM ($1.95)
+
+# Another option: AS1C2M16P, 6 x 7 mm BGA, 0.75mm pitch, 2M x 16 PSRAM ($2.28)
+
+# Another option: IS61WV25616EDBLL, 6 x 8 mm BGA, 0.75mm pitch, 256k x 16 10ns SRAM ($2.50)
 
 
 ### 
