@@ -338,12 +338,28 @@ fpga_decoupling = [
 
 ### POWER SUPPLY
 
-# TODO add 3v3 reg and caps
-
 bulk = [
     myelin_kicad_pcb.C0805("1u", "3V3", "GND", ref="C%d" % r, handsoldering=False)
     for r in range(8, 10)
 ]
+
+power_in_cap = myelin_kicad_pcb.C0805("10u", "GND", "5V", ref="C1")
+
+# Power regulation from 5V down to 3.3V.
+regulator = myelin_kicad_pcb.Component(
+    footprint="Package_TO_SOT_SMD:SOT-89-3",
+    identifier="REG",
+    value="AP7365-33YG-XX",  # 600 mA, 0.3V dropout
+    desc="3.3V LDO regulator, e.g. Digikey AP7365-33YG-13DICT-ND.  Search for the exact part number because there are many variants.",
+    pins=[
+        # AP7365-Y: VOUT GND VIN  AP7365-33YG-...
+        Pin(1, "VOUT", ["3V3"]),
+        Pin(2, "GND", ["GND"]),  # sot-89 tab
+        Pin(3, "VIN", ["5V"]),
+    ],
+)
+reg_in_cap = myelin_kicad_pcb.C0805("1u", "GND", "5V", ref="C2")
+reg_out_cap = myelin_kicad_pcb.C0805("1u", "3V3", "GND", ref="C3")
 
 
 ### FLASH MEMORY (optional)
