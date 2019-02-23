@@ -85,9 +85,9 @@ ula = myelin_kicad_pcb.Component(
         Pin(28, "KBD1",      "KBD1_5V"),  # I
         Pin(31, "KBD2",      "KBD2_5V"),  # I
         Pin(32, "KBD3",      "KBD3_5V"),  # I
-        Pin(63, "CAPS_LOCK", "CAPS_LOCK"),  # OC O, drives caps LED via 470R (~6mA)
+        Pin(63, "CAPS_LOCK", "CAPS_LOCK"),  # O, drives caps LED via 470R (~6mA)
 
-        Pin(58, "nRST", "nRESET"),  # OC IO
+        Pin(58, "nRST", "nRESET"),  # OC I
         Pin(61, "nROM", "nROM"),    # O
 
         # Address bus: input
@@ -118,9 +118,9 @@ ula = myelin_kicad_pcb.Component(
         Pin(42, "PD6", "PD6_5V"),  # IO
         Pin(45, "PD7", "PD7_5V"),  # IO
 
-        Pin(57, "nNMI",    "nNMI_5V"),     # OC IO
+        Pin(57, "nNMI",    "nNMI_5V"),     # OC I
         Pin(60, "PHI_OUT", "PHI_OUT_5V"),  # O
-        Pin(30, "nIRQ",    "nIRQ_5V"),     # OC IO
+        Pin(30, "nIRQ",    "nIRQ_5V"),     # OC O
         Pin(46, "RnW",     "RnW_5V"),      # I
 
         # Clocks and ground
