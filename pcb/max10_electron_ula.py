@@ -42,7 +42,7 @@ Pin = myelin_kicad_pcb.Pin
 # ULA carrier board (Issue 6) is desoldered.  Details by Hoglet here:
 # https://stardot.org.uk/forums/viewtopic.php?f=3&t=9223&start=90#p149175
 
-# The following list of signal details was collated by jmw2:
+# The following list of signal details was collated by jms2:
 # https://stardot.org.uk/forums/viewtopic.php?f=3&t=9223&start=30#p105883
 #
 # 16 address lines (inputs only)
