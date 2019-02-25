@@ -387,95 +387,111 @@ reg_out_cap = myelin_kicad_pcb.C0805("1u", "3V3", "GND", ref="C3")
 
 ### FLASH MEMORY (optional)
 
-# Arcflash uses an S29GL064S chip in LAE064 (9x9mm 64-ball 1.0mm pitch)
-# package.  We can go even smaller with the VBK048 (8.15 x 6.15 mm 48-ball
-# 0.8mm pitch) package, but I already have a verified footprint for the LAE064
-# chip, so let's start with that.
-
-# I'm assuming we want the chip in 8-bit mode, although if it would be useful
-# to have 16-bit access, I can easily revert the pinout here to the Arcflash
-# one.
-
-# Alternatively we could switch this out for a serial flash chip (cmorley
-# suggests QSPI IS25LP016D, which can receive instructions via QPI, so a byte
-# at a random address can be read in 16 cycles --
-# https://stardot.org.uk/forums/viewtopic.php?p=228781#p228781) and either use
-# it directly or copy it to RAM before use. This will make room for more pins
-# to use for RAM.
+# A serial flash chip (cmorley suggests QSPI IS25LP016D, which can receive
+# instructions via QPI, so a byte at a random address can be read in 16 cycles
+# -- https://stardot.org.uk/forums/viewtopic.php?p=228781#p228781) and either
+# use it directly or copy it to RAM before use. This will make room for more
+# pins to use for RAM.
 
 # It looks like "QPI" chips can read the instruction in two clocks on all four
 # IOs, whereas "Quad SPI" chips typically require 8 clocks on one IO.
 
-# Lots of QPI chips come in 8-SO; make sure to avoid the larger 5.3mm chips
-# (8-SOIJ in KiCad) in favor of 3.9mm 8-SOIC.
+# Not sure on the ideal footprint here; we might be able to fit an 8-SO chip,
+# but if not, there are some tiny QFN options.
+
+# Note that lots of QPI chips come in 8-SO; make sure to get the right
+# footprint (5.3mm 8-SOIJ or 3.9mm 8-SOIC).
 
 flash = [
     myelin_kicad_pcb.Component(
-        footprint="myelin-kicad:cypress_lae064_fbga",
+        footprint="Package_SO:SOIJ-8_5.3x5.3mm_P1.27mm",
         identifier="FLASH",
-        value="S29GL064S70DHI010",  # 64-ball FBGA, 1mm pitch, 9x9mm (c.f. 20x14 in TQFP)
-        buses=[""],
+        value="package TBD",
         pins=[
-            Pin("F1", "Vio",     "3V3"),
-            Pin("A2", "A3",      "flash_A3"),
-            Pin("B2", "A4",      "flash_A4"),
-            Pin("C2", "A2",      "flash_A2"),
-            Pin("D2", "A1",      "flash_A1"),
-            Pin("E2", "A0",      "flash_A0"),
-            Pin("F2", "CE#",     "flash_nCE"),
-            Pin("G2", "OE#",     "flash_nOE"),
-            Pin("H2", "VSS",     "GND"),
-            Pin("A3", "A7",      "flash_A7"),
-            Pin("B3", "A17",     "flash_A17"),
-            Pin("C3", "A6",      "flash_A6"),
-            Pin("D3", "A5",      "flash_A5"),
-            Pin("E3", "DQ0",     "flash_DQ0"),
-            Pin("F3", "DQ8",     ""),  # tristated in byte mode
-            Pin("G3", "DQ9",     ""),  # tristated in byte mode
-            Pin("H3", "DQ1",     "flash_DQ1"),
-            Pin("A4", "RY/BY#",  "flash_READY"),
-            Pin("B4", "WP#/ACC"),  # contains an internal pull-up so we can leave it NC
-            Pin("C4", "A18",     "flash_A18"),
-            Pin("D4", "A20",     "flash_A20"),
-            Pin("E4", "DQ2",     "flash_DQ2"),
-            Pin("F4", "DQ10",    ""),  # tristated in byte mode
-            Pin("G4", "DQ11",    ""),  # tristated in byte mode
-            Pin("H4", "DQ3",     "flash_DQ3"),
-            Pin("A5", "WE#",     "flash_nWE"),
-            Pin("B5", "RESET#",  "flash_nRESET"),
-            Pin("C5", "A21",     "flash_A21"),
-            Pin("D5", "A19",     "flash_A19"),
-            Pin("E5", "DQ5",     "flash_DQ5"),
-            Pin("F5", "DQ12",    ""),  # tristated in byte mode
-            Pin("G5", "Vcc",     "3V3"),
-            Pin("H5", "DQ4",     "flash_DQ4"),
-            Pin("A6", "A9",      "flash_A9"),
-            Pin("B6", "A8",      "flash_A8"),
-            Pin("C6", "A10",     "flash_A10"),
-            Pin("D6", "A11",     "flash_A11"),
-            Pin("E6", "DQ7",     "flash_DQ7"),
-            Pin("F6", "DQ14",    ""),  # tristated in byte mode
-            Pin("G6", "DQ13",    ""),  # tristated in byte mode
-            Pin("H6", "DQ6",     "flash_DQ6"),
-            Pin("A7", "A13",     "flash_A13"),
-            Pin("B7", "A12",     "flash_A12"),
-            Pin("C7", "A14",     "flash_A14"),
-            Pin("D7", "A15",     "flash_A15"),
-            Pin("E7", "A16",     "flash_A16"),
-            Pin("F7", "BYTE#",   "GND"),  # always in byte mode
-            Pin("G7", "DQ15/A-1","flash_A-1"),  # extra A bit in byte mode, DQ15 in word mode
-            Pin("H7", "VSS",     "GND"),
-            Pin("D8", "Vio",     "3V3"),
-            Pin("E8", "VSS",     "GND"),
+            Pin("1", "CE#",              "flash_nCE"),
+            Pin("2", "SO_IO1",           "flash_IO1"),
+            Pin("3", "WP#_IO2",          "flash_IO2"),
+            Pin("4", "GND",              "GND"),
+            Pin("5", "SI_IO0",           "flash_IO0"),
+            Pin("6", "SCK",              "flash_SCK"),
+            Pin("7", "HOLD#_RESET#_IO3", "flash_IO3"),
+            Pin("8", "VCC",              "3V3"),
         ],
-    )
+    ),
 ]
-# Three capacitors per chip (2 x Vio, 1 x Vcc)
-flash_caps = [
-    myelin_kicad_pcb.C0805("100n", "3V3", "GND", ref="FC%d" % n)
-    for n in range(3)
-]
+flash_cap = myelin_kicad_pcb.C0805("100n", "3V3", "GND", ref="C4")
 
+
+# The original plan was to include an S29GL064S chip in LAE064 (9x9mm 64-ball
+# 1.0mm pitch) package, as used in Arcflash, except in 8-bit mode.  Retaining
+# this here in case we want to resurrect it at some point.
+#
+# flash = [
+#     myelin_kicad_pcb.Component(
+#         footprint="myelin-kicad:cypress_lae064_fbga",
+#         identifier="FLASH",
+#         value="S29GL064S70DHI010",  # 64-ball FBGA, 1mm pitch, 9x9mm (c.f. 20x14 in TQFP)
+#         buses=[""],
+#         pins=[
+#             Pin("F1", "Vio",     "3V3"),
+#             Pin("A2", "A3",      "flash_A3"),
+#             Pin("B2", "A4",      "flash_A4"),
+#             Pin("C2", "A2",      "flash_A2"),
+#             Pin("D2", "A1",      "flash_A1"),
+#             Pin("E2", "A0",      "flash_A0"),
+#             Pin("F2", "CE#",     "flash_nCE"),
+#             Pin("G2", "OE#",     "flash_nOE"),
+#             Pin("H2", "VSS",     "GND"),
+#             Pin("A3", "A7",      "flash_A7"),
+#             Pin("B3", "A17",     "flash_A17"),
+#             Pin("C3", "A6",      "flash_A6"),
+#             Pin("D3", "A5",      "flash_A5"),
+#             Pin("E3", "DQ0",     "flash_DQ0"),
+#             Pin("F3", "DQ8",     ""),  # tristated in byte mode
+#             Pin("G3", "DQ9",     ""),  # tristated in byte mode
+#             Pin("H3", "DQ1",     "flash_DQ1"),
+#             Pin("A4", "RY/BY#",  "flash_READY"),
+#             Pin("B4", "WP#/ACC"),  # contains an internal pull-up so we can leave it NC
+#             Pin("C4", "A18",     "flash_A18"),
+#             Pin("D4", "A20",     "flash_A20"),
+#             Pin("E4", "DQ2",     "flash_DQ2"),
+#             Pin("F4", "DQ10",    ""),  # tristated in byte mode
+#             Pin("G4", "DQ11",    ""),  # tristated in byte mode
+#             Pin("H4", "DQ3",     "flash_DQ3"),
+#             Pin("A5", "WE#",     "flash_nWE"),
+#             Pin("B5", "RESET#",  "flash_nRESET"),
+#             Pin("C5", "A21",     "flash_A21"),
+#             Pin("D5", "A19",     "flash_A19"),
+#             Pin("E5", "DQ5",     "flash_DQ5"),
+#             Pin("F5", "DQ12",    ""),  # tristated in byte mode
+#             Pin("G5", "Vcc",     "3V3"),
+#             Pin("H5", "DQ4",     "flash_DQ4"),
+#             Pin("A6", "A9",      "flash_A9"),
+#             Pin("B6", "A8",      "flash_A8"),
+#             Pin("C6", "A10",     "flash_A10"),
+#             Pin("D6", "A11",     "flash_A11"),
+#             Pin("E6", "DQ7",     "flash_DQ7"),
+#             Pin("F6", "DQ14",    ""),  # tristated in byte mode
+#             Pin("G6", "DQ13",    ""),  # tristated in byte mode
+#             Pin("H6", "DQ6",     "flash_DQ6"),
+#             Pin("A7", "A13",     "flash_A13"),
+#             Pin("B7", "A12",     "flash_A12"),
+#             Pin("C7", "A14",     "flash_A14"),
+#             Pin("D7", "A15",     "flash_A15"),
+#             Pin("E7", "A16",     "flash_A16"),
+#             Pin("F7", "BYTE#",   "GND"),  # always in byte mode
+#             Pin("G7", "DQ15/A-1","flash_A-1"),  # extra A bit in byte mode, DQ15 in word mode
+#             Pin("H7", "VSS",     "GND"),
+#             Pin("D8", "Vio",     "3V3"),
+#             Pin("E8", "VSS",     "GND"),
+#         ],
+#     )
+# ]
+# # Three capacitors per chip (2 x Vio, 1 x Vcc)
+# flash_caps = [
+#     myelin_kicad_pcb.C0805("100n", "3V3", "GND", ref="FC%d" % n)
+#     for n in range(3)
+# ]
 
 ### RAM (optional)
 
