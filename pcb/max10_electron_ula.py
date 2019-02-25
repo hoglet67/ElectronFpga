@@ -397,8 +397,17 @@ reg_out_cap = myelin_kicad_pcb.C0805("1u", "3V3", "GND", ref="C3")
 # one.
 
 # Alternatively we could switch this out for a serial flash chip (cmorley
-# suggests QSPI) and either use it directly or copy it to RAM before use.
-# This might make room for more pins to use for RAM.
+# suggests QSPI IS25LP016D, which can receive instructions via QPI, so a byte
+# at a random address can be read in 16 cycles --
+# https://stardot.org.uk/forums/viewtopic.php?p=228781#p228781) and either use
+# it directly or copy it to RAM before use. This will make room for more pins
+# to use for RAM.
+
+# It looks like "QPI" chips can read the instruction in two clocks on all four
+# IOs, whereas "Quad SPI" chips typically require 8 clocks on one IO.
+
+# Lots of QPI chips come in 8-SO; make sure to avoid the larger 5.3mm chips
+# (8-SOIJ in KiCad) in favor of 3.9mm 8-SOIC.
 
 flash = [
     myelin_kicad_pcb.Component(
@@ -488,6 +497,79 @@ flash_caps = [
 
 # Another option: IS61WV25616EDBLL, 6 x 8 mm BGA, 0.75mm pitch, 256k x 16 10ns SRAM ($2.50)
 
+ram = [
+    myelin_kicad_pcb.Component(
+        footprint="myelin-kicad:sdram_54tfbga",
+        identifier="RAM",
+        value="MT48LC16M16A2",
+        desc="MT48LC16M16A2F4-6A:GTR",
+        buses=[""],
+        pins=[
+            Pin("A1", "VSS", "GND"),
+            Pin("A2", "DQ15", "sdram_DQ15"),
+            Pin("A3", "VSSQ", "GND"),
+            Pin("A7", "VDDQ", "3V3"),
+            Pin("A8", "DQ0", "sdram_DQ0"),
+            Pin("A9", "VDD", "3V3"),
+
+            Pin("B1", "DQ14", "sdram_DQ14"),
+            Pin("B2", "DQ13", "sdram_DQ13"),
+            Pin("B3", "VDDQ", "3V3"),
+            Pin("B7", "VSSQ", "GND"),
+            Pin("B8", "DQ2", "sdram_DQ2"),
+            Pin("B9", "DQ1", "sdram_DQ1"),
+
+            Pin("C1", "DQ12", "sdram_DQ12"),
+            Pin("C2", "DQ11", "sdram_DQ11"),
+            Pin("C3", "VSSQ", "GND"),
+            Pin("C7", "VDDQ", "3V3"),
+            Pin("C8", "DQ4", "sdram_DQ4"),
+            Pin("C9", "DQ3", "sdram_DQ3"),
+
+            Pin("D1", "DQ10", "sdram_DQ10"),
+            Pin("D2", "DQ9", "sdram_DQ9"),
+            Pin("D3", "VDDQ", "3V3"),
+            Pin("D7", "VSSQ", "GND"),
+            Pin("D8", "DQ6", "sdram_DQ6"),
+            Pin("D9", "DQ5", "sdram_DQ5"),
+
+            Pin("E1", "DQ8", "sdram_DQ8"),
+            Pin("E2", "NC"),
+            Pin("E3", "VSS", "GND"),
+            Pin("E7", "VDD", "3V3"),
+            Pin("E8", "LDQM", "sdram_LDQM"),
+            Pin("E9", "DQ7", "sdram_DQ7"),
+
+            Pin("F1", "UDQM", "sdram_UDQM"),
+            Pin("F2", "CLK", "sdram_CLK"),
+            Pin("F3", "CKE", "sdram_CKE"),
+            Pin("F7", "CAS#", "sdram_nCAS"),
+            Pin("F8", "RAS#", "sdram_nRAS"),
+            Pin("F9", "WE#", "sdram_nWE"),
+
+            Pin("G1", "A12", "sdram_A12"),
+            Pin("G2", "A11", "sdram_A11"),
+            Pin("G3", "A9", "sdram_A9"),
+            Pin("G7", "BA0", "sdram_BA0"),
+            Pin("G8", "BA1", "sdram_BA1"),
+            Pin("G9", "CS#", "sdram_nCS"),
+
+            Pin("H1", "A8", "sdram_A8"),
+            Pin("H2", "A7", "sdram_A7"),
+            Pin("H3", "A6", "sdram_A6"),
+            Pin("H7", "A0", "sdram_A0"),
+            Pin("H8", "A1", "sdram_A1"),
+            Pin("H9", "A10", "sdram_A10"),
+
+            Pin("J1", "VSS", "GND"),
+            Pin("J2", "A5", "sdram_A5"),
+            Pin("J3", "A4", "sdram_A4"),
+            Pin("J7", "A3", "sdram_A3"),
+            Pin("J8", "A2", "sdram_A2"),
+            Pin("J9", "VDD", "3V3"),
+        ],
+    ),
+]
 
 ### 
 
