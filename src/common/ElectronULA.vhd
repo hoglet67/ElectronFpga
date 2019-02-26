@@ -863,6 +863,13 @@ begin
                                 when others =>
                                 end case;
                                 comms_mode   <= data_in(2 downto 1);
+                                -- A quirk of the Electron ULA is that RxFull
+                                -- interrupt fires when tape output mode is
+                                -- entered. Games like Southen Belle rely on
+                                -- this quirk.
+                                if data_in(2 downto 1) = "10" then
+                                    isr(4) <= '1';
+                                end if;
                             when others =>
                                 -- A '1' in the palatte data means disable the colour
                                 -- Invert the stored palette, to make the palette logic simpler
