@@ -587,7 +587,81 @@ ram = [
     ),
 ]
 
-### 
+### DAC for audio output
+
+# This is a bit of a stretch because I've never worked with DACs before.  The
+# WM8524 is $2 at Digikey and apparently good quality.  It has some
+# interesting clocking requirements -- MCLK needs to be 128 or 256 times the
+# fs (sample rate), or maybe just an integer ratio, but the datasheet isn't
+# clear on exactly what's required.  The Altera DE1 version of ElectronFpga
+# uses MCLK=32MHz and LRCLK=125kHz for its Wolfson DAC, so with any luck
+# that'll work here as well, and we won't need to use one of the PLLs to
+# generate the audio clocks.
+
+# If we *do* need to generate a precise clock, we could generate a 12.288MHz
+# clock (48kHz x 256) from 16MHz.  (16MHz x 3 x 256 / 1000, or 16/5x192/50.)
+
+dac = [
+    myelin_kicad_pcb.Component(
+        footprint="Package_SO:TSSOP-16_4.4x5mm_P0.65mm",
+        identifier="DAC",
+        value="WM8524",
+        pins=[
+            Pin( 1, "LINEVOUTL", "dac_out_left"),
+            Pin( 2, "CPVOUTN",   "dac_power_cpvoutn"),
+            Pin( 3, "CPCB",      "dac_power_cpcb"),
+            Pin( 4, "LINEGND",   "GND"),
+            Pin( 5, "CPCA",      "dac_power_cpca"),
+            Pin( 6, "LINEVDD",   "3V3"),
+            Pin( 7, "DACDAT",    "dac_dacdat"),  # to fpga
+            Pin( 8, "LRCLK",     "dac_lrclk"),  # to fpga
+            Pin( 9, "BCLK",      "dac_bclk"),  # to fpga
+            Pin(10, "MCLK",      "dac_mclk"),  # to fpga
+            Pin(11, "nMUTE",     "dac_nmute"),  # to fpga
+            Pin(12, "AIFMODE",   "3V3"),  # tie high for 12 bit i2s
+            Pin(13, "AGND",      "GND"),
+            Pin(14, "VMID",      "dac_power_vmid"),
+            # TODO use a ferrite between 3V3 and AVDD
+            Pin(15, "AVDD",      "3V3"),
+            Pin(16, "LINEVOUTR", "dac_out_right"),
+        ],
+    ),
+]
+audio_caps = [
+    # as recommended in the WM8524 datasheet.
+    # TODO use very low ESR caps.
+    myelin_kicad_pcb.C0805("1u", "dac_power_cpvoutn", "GND", ref="DC1"),
+    myelin_kicad_pcb.C0805("4.7u", "3V3", "GND", ref="DC2"),
+    myelin_kicad_pcb.C0805("4.7u", "3V3", "GND", ref="DC3"),
+    myelin_kicad_pcb.C0805("2.2u", "dac_power_vmid", "GND", ref="DC4"),
+    myelin_kicad_pcb.C0805("1u", "dac_power_cpca", "dac_power_cpcb", ref="DC5"),
+]
+audio_filters = [
+    # NF if we're not using the external left/right outputs (i.e. pure ULA mode)
+    myelin_kicad_pcb.R0805("560R NF", "dac_out_left", "audio_out_left", ref="DR1"),
+    myelin_kicad_pcb.C0805("2.7n NF", "audio_out_left", "GND", ref="DC6"),
+    myelin_kicad_pcb.R0805("560R NF", "dac_out_right", "audio_out_right", ref="DR2"),
+    myelin_kicad_pcb.C0805("2.7n NF", "audio_out_right", "GND", ref="DC7"),
+]
+ula_audio_output = [
+    # pulldown for dac_out_left to prevent startup pops (maybe unnecessary)
+    myelin_kicad_pcb.R0805("NF 10k", "dac_out_left", "GND", ref="DR3"),
+    # coupling capacitor for dac output (center voltage 0V) to SOUND_OUT_5V (center 2.5V)
+    myelin_kicad_pcb.C0805("10u", "dac_out_left", "SOUND_OUT_5V", ref="DC8"),
+    # pull resistor to center sound output on 2.5V
+    myelin_kicad_pcb.R0805("10k", "SOUND_OUT_5V", "audio_bias", ref="DR4"),
+    # voltage divider to generate ~2.5V
+    myelin_kicad_pcb.R0805("10k", "audio_bias", "GND", ref="DR5"),
+    myelin_kicad_pcb.R0805("10k", "audio_bias", "5V", ref="DR6"),
+    # decoupling capacitor to stabilize voltage divider
+    myelin_kicad_pcb.C0805("10u", "audio_bias", "GND", ref="DC9"),
+]
+
+
+### FPGA-ULA BUFFERS
+
+# TODO pullup resistors on all enables to ensure we don't do anything bad to the host machine during FPGA programming
+# TODO low pass filter on PHI OUT to bring rise time down to ~25 ns
 
 
 ### END
