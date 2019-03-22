@@ -31,6 +31,8 @@ import myelin_kicad_pcb
 Pin = myelin_kicad_pcb.Pin
 
 
+# TODO renumber resistors and capacitors
+
 ### ULA
 
 # Electron ULA header -- this will plug into the PGA socket once one has been
@@ -55,8 +57,17 @@ Pin = myelin_kicad_pcb.Pin
 # Sound (output)
 # nPOR (power-on reset)
 
+# 16 + 8 + 16 buffers needed
+
+# TODO wire up direction select for all buffers, to give the option of implementing the CPU inside the ULA.
+
+# Sanity check:
+# - 32 x LVT buf (input)
+# - 4 x HCT125 OC (output)
+# - 8 x HCT245 (output)
+
 ula = myelin_kicad_pcb.Component(
-    footprint="Package_LCC:PLCC-68_THT-Socket",
+    footprint="modified-kicad:PLCC-68_THT-Socket-Electron-ULA",
     identifier="ULA",
     value="ULA header",
     desc="Set of pin headers to plug into an Acorn Electron ULA socket",
@@ -80,73 +91,82 @@ ula = myelin_kicad_pcb.Component(
         Pin( 7, "RA6",  "3V3"),  # O
         Pin( 6, "RA7",  "3V3"),  # O
 
-        # Keyboard
-        Pin(27, "KBD0",      "KBD0_5V"),  # I
-        Pin(28, "KBD1",      "KBD1_5V"),  # I
-        Pin(31, "KBD2",      "KBD2_5V"),  # I
-        Pin(32, "KBD3",      "KBD3_5V"),  # I
-        Pin(63, "CAPS_LOCK", "CAPS_LOCK"),  # O, drives caps LED via 470R (~6mA)
+        # Keyboard: KBD0-3 are 5V inputs, driven by CPU address lines.
+        # CAPS_LOCK is an OC output (low speed).
+        Pin(27, "KBD0",      "KBD0_5V"),  # I (LVT buf)
+        Pin(28, "KBD1",      "KBD1_5V"),  # I (LVT buf)
+        Pin(31, "KBD2",      "KBD2_5V"),  # I (LVT buf)
+        Pin(32, "KBD3",      "KBD3_5V"),  # I (LVT buf)
+        Pin(63, "CAPS_LOCK", "CAPS_LOCK_5V"),  # O (HCT125 OC), drives caps LED via 470R (~6mA)
 
-        Pin(58, "nRST", "nRESET"),  # OC I
-        Pin(61, "nROM", "nROM"),    # O
+        # nRST is apparently an input, but being able to drive it seems sensible.
+        Pin(58, "nRST", "nRESET_5V"),  # OC I (diode/resistor buf + HCT125 OC)
 
-        # Address bus: input
-        Pin( 5, "A0",  "A0_5V"),   # I
-        Pin( 1, "A1",  "A1_5V"),   # I
-        Pin(12, "A2",  "A2_5V"),   # I
-        Pin(24, "A3",  "A3_5V"),   # I
-        Pin(21, "A4",  "A4_5V"),   # I
-        Pin(20, "A5",  "A5_5V"),   # I
-        Pin(17, "A6",  "A6_5V"),   # I
-        Pin(15, "A7",  "A7_5V"),   # I
-        Pin( 2, "A8",  "A8_5V"),   # I
-        Pin(26, "A9",  "A9_5V"),   # I
-        Pin(25, "A10", "A10_5V"),  # I
-        Pin(23, "A11", "A11_5V"),  # I
-        Pin(13, "A12", "A12_5V"),  # I
-        Pin(14, "A13", "A13_5V"),  # I
-        Pin(10, "A14", "A14_5V"),  # I
-        Pin(56, "A15", "A15_5V"),  # I
+        # nROM is the TTL ROM chip select, so doesn't need a buffer.
+        Pin(61, "nROM", "nROM"),    # O (direct output from FPGA)
+
+        # Address bus: input; use 74lvth162245 with A-port (with 22R series
+        # resistors) connected to Electron.
+        Pin( 5, "A0",  "A0_5V"),   # IO (LVT buf, reversible)
+        Pin( 1, "A1",  "A1_5V"),   # IO (LVT buf, reversible)
+        Pin(12, "A2",  "A2_5V"),   # IO (LVT buf, reversible)
+        Pin(24, "A3",  "A3_5V"),   # IO (LVT buf, reversible)
+        Pin(21, "A4",  "A4_5V"),   # IO (LVT buf, reversible)
+        Pin(20, "A5",  "A5_5V"),   # IO (LVT buf, reversible)
+        Pin(17, "A6",  "A6_5V"),   # IO (LVT buf, reversible)
+        Pin(15, "A7",  "A7_5V"),   # IO (LVT buf, reversible)
+        Pin( 2, "A8",  "A8_5V"),   # IO (LVT buf, reversible)
+        Pin(26, "A9",  "A9_5V"),   # IO (LVT buf, reversible)
+        Pin(25, "A10", "A10_5V"),  # IO (LVT buf, reversible)
+        Pin(23, "A11", "A11_5V"),  # IO (LVT buf, reversible)
+        Pin(13, "A12", "A12_5V"),  # IO (LVT buf, reversible)
+        Pin(14, "A13", "A13_5V"),  # IO (LVT buf, reversible)
+        Pin(10, "A14", "A14_5V"),  # IO (LVT buf, reversible)
+        Pin(56, "A15", "A15_5V"),  # IO (LVT buf, reversible)
 
         # Data bus: input/output
-        Pin(33, "PD0", "PD0_5V"),  # IO
-        Pin(35, "PD1", "PD1_5V"),  # IO
-        Pin(36, "PD2", "PD2_5V"),  # IO
-        Pin(38, "PD3", "PD3_5V"),  # IO
-        Pin(39, "PD4", "PD4_5V"),  # IO
-        Pin(41, "PD5", "PD5_5V"),  # IO
-        Pin(42, "PD6", "PD6_5V"),  # IO
-        Pin(45, "PD7", "PD7_5V"),  # IO
+        Pin(33, "PD0", "PD0_5V"),  # IO (LVT buf, bidirectional)
+        Pin(35, "PD1", "PD1_5V"),  # IO (LVT buf, bidirectional)
+        Pin(36, "PD2", "PD2_5V"),  # IO (LVT buf, bidirectional)
+        Pin(38, "PD3", "PD3_5V"),  # IO (LVT buf, bidirectional)
+        Pin(39, "PD4", "PD4_5V"),  # IO (LVT buf, bidirectional)
+        Pin(41, "PD5", "PD5_5V"),  # IO (LVT buf, bidirectional)
+        Pin(42, "PD6", "PD6_5V"),  # IO (LVT buf, bidirectional)
+        Pin(45, "PD7", "PD7_5V"),  # IO (LVT buf, bidirectional)
 
-        Pin(57, "nNMI",    "nNMI_5V"),     # OC I
-        Pin(60, "PHI_OUT", "PHI_OUT_5V"),  # O
-        Pin(30, "nIRQ",    "nIRQ_5V"),     # OC O
-        Pin(46, "RnW",     "RnW_5V"),      # I
+        # nNMI is an input to the ULA and CPU.
+        Pin(57, "nNMI",    "nNMI_5V"),     # I (LVT buf) (OC externally but not for us)
+        # PHI_OUT is a 5V signal with CMOS levels.
+        Pin(60, "PHI_OUT", "PHI_OUT_5V"),  # O (HCT245 out)
+        # nIRQ is an output from the ULA, input to the CPU.
+        Pin(30, "nIRQ",    "nIRQ_5V"),     # OC IO (LVT buf + HCT125 OC)
+        # RnW is an input to the ULA, output from the CPU.
+        Pin(46, "RnW",     "RnW_5V"),      # IO (LVT buf + HCT125 optional out)
 
         # Clocks and ground
-        Pin(55, "DIV13_IN", "CLK_DIV13_5V"),  # I
+        Pin(55, "DIV13_IN"),                  # NC - unused by FPGA
         Pin(68, "GND", "GND"),
         Pin(51, "GND", "GND"),
-        Pin(49, "CLOCK_IN", "CLK_16MHZ_5V"),  # I
+        Pin(49, "CLOCK_IN", "CLK_16MHZ_5V"),  # I (LVT buf)
 
-        # Video
-        Pin(67, "nHS",    "nHS_5V"),     # O: horizontal sync
-        Pin( 3, "RED",    "RED_5V"),     # O
-        Pin( 4, "GREEN",  "GREEN_5V"),   # O
-        Pin(66, "BLUE",   "BLUE_5V"),    # O
-        Pin(65, "nCSYNC", "nCSYNC_5V"),  # O: composite sync
+        # Video: direct from FPGA ok as all go straight to buffers
+        Pin(67, "nHS",    "nHS_5V"),     # O (HCT245 out) - horizontal sync
+        Pin( 3, "RED",    "RED_5V"),     # O (HCT245 out)
+        Pin( 4, "GREEN",  "GREEN_5V"),   # O (HCT245 out)
+        Pin(66, "BLUE",   "BLUE_5V"),    # O (HCT245 out)
+        Pin(65, "nCSYNC", "nCSYNC_5V"),  # O (HCT245 out) - composite sync
 
         # Power-on reset
-        Pin(54, "nPOR", "nPOR_5V"),  # I: power-on reset
+        Pin(54, "nPOR"),  # NC - FPGA already has power on detect
 
         # Audio
-        Pin(62, "SOUND_OUT", "SOUND_OUT_5V"),  # O
+        Pin(62, "SOUND_OUT", "SOUND_OUT_5V"),  # O (via WM8524 DAC), goes straight to amplifier
 
         # Cassettte
-        Pin(59, "CAS_IN",  "CAS_IN_5V"),   # I
-        Pin(64, "CAS_MO",  "CAS_MO_5V"),   # O: motor relay
-        Pin(47, "CAS_RC",  "CAS_RC_5V"),   # TODO O?  RC filter?  NC?
-        Pin(50, "CAS_OUT", "CAS_OUT_5V"),  # O
+        Pin(59, "CAS_IN",  "CAS_IN_5V"),   # I (via MIC7221 comparator)
+        Pin(64, "CAS_MO",  "CAS_MO_5V"),   # O (HCT245 out) - motor relay (2mA)
+        Pin(50, "CAS_OUT", "CAS_OUT_5V"),  # O (HCT245 out)
+        Pin(47, "CAS_RC"),                 # NC - cassette high tone detect
 
         # Power
         Pin(48, "VCC1", "5V"),  # direct to 5V
@@ -157,6 +177,57 @@ ula = myelin_kicad_pcb.Component(
 
 
 ### FPGA
+
+# IO requirements: max 130 IO in U169 package.
+
+# So far 113 IO used:
+
+# TODO Serial flash: 6 (flash_nCE, flash_SCK, flash_IO0, flash_IO1, flash_IO2, flash_IO3)
+# TODO flash_nCE pullup
+
+# TODO SDRAM: 39 (D x 16, A x 13, BA x 2, nCS, nWE, nCAS, nRAS, CLK, CKE, UDQM, LDQM)
+# TODO SDRAM nCS pullup
+
+# TODO SD card signals: 6 (sd_CLK_SCK, sd_CMD_MOSI, sd_DAT0_MISO, sd_DAT1, sd_DAT2, sd_DAT3_nCS)
+
+# TODO USB signals: 3 (USB_M, USB_P, USB_PU)
+
+# TODO clock_osc
+
+# TODO DAC signals: 5 (dac_dacdat, dac_lrclk, dac_bclk, dac_mclk, dac_nmute)
+
+# TODO 32 x 74lvt162245 signals, A_buf_dir, A_buf_nOE, D_buf_dir, D_buf_nOE, input_buf_nOE (misc dir fixed)
+
+# TODO 5 x 74hct125 signals (CAPS_LOCK, nRESET_out, nIRQ_out, RnW_out, RnW_nOE)
+
+# TODO nRESET_in via diode
+
+# TODO 8 x 74hct245 signals, fixed direction, nOE
+
+# TODO CAS IN via comparator
+# TODO nROMCS signal
+
+# TODO check that all 44 digital + 1 analog ULA pins are connected
+# TODO check that three signals have two connections (nRST, nIRQ, RnW)
+# TODO check clocks (clock_osc, CLK_16MHZ) and make sure they work with PLLs
+
+# Pullup resistors on all enables to ensure we don't do anything bad to the
+# host machine during FPGA programming
+pullups = [
+    # chip enables
+    myelin_kicad_pcb.R0805("10k", "flash_nCE", "3V3", ref="PR?"),
+    myelin_kicad_pcb.R0805("10k", "sdram_nCS", "3V3", ref="PR?"),
+    myelin_kicad_pcb.R0805("10k", "sd_DAT3_nCS", "3V3", ref="PR?"),
+    # buffer enables
+    myelin_kicad_pcb.R0805("10k", "A_buf_nOE", "3V3", ref="PR?"),
+    myelin_kicad_pcb.R0805("10k", "D_buf_nOE", "3V3", ref="PR?"),
+    myelin_kicad_pcb.R0805("10k", "input_buf_nOE", "3V3", ref="PR?"),
+    myelin_kicad_pcb.R0805("10k", "misc_buf_nOE", "5V", ref="PR?"),
+    # open collector outputs
+    myelin_kicad_pcb.R0805("10k", "nRESET_out", "3V3", ref="PR?"),
+    myelin_kicad_pcb.R0805("10k", "nIRQ_out", "3V3", ref="PR?"),
+    myelin_kicad_pcb.R0805("10k", "RnW_nOE", "3V3", ref="PR?"),
+]
 
 fpga = myelin_kicad_pcb.Component(
     footprint="myelin-kicad:intel_ubga169",
@@ -354,7 +425,7 @@ tck_pulldown = myelin_kicad_pcb.R0805("1-10k", "fpga_TCK", "GND", ref="R3", hand
 # fpga_CONFIG_SEL is connected to GND because we don't use this
 
 fpga_decoupling = [
-    myelin_kicad_pcb.C0402("100n", "3V3", "GND", ref="C%d" % r)
+    myelin_kicad_pcb.C0402("100n", "3V3", "GND", ref="DC?")
     for r in range(10, 24)
 ]
 
@@ -366,6 +437,7 @@ bulk = [
     for r in range(8, 10)
 ]
 
+# TODO maybe want more of these
 power_in_cap = myelin_kicad_pcb.C0805("10u", "GND", "5V", ref="C1")
 
 # Power regulation from 5V down to 3.3V.
@@ -383,6 +455,28 @@ regulator = myelin_kicad_pcb.Component(
 )
 reg_in_cap = myelin_kicad_pcb.C0805("1u", "GND", "5V", ref="C2")
 reg_out_cap = myelin_kicad_pcb.C0805("1u", "3V3", "GND", ref="C3")
+
+
+### OSCILLATOR (optional)
+
+# With any luck we'll be able to clock everything from the Electron's 16MHz
+# oscillator, but just in case that doesn't work, here's a standalone clock
+# that the FPGA can use.
+
+osc = myelin_kicad_pcb.Component(
+    footprint="Oscillator:Oscillator_SMD_Abracon_ASE-4Pin_3.2x2.5mm_HandSoldering",
+    identifier="OSC",
+    value="osc",
+    # When ordering: double check it's the 3.2x2.5mm package
+    # http://ww1.microchip.com/downloads/en/DeviceDoc/20005529B.pdf
+    #    DSC100X-C-X-X-096.000-X
+    pins=[
+        Pin(1, "STANDBY#",  "3V3"),
+        Pin(2, "GND",       "GND"),
+        Pin(3, "OUT",       "clock_osc"),  # TODO connect to a clock pin on the FPGA
+        Pin(4, "VDD",       "3V3"),
+    ],
+)
 
 
 ### FLASH MEMORY (optional)
@@ -419,7 +513,7 @@ flash = [
         ],
     ),
 ]
-flash_cap = myelin_kicad_pcb.C0805("100n", "3V3", "GND", ref="C4")
+flash_cap = myelin_kicad_pcb.C0805("100n", "3V3", "GND", ref="DC?")
 
 
 # The original plan was to include an S29GL064S chip in LAE064 (9x9mm 64-ball
@@ -489,7 +583,7 @@ flash_cap = myelin_kicad_pcb.C0805("100n", "3V3", "GND", ref="C4")
 # ]
 # # Three capacitors per chip (2 x Vio, 1 x Vcc)
 # flash_caps = [
-#     myelin_kicad_pcb.C0805("100n", "3V3", "GND", ref="FC%d" % n)
+#     myelin_kicad_pcb.C0805("100n", "3V3", "GND", ref="DC?")
 #     for n in range(3)
 # ]
 
@@ -630,38 +724,353 @@ dac = [
 audio_caps = [
     # as recommended in the WM8524 datasheet.
     # TODO use very low ESR caps.
-    myelin_kicad_pcb.C0805("1u", "dac_power_cpvoutn", "GND", ref="DC1"),
-    myelin_kicad_pcb.C0805("4.7u", "3V3", "GND", ref="DC2"),
-    myelin_kicad_pcb.C0805("4.7u", "3V3", "GND", ref="DC3"),
-    myelin_kicad_pcb.C0805("2.2u", "dac_power_vmid", "GND", ref="DC4"),
-    myelin_kicad_pcb.C0805("1u", "dac_power_cpca", "dac_power_cpcb", ref="DC5"),
+    myelin_kicad_pcb.C0805("1u", "dac_power_cpvoutn", "GND", ref="AC1"),
+    myelin_kicad_pcb.C0805("4.7u", "3V3", "GND", ref="AC2"),
+    myelin_kicad_pcb.C0805("4.7u", "3V3", "GND", ref="AC3"),
+    myelin_kicad_pcb.C0805("2.2u", "dac_power_vmid", "GND", ref="AC4"),
+    myelin_kicad_pcb.C0805("1u", "dac_power_cpca", "dac_power_cpcb", ref="AC5"),
 ]
 audio_filters = [
     # NF if we're not using the external left/right outputs (i.e. pure ULA mode)
-    myelin_kicad_pcb.R0805("560R NF", "dac_out_left", "audio_out_left", ref="DR1"),
-    myelin_kicad_pcb.C0805("2.7n NF", "audio_out_left", "GND", ref="DC6"),
-    myelin_kicad_pcb.R0805("560R NF", "dac_out_right", "audio_out_right", ref="DR2"),
-    myelin_kicad_pcb.C0805("2.7n NF", "audio_out_right", "GND", ref="DC7"),
+    myelin_kicad_pcb.R0805("560R NF", "dac_out_left", "audio_out_left", ref="AR1"),
+    myelin_kicad_pcb.C0805("2.7n NF", "audio_out_left", "GND", ref="AC6"),
+    myelin_kicad_pcb.R0805("560R NF", "dac_out_right", "audio_out_right", ref="AR2"),
+    myelin_kicad_pcb.C0805("2.7n NF", "audio_out_right", "GND", ref="AC7"),
 ]
 ula_audio_output = [
     # pulldown for dac_out_left to prevent startup pops (maybe unnecessary)
-    myelin_kicad_pcb.R0805("NF 10k", "dac_out_left", "GND", ref="DR3"),
+    myelin_kicad_pcb.R0805("NF 10k", "dac_out_left", "GND", ref="AR3"),
     # coupling capacitor for dac output (center voltage 0V) to SOUND_OUT_5V (center 2.5V)
-    myelin_kicad_pcb.C0805("10u", "dac_out_left", "SOUND_OUT_5V", ref="DC8"),
+    myelin_kicad_pcb.C0805("10u", "dac_out_left", "SOUND_OUT_5V", ref="AC8"),
     # pull resistor to center sound output on 2.5V
-    myelin_kicad_pcb.R0805("10k", "SOUND_OUT_5V", "audio_bias", ref="DR4"),
+    myelin_kicad_pcb.R0805("10k", "SOUND_OUT_5V", "audio_bias", ref="AR4"),
     # voltage divider to generate ~2.5V
-    myelin_kicad_pcb.R0805("10k", "audio_bias", "GND", ref="DR5"),
-    myelin_kicad_pcb.R0805("10k", "audio_bias", "5V", ref="DR6"),
+    myelin_kicad_pcb.R0805("10k", "audio_bias", "GND", ref="AR5"),
+    myelin_kicad_pcb.R0805("10k", "audio_bias", "5V", ref="AR6"),
     # decoupling capacitor to stabilize voltage divider
-    myelin_kicad_pcb.C0805("10u", "audio_bias", "GND", ref="DC9"),
+    myelin_kicad_pcb.C0805("10u", "audio_bias", "GND", ref="AC9"),
 ]
 
 
 ### FPGA-ULA BUFFERS
 
-# TODO pullup resistors on all enables to ensure we don't do anything bad to the host machine during FPGA programming
-# TODO low pass filter on PHI OUT to bring rise time down to ~25 ns
+# No need for a low pass filter on CAS_OUT_5V to allow the FPGA to generate a
+# nicer signal. I  imagine we'll want to do PWM at 1MHz, which gives us 96
+# levels assuming a 96 MHz clock. CAS OUT already has a filter (100k + 2n2, so
+# 220us time constant / knee at 4.5 kHz) so we can just connect an HCT output
+# directly to CAS_OUT_5V.
+
+# Reset level conversion using diode + pullup
+reset_3v3_pullup = myelin_kicad_pcb.R0805("10k", "3V3", "nRESET_in", ref="R?")
+reset_3v3_diode = myelin_kicad_pcb.DSOD323("BAT54", "nRESET_5V", "nRESET_in", ref="D?")
+
+big_buffers = [
+    [
+        myelin_kicad_pcb.Component(
+            footprint="myelin-kicad:ti_zrd_54_pbga",
+            identifier=ident,
+            value="74LVTH162245", # TODO exact part number
+            pins=[
+                Pin("A3", "1DIR", nOE1),
+                Pin("A4", "1nOE", DIR1),
+
+                Pin("A6", "1A1", conn1[0][0]),
+                Pin("A1", "1B1", conn1[0][1]),
+                Pin("B5", "1A2", conn1[1][0]),
+                Pin("B2", "1B2", conn1[1][1]),
+                Pin("B6", "1A3", conn1[2][0]),
+                Pin("B1", "1B3", conn1[2][1]),
+                Pin("C5", "1A4", conn1[3][0]),
+                Pin("C2", "1B4", conn1[3][1]),
+                Pin("C6", "1A5", conn1[4][0]),
+                Pin("C1", "1B5", conn1[4][1]),
+                Pin("D5", "1A6", conn1[5][0]),
+                Pin("D2", "1B6", conn1[5][1]),
+                Pin("D6", "1A7", conn1[6][0]),
+                Pin("D1", "1B7", conn1[6][1]),
+                Pin("E5", "1A8", conn1[7][0]),
+                Pin("E2", "1B8", conn1[7][1]),
+
+                Pin("J3", "2DIR", nOE2),
+                Pin("J4", "2nOE", DIR2),
+
+                Pin("E6", "2A1", conn2[0][0]),
+                Pin("E1", "2B1", conn2[0][1]),
+                Pin("F5", "2A2", conn2[1][0]),
+                Pin("F2", "2B2", conn2[1][1]),
+                Pin("F6", "2A3", conn2[2][0]),
+                Pin("F1", "2B3", conn2[2][1]),
+                Pin("G5", "2A4", conn2[3][0]),
+                Pin("G2", "2B4", conn2[3][1]),
+                Pin("G6", "2A5", conn2[4][0]),
+                Pin("G1", "2B5", conn2[4][1]),
+                Pin("H5", "2A6", conn2[5][0]),
+                Pin("H2", "2B6", conn2[5][1]),
+                Pin("H6", "2A7", conn2[6][0]),
+                Pin("H1", "2B7", conn2[6][1]),
+                Pin("J6", "2A8", conn2[7][0]),
+                Pin("J1", "2B8", conn2[7][1]),
+
+                Pin("C3", "VCC", "3V3"),
+                Pin("C4", "VCC", "3V3"),
+                Pin("G3", "VCC", "3V3"),
+                Pin("G4", "VCC", "3V3"),
+
+                Pin("D3", "GND", "GND"),
+                Pin("D4", "GND", "GND"),
+                Pin("E3", "GND", "GND"),
+                Pin("E4", "GND", "GND"),
+                Pin("F3", "GND", "GND"),
+                Pin("F4", "GND", "GND"),
+            ],
+        ),
+        # Four caps per buffer -- lots of power pins
+        myelin_kicad_pcb.C0402("100n", "GND", "3V3", ref="DC?"),
+        myelin_kicad_pcb.C0402("100n", "GND", "3V3", ref="DC?"),
+        myelin_kicad_pcb.C0402("100n", "GND", "3V3", ref="DC?"),
+        myelin_kicad_pcb.C0402("100n", "GND", "3V3", ref="DC?"),
+    ]
+    for ident, nOE1, DIR1, conn1, nOE2, DIR2, conn2 in
+    [
+        # 74LVTH162245 for A_buf
+        "ABUF",
+        # A port (with series 22R) should connect to ULA pins, B port should connect to FPGA
+        "A_buf_nOE",  # pulled up
+        "A_buf_DIR",
+        [
+            # [A port, B port]
+            ["A0_5V",  "A0"],
+            ["A1_5V",  "A1"],
+            ["A2_5V",  "A2"],
+            ["A3_5V",  "A3"],
+            ["A4_5V",  "A4"],
+            ["A5_5V",  "A5"],
+            ["A6_5V",  "A6"],
+            ["A7_5V",  "A7"],
+        ],
+        "A_buf_nOE",  # pulled up
+        "A_buf_DIR",
+        [
+            ["A8_5V",  "A8"],
+            ["A9_5V",  "A9"],
+            ["A10_5V", "A10"],
+            ["A11_5V", "A11"],
+            ["A12_5V", "A12"],
+            ["A13_5V", "A13"],
+            ["A14_5V", "A14"],
+            ["A15_5V", "A15"],
+        ],
+    ],
+    [
+        # 74LVTH162245 for D_buf + input_buf
+        "DBUF",
+        # A port (with series 22R) should connect to ULA pins, B port should connect to FPGA
+        "D_buf_nOE",  # pulled up
+        "D_buf_DIR",
+        [
+            # [A port, B port]
+            ["PD0_5V", "PD0"],
+            ["PD1_5V", "PD1"],
+            ["PD2_5V", "PD2"],
+            ["PD3_5V", "PD3"],
+            ["PD4_5V", "PD4"],
+            ["PD5_5V", "PD5"],
+            ["PD6_5V", "PD6"],
+            ["PD7_5V", "PD7"],
+        ],
+        # These are always inputs - fixed direction
+        "input_buf_nOE",  # pulled up
+        "3V3",  # input_buf_DIR = A -> B
+        [
+            # [A port, B port]
+            ["KBD0_5V",      "KBD0"],
+            ["KBD1_5V",      "KBD1"],
+            ["KBD2_5V",      "KBD2"],
+            ["KBD3_5V",      "KBD3"],
+            ["nNMI_5V",      "nNMI_in"],
+            ["nIRQ_5V",      "nIRQ_in"],
+            ["RnW_5V",       "RnW_in"],
+            ["CLK_16MHZ_5V", "CLK_16MHZ"],
+        ]
+    ],
+]
+
+oc_buf = [
+    [
+        myelin_kicad_pcb.Component(
+            footprint="Package_SO:TSSOP-14_4.4x5mm_P0.65mm",  # TODO the pins are really fat here, make my own?
+            identifier=ident,
+            value="74HCT125PW",
+            pins=[
+                Pin( 1, "1nOE", conn[0][0]),
+                Pin( 2, "1A",   conn[0][1]),
+                Pin( 3, "1Y",   conn[0][2]),
+                Pin( 4, "2nOE", conn[1][0]),
+                Pin( 5, "2A",   conn[1][1]),
+                Pin( 6, "2Y",   conn[1][2]),
+                Pin( 7, "GND",  "GND"),
+                Pin( 8, "3Y",   conn[2][2]),
+                Pin( 9, "3A",   conn[2][1]),
+                Pin(10, "3nOE", conn[2][0]),
+                Pin(11, "4Y",   conn[3][2]),
+                Pin(12, "4A",   conn[3][1]),
+                Pin(13, "4nOE", conn[3][0]),
+                Pin(14, "VCC",  power),
+            ],
+        ),
+        myelin_kicad_pcb.C0805("100n", "GND", power, ref="DC?"),
+    ]
+    for ident, power, conn in [
+        (
+            "OC",
+            "5V",
+            [
+                # [nOE, input, output]
+                ["GND",        "CAPS_LOCK", "CAPS_LOCK_5V"],
+                ["nRESET_out", "GND",       "nRESET_5V"],
+                ["nIRQ_out",   "GND",       "nIRQ_5V"],
+                ["RnW_out",    "RnW_nOE",   "RnW_5V"],
+            ]
+        )
+    ]
+]
+
+# buffer to generate 5V signals with rail to rail swing for clock, video, cassette
+misc_buf = [
+    [
+        myelin_kicad_pcb.Component(
+            footprint="Package_SO:SSOP-20_4.4x6.5mm_P0.65mm",
+            identifier=ident,
+            value="74HCT245PW",
+            pins=[
+                Pin( 1, "A->B", DIR),
+                Pin( 2, "A0",   conn[0][0]),
+                Pin( 3, "A1",   conn[1][0]),
+                Pin( 4, "A2",   conn[2][0]),
+                Pin( 5, "A3",   conn[3][0]),
+                Pin( 6, "A4",   conn[4][0]),
+                Pin( 7, "A5",   conn[5][0]),
+                Pin( 8, "A6",   conn[6][0]),
+                Pin( 9, "A7",   conn[7][0]),
+                Pin(10, "GND",  "GND"),
+                Pin(11, "B7",   conn[7][1]),
+                Pin(12, "B6",   conn[6][1]),
+                Pin(13, "B5",   conn[5][1]),
+                Pin(14, "B4",   conn[4][1]),
+                Pin(15, "B3",   conn[3][1]),
+                Pin(16, "B2",   conn[2][1]),
+                Pin(17, "B1",   conn[1][1]),
+                Pin(18, "B0",   conn[0][1]),
+                Pin(19, "nCE",  nOE),
+                Pin(20, "VCC",  power),
+            ],
+        ),
+        myelin_kicad_pcb.C0805("100n", "GND", power, ref="DC?"),
+    ]
+    for power, ident, DIR, nOE, conn in [
+        (
+            "5V",
+            "MISC",
+            "5V",  # misc_buf_DIR = A -> B  # TODO verify
+            "misc_buf_nOE",  # pulled up
+            [
+                # [A port, B port]
+                ["PHI_OUT", "PHI_OUT_5V_prefilter"],
+                ["nHS",     "nHS_5V"],
+                ["RED",     "RED_5V"],
+                ["GREEN",   "GREEN_5V"],
+                ["BLUE",    "BLUE_5V"],
+                ["nCSYNC",  "nCSYNC_5V"],
+                ["CAS_MO",  "CAS_MO_5V"],
+                ["CAS_OUT", "CAS_OUT_5V"],
+            ]
+        )
+    ]
+]
+
+# Low pass filter on PHI_OUT_5V to bring rise time down to ~25 ns
+phi_out_filter = [
+    myelin_kicad_pcb.R0805("100R", "PHI_OUT_5V_prefilter", "PHI_OUT_5V", ref="R?"),
+    myelin_kicad_pcb.C0805("2.7n", "PHI_OUT_5V", "GND", ref="C?"),
+]
+
+# MIC7221 comparator for CAS IN
+comparator = [
+    myelin_kicad_pcb.Component(
+        footprint="", # TODO
+        identifier="CMP",
+        value="MIC7221",
+        pins=[
+            Pin( 1, "OUT", "CAS_IN"),  # open drain, pulled to 3V3
+            Pin( 2, "V+",  "5V"),
+            Pin( 3, "IN+", "CAS_IN_5V"),
+            Pin( 4, "IN-", "CAS_IN_divider"),
+            Pin( 5, "V-",  "GND"),
+        ],
+    ),
+]
+
+comparator_misc = [
+    # MIC7221 pullup to 3V3
+    myelin_kicad_pcb.R0805("1k", "CAS_IN", "3V3", ref="R?"),
+    # TODO calculate CAS_IN_divider values to make the center voltage for CAS_IN
+    myelin_kicad_pcb.R0805("1k", "GND", "CAS_IN_divider", ref="R?"),
+    myelin_kicad_pcb.R0805("1k", "CAS_IN_divider", "5V", ref="R?"),
+    # decoupling
+    myelin_kicad_pcb.C0805("100n", "3V3", "GND", ref="DC?"),
+]
+
+
+### MICRO USB SOCKET
+
+# Optional part; this is intended to support the TinyFPGA Bootloader or a
+# similar soft USB stack.  Unlike the ATSAMD devices, series resistors and a
+# D+ pullup are needed.
+
+micro_usb = myelin_kicad_pcb.Component(
+    footprint="myelin-kicad:micro_usb_b_smd_molex",
+    identifier="USB",
+    value="usb",
+    desc="Molex 1050170001 (Digikey WM1399CT-ND) surface mount micro USB socket with mounting holes.",
+    pins=[
+        # TODO add a jumper and/or a diode so we can power the system from VUSB during bringup
+        Pin(1, "V", "VUSB"),
+        Pin(2, "-", "USBDM"),
+        Pin(3, "+", "USBDP"),
+        Pin(4, "ID"),
+        Pin(5, "G", "GND"),
+    ],
+)
+usb_misc = [
+    # series resistors between USB and FPGA
+    myelin_kicad_pcb.R0805("68R", "USBDM", "USB_M", ref="R?"),
+    myelin_kicad_pcb.R0805("68R", "USBDP", "USB_P", ref="R?"),
+    # configurable pullup on D+
+    myelin_kicad_pcb.R0805("1k5", "USBDP", "USB_PU", ref="R?"),
+]
+
+
+### MICRO SD SOCKET
+
+sd_card = myelin_kicad_pcb.Component(
+    footprint="myelin-kicad:hirose_micro_sd_card_socket",
+    identifier="SD",
+    value="Micro SD socket",
+    pins=[
+        Pin(    8, "DAT1",       "sd_DAT1"),
+        Pin(    7, "DAT0_MISO",  "sd_DAT0_MISO"),
+        Pin(    6, "VSS",        "GND"),
+        Pin(    5, "CLK_SCK",    "sd_CLK_SCK"),
+        Pin(    4, "VDD",        "3V3"),
+        Pin(    3, "CMD_MOSI",   "sd_CMD_MOSI"),
+        Pin(    2, "CD_DAT3_CS", "sd_DAT3_nCS"),
+        Pin(    1, "DAT2"        "sd_DAT2"),
+        Pin("SH1", "",           "GND",),
+        Pin("SH2", "",           "GND"),
+    ],
+)
+# Just in case -- I don't think this is needed for [micro] SD cards
+sd_cmd_pullup = myelin_kicad_pcb.R0805("10k NF", "3V3", "sd_CMD_MOSI", ref="PR?")
 
 
 ### END
