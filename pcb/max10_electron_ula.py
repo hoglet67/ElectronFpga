@@ -229,187 +229,219 @@ pullups = [
     myelin_kicad_pcb.R0805("10k", "RnW_nOE", "3V3", ref="PR?"),
 ]
 
-fpga = myelin_kicad_pcb.Component(
-    footprint="myelin-kicad:intel_ubga169",
-    identifier="FPGA",
-    value="10M08SCU169",
-    pins=[
-        # IOs
+fpga = [
+    myelin_kicad_pcb.Component(
+        footprint="myelin-kicad:intel_ubga169",
+        identifier="FPGA",
+        value="10M08SCU169",
+        pins=[
+            # IOs
 
-        # Outer ring -- 45 IOs (4 x 13 - 1 for TMS on G1)
-        Pin("A2",  "", "C1_11"),
-        Pin("A3",  "", "C1_9"),
-        Pin("A4",  "", "C1_14"),
-        Pin("A5",  "", "C1_19"),
-        Pin("A6",  "", "C1_17"),
-        Pin("A7",  "", "C1_23"),
-        Pin("A8",  "", "C1_16"),
-        Pin("A9",  "", "C1_20"),
-        Pin("A10", "", "C1_26"),
-        Pin("A11", "", "C1_25"),
-        Pin("A12", "", "C1_30"),
-        Pin("N4",  "", "C4_17"),
-        Pin("N5",  "", "C4_19"),
-        Pin("N6",  "", "C4_24"),
-        Pin("N7",  "", "C4_25"),
-        Pin("N8",  "", "C4_22"),
-        Pin("N9",  "", "C4_28"),
-        Pin("N10", "", "C4_26"),
-        Pin("N11", "", "C4_31"),
-        Pin("N12", "", "C4_36"),
-        Pin("B1",  "", "C1_2"),
-        Pin("C1",  "", "C1_1"),
-        Pin("D1",  "", "C2_1"),
-        Pin("E1",  "", "C2_5"),
-        Pin("F1",  "", "C2_8"),
-        Pin("H1",  "", "C1_3"),
-        Pin("J1",  "", "C4_4"),
-        Pin("K1",  "", "C2_12"),
-        Pin("M1",  "", "C4_12"),
-        Pin("B13", "", "C1_36"),
-        Pin("C13", "", "C1_33"),
-        Pin("D13", "", "C1_37"),
-        Pin("G13", "", "C3_4"),
-        Pin("H13", "", "C4_34"),
-        Pin("J13", "", "C3_10"),
-        Pin("K13", "", "C4_35"),
-        Pin("L13", "", "C4_37"),
-        Pin("M13", "", "C4_39"),
+            # The Max 10 Overview says that the U169 package can have up to 130
+            # IOs -- but only if you use everything (including the JTAG pins) as
+            # IO.  There are 12 "global" pins (JTAGEN, TCK, TMS, TDI, TDO,
+            # DEV_CLRn, DEV_OE, CONFIG_SEL, nCONFIG, CRC_ERROR, nSTATUS,
+            # CONF_DONE) that should probably be left alone, but we can have all
+            # the others, so 118 IO.  Just enough -- only five spare right now!
 
-        # Next ring in -
-        Pin("B2",  "", "C1_6"),
-        Pin("B3",  "", "C1_5"),
-        Pin("B4",  "", "C1_10"),
-        Pin("B5",  "", "C1_13"),
-        Pin("B6",  "", "C1_18"),
-        Pin("B7",  "", "C1_12"),
-        Pin("B10", "", "C1_24"),
-        Pin("B11", "", "C1_31"),
-        Pin("M2",  "", "C4_11"),
-        Pin("M3",  "", "C4_13"),
-        Pin("M4",  "", "C4_14"),
-        Pin("M5",  "", "C4_20"),
-        Pin("M7",  "", "C4_21"),
-        Pin("M8",  "", "C4_23"),
-        Pin("M9",  "", "C4_33"),
-        Pin("M10", "", "C4_27"),
-        Pin("M11", "", "C4_30"),
-        Pin("M12", "", "C4_38"),
+            # Escape routing:
+            # 35 on bottom layer (8 R 11 B 8 L 8 T)
+            # 4 x 11 outer ring (GND in corners) = 44
+            # 4 x 12 between gaps in outer ring = 48
+            # plus CONFIG_SEL, nCONFIG, and CRC_ERROR connected to power pins
+            # = 130
 
-        Pin("C2",  "", "C2_4"),
-        Pin("H2",  "", "C1_7"),
-        Pin("J2",  "", "C4_7"),
-        Pin("K2",  "", "C4_8"),
-        Pin("L2",  "", "C4_6"),
-        Pin("L3",  "", "C4_10"),
-        Pin("C9",  "", "C1_22"),
-        Pin("C10", "", "C1_27"),
-        Pin("B12", "", "C1_29"),
-        Pin("C12", "", "C1_34"),
-        Pin("D11", "", "C1_38"),
-        Pin("D12", "", "C3_3"),
-        Pin("E12", "", "C3_1"),
-        Pin("F12", "", "C3_6"),
-        Pin("G12", "", "C3_8"),
-        Pin("J12", "", "C3_7"),
-        Pin("K11", "", "C3_12"),
-        Pin("K12", "", "C3_9"),
-        Pin("L11", "", "C3_11"),
-        Pin("L12", "", "C4_40"),
-        Pin("L10", "", "C4_32"),
-        Pin("C11", "", "C1_28"),
-        Pin("E3",  "", "C2_3"),
-        Pin("L5",  "", "C4_18"),
+            # Outer ring -- 45 IOs (4 x 13 - 1 for TMS on G1)
+            Pin("A2",  "", conn[0]),
+            Pin("A3",  "", conn[1]),
+            Pin("A4",  "", conn[2]),
+            Pin("A5",  "", conn[3]),
+            Pin("A6",  "", conn[4]),
+            Pin("A7",  "", conn[5]),
+            Pin("A8",  "", conn[6]),
+            Pin("A9",  "", conn[7]),
+            Pin("A10", "", conn[8]),
+            Pin("A11", "", conn[9]),
+            Pin("A12", "", conn[10]),
+            Pin("N4",  "", conn[11]),
+            Pin("N5",  "", conn[12]),
+            Pin("N6",  "", conn[13]),
+            Pin("N7",  "", conn[14]),
+            Pin("N8",  "", conn[15]),
+            Pin("N9",  "", conn[16]),
+            Pin("N10", "", conn[17]),
+            Pin("N11", "", conn[18]),
+            Pin("N12", "", conn[19]),
+            Pin("B1",  "", conn[20]),
+            Pin("C1",  "", conn[21]),
+            Pin("D1",  "", conn[22]),
+            Pin("E1",  "", conn[23]),
+            Pin("F1",  "", conn[24]),
+            Pin("H1",  "", conn[25]),
+            Pin("J1",  "", conn[26]),
+            Pin("K1",  "", conn[27]),
+            Pin("M1",  "", conn[28]),
+            Pin("B13", "", conn[29]),
+            Pin("C13", "", conn[30]),
+            Pin("D13", "", conn[31]),
+            Pin("G13", "", conn[32]),
+            Pin("H13", "", conn[33]),
+            Pin("J13", "", conn[34]),
+            Pin("K13", "", conn[35]),
+            Pin("L13", "", conn[36]),
+            Pin("M13", "", conn[37]),
 
-        # Special pins
-        Pin("G5", "CLK0n", "CLK0n"),
-        Pin("H6", "CLK0p", "CLK0p"),
-        Pin("H5", "CLK1n", "CLK1n"),
-        Pin("H4", "CLK1p", "CLK1p"),
-        Pin("G10", "CLK2n", "CLK2n"),
-        Pin("G9", "CLK2p", "CLK2p"),
-        Pin("E13", "CLK3n", "C3_2_CLK3n"),
-        Pin("F13", "CLK3p", "C3_5_CLK3p"),
-        Pin("N2", "DPCLK0", "C4_16_DPCLK0"),
-        Pin("N3", "DPCLK1", "C4_15_DPCLK1"),
-        Pin("F10", "DPCLK2", "DPCLK2"),
-        Pin("F9", "DPCLK3", "DPCLK3"),
-        Pin("L1", "VREFB2N0", "C4_3_VREFB2N0"),
+            # Next ring in -
+            Pin("B2",  "", conn[38]),
+            Pin("B3",  "", conn[39]),
+            Pin("B4",  "", conn[40]),
+            Pin("B5",  "", conn[41]),
+            Pin("B6",  "", conn[42]),
+            Pin("B7",  "", conn[43]),
+            Pin("B10", "", conn[44]),
+            Pin("B11", "", conn[45]),
+            Pin("M2",  "", conn[46]),
+            Pin("M3",  "", conn[47]),
+            Pin("M4",  "", conn[48]),
+            Pin("M5",  "", conn[49]),
+            Pin("M7",  "", conn[40]),
+            Pin("M8",  "", conn[51]),
+            Pin("M9",  "", conn[52]),
+            Pin("M10", "", conn[53]),
+            Pin("M11", "", conn[54]),
+            Pin("M12", "", conn[55]),
 
-        # JTAG and other config pins
-        Pin("E5",  "JTAGEN",     "fpga_JTAGEN"),
-        Pin("G1",  "TMS",        "fpga_TMS"),
-        Pin("G2",  "TCK",        "fpga_TCK"),
-        Pin("F5",  "TDI",        "fpga_TDI"),
-        Pin("F6",  "TDO",        "fpga_TDO"),
-        Pin("B9",  "DEV_CLRn",   "fpga_DEV_CLRn"),  # measures high on first soldered board
-        Pin("D8",  "DEV_OE",     "fpga_DEV_OE"),
-        Pin("D7",  "CONFIG_SEL", "GND"),  # unused, so connected to GND
-        Pin("E7",  "nCONFIG",    "3V3"),  # can be connected straight to VCCIO
-        Pin("D6",  "CRC_ERROR",  "GND"),  # WARNING: disable Error Detection CRC option
-        Pin("C4",  "nSTATUS",    "fpga_nSTATUS"),  # measures high on first soldered board
-        Pin("C5",  "CONF_DONE",  "fpga_CONF_DONE"),  # measures high on first soldered board
+            Pin("C2",  "", conn[56]),
+            Pin("H2",  "", conn[57]),
+            Pin("J2",  "", conn[58]),
+            Pin("K2",  "", conn[59]),
+            Pin("L2",  "", conn[60]),
+            Pin("L3",  "", conn[61]),
+            Pin("C9",  "", conn[62]),
+            Pin("C10", "", conn[63]),
+            Pin("B12", "", conn[64]),
+            Pin("C12", "", conn[65]),
+            Pin("D11", "", conn[66]),
+            Pin("D12", "", conn[67]),
+            Pin("E12", "", conn[68]),
+            Pin("F12", "", conn[69]),
+            Pin("G12", "", conn[70]),
+            Pin("J12", "", conn[71]),
+            Pin("K11", "", conn[72]),
+            Pin("K12", "", conn[73]),
+            Pin("L11", "", conn[74]),
+            Pin("L12", "", conn[75]),
+            Pin("L10", "", conn[76]),
+            Pin("C11", "", conn[77]),
+            Pin("E3",  "", conn[78]),
+            Pin("L5",  "", conn[79]),
 
-        # Signals used as power/ground to enable vias in the 2-layer version
-        # TODO none of these are listed as IOs; add them
-        Pin("E4",  "",     ""),  # TODO
-        Pin("J5",  "",     ""),  # TODO
-        Pin("J6",  "",     ""),  # TODO
-        Pin("K10", "",     ""),  # TODO
-        Pin("E10", "",     ""),  # TODO
-        Pin("J10", "",     ""),  # TODO
-        Pin("E8",  "",     ""),  # TODO
-        Pin("H8",  "",     ""),  # TODO
-        Pin("D9",  "",     ""),  # TODO
-        Pin("K7",  "",     ""),  # TODO
-        Pin("K8",  "",     ""),  # TODO
-        Pin("E6",  "",     ""),  # TODO
-        Pin("F8",  "",     ""),  # TODO
-        Pin("G4",  "",     ""),  # TODO
-        Pin("L4",  "",     ""),  # TODO
+            # These were used as VCC/GND in the two layer version
+            Pin("D9",  "", conn[80]),
+            Pin("E4",  "", conn[81]),
+            Pin("E6",  "", conn[82]),
+            Pin("E8",  "", conn[83]),
+            Pin("E10", "", conn[84]),
+            Pin("F8",  "", conn[85]),
+            Pin("G4",  "", conn[86]),
+            Pin("H8",  "", conn[87]),
+            Pin("J5",  "", conn[88]),
+            Pin("J6",  "", conn[89]),
+            Pin("J10", "", conn[90]),
+            Pin("K7",  "", conn[91]),
+            Pin("K8",  "", conn[92]),
+            Pin("K10", "", conn[93]),
+            Pin("L4",  "", conn[94]),
 
-        # Power and ground
-        Pin("D2",  "GND",     "GND"),
-        Pin("E2",  "GND",     "GND"),
-        Pin("N13", "GND",     "GND"),
-        Pin("N1",  "GND",     "GND"),
-        Pin("M6",  "GND",     "GND"),
-        Pin("L9",  "GND",     "GND"),
-        Pin("J4",  "GND",     "GND"),
-        Pin("H12", "GND",     "GND"),
-        Pin("G7",  "GND",     "GND"),
-        Pin("F3",  "GND",     "GND"),
-        Pin("E11", "GND",     "GND"),
-        Pin("D5",  "GND",     "GND"),
-        Pin("C3",  "GND",     "GND"),
-        Pin("B8",  "GND",     "GND"),
-        Pin("A13", "GND",     "GND"),
-        Pin("A1",  "GND",     "GND"),
-        Pin("F2",  "VCCIO1A", "3V3"),
-        Pin("G3",  "VCCIO1B", "3V3"),
-        Pin("K3",  "VCCIO2",  "3V3"),
-        Pin("J3",  "VCCIO2",  "3V3"),
-        Pin("L8",  "VCCIO3",  "3V3"),
-        Pin("L7",  "VCCIO3",  "3V3"),
-        Pin("L6",  "VCCIO3",  "3V3"),
-        Pin("J11", "VCCIO5",  "3V3"),
-        Pin("H11", "VCCIO5",  "3V3"),
-        Pin("G11", "VCCIO6",  "3V3"),
-        Pin("F11", "VCCIO6",  "3V3"),
-        Pin("C8",  "VCCIO8",  "3V3"),
-        Pin("C7",  "VCCIO8",  "3V3"),
-        Pin("C6",  "VCCIO8",  "3V3"),
-        Pin("K4",  "VCCA1",   "3V3"),
-        Pin("D10", "VCCA2",   "3V3"),
-        Pin("D3",  "VCCA3",   "3V3"),
-        Pin("D4",  "VCCA3",   "3V3"),
-        Pin("K9",  "VCCA4",   "3V3"),
-        Pin("H7",  "VCC_ONE", "3V3"),
-        Pin("G8",  "VCC_ONE", "3V3"),
-        Pin("G6",  "VCC_ONE", "3V3"),
-        Pin("F7",  "VCC_ONE", "3V3"),
-    ],
-)
+            # TODO one pin is missing from here
+
+            Pin("E9",  "", conn[95]),
+            Pin("F4",  "", conn[96]),
+            Pin("H9",  "", conn[97]),
+            Pin("H10", "", conn[98]),
+            Pin("J7",  "", conn[99]),
+            Pin("J8",  "", conn[100]),
+            Pin("J9",  "", conn[101]),
+            Pin("K5",  "", conn[102]),
+            Pin("K6",  "", conn[103]),
+            Pin("H3",  "", conn[104]),
+
+            # Clocks and VREF -- also usable as IO
+            Pin("G5",  "CLK0n",    conn[105]),
+            Pin("H6",  "CLK0p",    conn[106]),
+            Pin("H5",  "CLK1n",    conn[107]),
+            Pin("H4",  "CLK1p",    conn[108]),
+            Pin("G10", "CLK2n",    conn[109]),
+            Pin("G9",  "CLK2p",    conn[110]),
+            Pin("E13", "CLK3n",    conn[111]),
+            Pin("F13", "CLK3p",    conn[112]),
+            Pin("N2",  "DPCLK0",   conn[113]),
+            Pin("N3",  "DPCLK1",   conn[114]),
+            Pin("F10", "DPCLK2",   conn[115]),
+            Pin("F9",  "DPCLK3",   conn[116]),
+            Pin("L1",  "VREFB2N0", conn[117]),
+
+            # 12 JTAG and other special pins
+            Pin("E5",  "JTAGEN",     "fpga_JTAGEN"),
+            Pin("G1",  "TMS",        "fpga_TMS"),
+            Pin("G2",  "TCK",        "fpga_TCK"),
+            Pin("F5",  "TDI",        "fpga_TDI"),
+            Pin("F6",  "TDO",        "fpga_TDO"),
+            Pin("B9",  "DEV_CLRn",   "fpga_DEV_CLRn"),
+            Pin("D8",  "DEV_OE",     "fpga_DEV_OE"),
+            Pin("D7",  "CONFIG_SEL", "GND"),  # unused, so connected to GND
+            Pin("E7",  "nCONFIG",    "3V3"),  # can be connected straight to VCCIO
+            Pin("D6",  "CRC_ERROR",  "GND"),  # WARNING: disable Error Detection CRC option
+            Pin("C4",  "nSTATUS",    "fpga_nSTATUS"),
+            Pin("C5",  "CONF_DONE",  "fpga_CONF_DONE"),
+
+            # 39 power and ground pins
+            Pin("D2",  "GND",     "GND"),
+            Pin("E2",  "GND",     "GND"),
+            Pin("N13", "GND",     "GND"),
+            Pin("N1",  "GND",     "GND"),
+            Pin("M6",  "GND",     "GND"),
+            Pin("L9",  "GND",     "GND"),
+            Pin("J4",  "GND",     "GND"),
+            Pin("H12", "GND",     "GND"),
+            Pin("G7",  "GND",     "GND"),
+            Pin("F3",  "GND",     "GND"),
+            Pin("E11", "GND",     "GND"),
+            Pin("D5",  "GND",     "GND"),
+            Pin("C3",  "GND",     "GND"),
+            Pin("B8",  "GND",     "GND"),
+            Pin("A13", "GND",     "GND"),
+            Pin("A1",  "GND",     "GND"),
+            Pin("F2",  "VCCIO1A", "3V3"),
+            Pin("G3",  "VCCIO1B", "3V3"),
+            Pin("K3",  "VCCIO2",  "3V3"),
+            Pin("J3",  "VCCIO2",  "3V3"),
+            Pin("L8",  "VCCIO3",  "3V3"),
+            Pin("L7",  "VCCIO3",  "3V3"),
+            Pin("L6",  "VCCIO3",  "3V3"),
+            Pin("J11", "VCCIO5",  "3V3"),
+            Pin("H11", "VCCIO5",  "3V3"),
+            Pin("G11", "VCCIO6",  "3V3"),
+            Pin("F11", "VCCIO6",  "3V3"),
+            Pin("C8",  "VCCIO8",  "3V3"),
+            Pin("C7",  "VCCIO8",  "3V3"),
+            Pin("C6",  "VCCIO8",  "3V3"),
+            Pin("K4",  "VCCA1",   "3V3"),
+            Pin("D10", "VCCA2",   "3V3"),
+            Pin("D3",  "VCCA3",   "3V3"),
+            Pin("D4",  "VCCA3",   "3V3"),
+            Pin("K9",  "VCCA4",   "3V3"),
+            Pin("H7",  "VCC_ONE", "3V3"),
+            Pin("G8",  "VCC_ONE", "3V3"),
+            Pin("G6",  "VCC_ONE", "3V3"),
+            Pin("F7",  "VCC_ONE", "3V3"),
+        ],
+    )
+    for conn in [[
+        "conn%d" % n
+        for n in range(130)
+    ]]
+]
 
 # chip won't init unless this is pulled high
 conf_done_pullup = myelin_kicad_pcb.R0805("10k", "fpga_CONF_DONE", "3V3", ref="R1", handsoldering=False)
@@ -428,6 +460,52 @@ fpga_decoupling = [
     myelin_kicad_pcb.C0402("100n", "3V3", "GND", ref="DC?")
     for r in range(10, 24)
 ]
+
+# TODO fpga jtag - verify this works with USB Blaster / Intel Download Cable
+# altera jtag header, like in the lc-electronics xc9572xl board
+# left column: tck tdo tms nc tdi
+# right column: gnd vcc nc nc gnd
+jtag = myelin_kicad_pcb.Component(
+    footprint="myelin-kicad:jtag_shrouded_2x5",  # TODO replace with bigger IDC footprint
+    identifier="JTAG",
+    value="jtag",
+    pins=[
+        Pin( 1, "TCK", "fpga_TCK"), # top left
+        Pin( 2, "GND", "GND"), # top right
+        Pin( 3, "TDO", "fpga_TDO"),
+        Pin( 4, "3V3", "3V3"),
+        Pin( 5, "TMS", "fpga_TMS"),
+        Pin( 6, "NC"),  # TODO something intel-specific here?
+        Pin( 7, "NC"),
+        Pin( 8, "NC"),
+        Pin( 9, "TDI", "fpga_TDI"),
+        Pin(10, "GND", "GND"),
+    ],
+)
+
+# Quick-connect JTAG header for a Tag-Connect TC2030 series
+tag_connect = myelin_kicad_pcb.Component(
+    footprint="Tag-Connect_TC2030-IDC-FP_2x03_P1.27mm_Vertical",
+    identifier="JTAGTC",
+    value="jtagtc",
+    pins=[
+        # This pinout is for the Tag-Connect TC2030-ALT cable
+        # (http://www.tag-connect.com/TC2030-ALT) when used with an Altera USB
+        # Blaster.
+
+        # I already have a TC2030-CTX (http://www.tag-connect.com/TC2030-CTX)
+        # and don't want to buy another cable, so I'm going to make an adapter
+        # which connects a USB Blaster header to a 2x5 Cortex debug header,
+        # which will then work with the TC2030-CTX.
+
+        Pin(1, "VCC", "3V3"),       # Cortex pin 1
+        Pin(2, "TMS", "fpga_TMS"),  # Cortex pin 2 (SWDIO)
+        Pin(3, "TDI", "fpga_TDI"),  # Cortex pin 10 (nRESET)
+        Pin(4, "TCK", "fpga_TCK"),  # Cortex pin 4 (SWCLK)
+        Pin(5, "GND", "GND"),       # Cortex pin 3, 5, 9
+        Pin(6, "TDO", "fpga_TDO"),  # Cortex pin 6 (SWO)
+    ],
+)
 
 
 ### POWER SUPPLY
