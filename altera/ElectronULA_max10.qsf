@@ -1,0 +1,591 @@
+# -------------------------------------------------------------------------- #
+#
+# Copyright (C) 1991-2013 Altera Corporation
+# Your use of Altera Corporation's design tools, logic functions 
+# and other software and tools, and its AMPP partner logic 
+# functions, and any output files from any of the foregoing 
+# (including device programming or simulation files), and any 
+# associated documentation or information are expressly subject 
+# to the terms and conditions of the Altera Program License 
+# Subscription Agreement, Altera MegaCore Function License 
+# Agreement, or other applicable license agreement, including, 
+# without limitation, that your use is for the sole purpose of 
+# programming logic devices manufactured by Altera and sold by 
+# Altera or its authorized distributors.  Please refer to the 
+# applicable agreement for further details.
+#
+# -------------------------------------------------------------------------- #
+#
+# Quartus II 32-bit
+# Version 13.0.1 Build 232 06/12/2013 Service Pack 1 SJ Web Edition
+# Date created = 15:59:13  November 13, 2015
+#
+# -------------------------------------------------------------------------- #
+#
+# Notes:
+#
+# 1) The default values for assignments are stored in the file:
+#		EletronFpga_de1_assignment_defaults.qdf
+#    If this file doesn't exist, see file:
+#		assignment_defaults.qdf
+#
+# 2) Altera recommends that you do not modify this file. This
+#    file is updated automatically by the Quartus II software
+#    and any changes you make may be lost or overwritten.
+#
+# -------------------------------------------------------------------------- #
+
+set_global_assignment -name FAMILY "MAX 10"
+set_global_assignment -name DEVICE 10M08SCU169C8G
+set_global_assignment -name TOP_LEVEL_ENTITY ElectronULA_max10
+set_global_assignment -name ORIGINAL_QUARTUS_VERSION 17.1.0
+set_global_assignment -name PROJECT_CREATION_TIME_DATE "00:57:33  JANUARY 29, 2018"
+set_global_assignment -name LAST_QUARTUS_VERSION "17.1.0 Lite Edition"
+set_global_assignment -name PROJECT_OUTPUT_DIRECTORY output_files
+set_global_assignment -name MIN_CORE_JUNCTION_TEMP 0
+set_global_assignment -name MAX_CORE_JUNCTION_TEMP 85
+set_global_assignment -name DEVICE_FILTER_PACKAGE UFBGA
+set_global_assignment -name DEVICE_FILTER_PIN_COUNT 169
+set_global_assignment -name DEVICE_FILTER_SPEED_GRADE 8
+set_global_assignment -name ERROR_CHECK_FREQUENCY_DIVISOR 256
+set_global_assignment -name RESERVE_ALL_UNUSED_PINS "AS INPUT TRI-STATED WITH WEAK PULL-UP"
+
+
+set_instance_assignment -name IO_STANDARD LVTTL -to GPIO_0[0]
+set_instance_assignment -name IO_STANDARD LVTTL -to GPIO_0[1]
+set_instance_assignment -name IO_STANDARD LVTTL -to GPIO_0[2]
+set_instance_assignment -name IO_STANDARD LVTTL -to GPIO_0[3]
+set_instance_assignment -name IO_STANDARD LVTTL -to GPIO_0[4]
+set_instance_assignment -name IO_STANDARD LVTTL -to GPIO_0[5]
+set_instance_assignment -name IO_STANDARD LVTTL -to GPIO_0[6]
+set_instance_assignment -name IO_STANDARD LVTTL -to GPIO_0[7]
+set_instance_assignment -name IO_STANDARD LVTTL -to GPIO_0[8]
+set_instance_assignment -name IO_STANDARD LVTTL -to GPIO_0[9]
+set_instance_assignment -name IO_STANDARD LVTTL -to GPIO_0[10]
+set_instance_assignment -name IO_STANDARD LVTTL -to GPIO_0[11]
+set_instance_assignment -name IO_STANDARD LVTTL -to GPIO_0[12]
+set_instance_assignment -name IO_STANDARD LVTTL -to GPIO_0[13]
+set_instance_assignment -name IO_STANDARD LVTTL -to GPIO_0[14]
+set_instance_assignment -name IO_STANDARD LVTTL -to GPIO_0[15]
+set_instance_assignment -name IO_STANDARD LVTTL -to GPIO_0[16]
+set_instance_assignment -name IO_STANDARD LVTTL -to GPIO_0[17]
+set_instance_assignment -name IO_STANDARD LVTTL -to GPIO_0[18]
+set_instance_assignment -name IO_STANDARD LVTTL -to GPIO_0[19]
+set_instance_assignment -name IO_STANDARD LVTTL -to GPIO_0[20]
+set_instance_assignment -name IO_STANDARD LVTTL -to GPIO_0[21]
+set_instance_assignment -name IO_STANDARD LVTTL -to GPIO_0[22]
+set_instance_assignment -name IO_STANDARD LVTTL -to GPIO_0[23]
+set_instance_assignment -name IO_STANDARD LVTTL -to GPIO_0[24]
+set_instance_assignment -name IO_STANDARD LVTTL -to GPIO_0[25]
+set_instance_assignment -name IO_STANDARD LVTTL -to GPIO_0[26]
+set_instance_assignment -name IO_STANDARD LVTTL -to GPIO_0[27]
+set_instance_assignment -name IO_STANDARD LVTTL -to GPIO_0[28]
+set_instance_assignment -name IO_STANDARD LVTTL -to GPIO_0[29]
+set_instance_assignment -name IO_STANDARD LVTTL -to GPIO_0[30]
+set_instance_assignment -name IO_STANDARD LVTTL -to GPIO_0[31]
+set_instance_assignment -name IO_STANDARD LVTTL -to GPIO_0[32]
+set_instance_assignment -name IO_STANDARD LVTTL -to GPIO_0[33]
+set_instance_assignment -name IO_STANDARD LVTTL -to GPIO_0[34]
+set_instance_assignment -name IO_STANDARD LVTTL -to GPIO_0[35]
+set_instance_assignment -name IO_STANDARD LVTTL -to GPIO_1[0]
+set_instance_assignment -name IO_STANDARD LVTTL -to GPIO_1[1]
+set_instance_assignment -name IO_STANDARD LVTTL -to GPIO_1[2]
+set_instance_assignment -name IO_STANDARD LVTTL -to GPIO_1[3]
+set_instance_assignment -name IO_STANDARD LVTTL -to GPIO_1[4]
+set_instance_assignment -name IO_STANDARD LVTTL -to GPIO_1[5]
+set_instance_assignment -name IO_STANDARD LVTTL -to GPIO_1[6]
+set_instance_assignment -name IO_STANDARD LVTTL -to GPIO_1[7]
+set_instance_assignment -name IO_STANDARD LVTTL -to GPIO_1[8]
+set_instance_assignment -name IO_STANDARD LVTTL -to GPIO_1[9]
+set_instance_assignment -name IO_STANDARD LVTTL -to GPIO_1[10]
+set_instance_assignment -name IO_STANDARD LVTTL -to GPIO_1[11]
+set_instance_assignment -name IO_STANDARD LVTTL -to GPIO_1[12]
+set_instance_assignment -name IO_STANDARD LVTTL -to GPIO_1[13]
+set_instance_assignment -name IO_STANDARD LVTTL -to GPIO_1[14]
+set_instance_assignment -name IO_STANDARD LVTTL -to GPIO_1[15]
+set_instance_assignment -name IO_STANDARD LVTTL -to GPIO_1[16]
+set_instance_assignment -name IO_STANDARD LVTTL -to GPIO_1[17]
+set_instance_assignment -name IO_STANDARD LVTTL -to GPIO_1[18]
+set_instance_assignment -name IO_STANDARD LVTTL -to GPIO_1[19]
+set_instance_assignment -name IO_STANDARD LVTTL -to GPIO_1[20]
+set_instance_assignment -name IO_STANDARD LVTTL -to GPIO_1[21]
+set_instance_assignment -name IO_STANDARD LVTTL -to GPIO_1[22]
+set_instance_assignment -name IO_STANDARD LVTTL -to GPIO_1[23]
+set_instance_assignment -name IO_STANDARD LVTTL -to GPIO_1[24]
+set_instance_assignment -name IO_STANDARD LVTTL -to GPIO_1[25]
+set_instance_assignment -name IO_STANDARD LVTTL -to GPIO_1[26]
+set_instance_assignment -name IO_STANDARD LVTTL -to GPIO_1[27]
+set_instance_assignment -name IO_STANDARD LVTTL -to GPIO_1[28]
+set_instance_assignment -name IO_STANDARD LVTTL -to GPIO_1[29]
+set_instance_assignment -name IO_STANDARD LVTTL -to GPIO_1[30]
+set_instance_assignment -name IO_STANDARD LVTTL -to GPIO_1[31]
+set_instance_assignment -name IO_STANDARD LVTTL -to GPIO_1[32]
+set_instance_assignment -name IO_STANDARD LVTTL -to GPIO_1[33]
+set_instance_assignment -name IO_STANDARD LVTTL -to GPIO_1[34]
+set_instance_assignment -name IO_STANDARD LVTTL -to GPIO_1[35]
+set_instance_assignment -name IO_STANDARD LVTTL -to SW[0]
+set_instance_assignment -name IO_STANDARD LVTTL -to SW[1]
+set_instance_assignment -name IO_STANDARD LVTTL -to SW[2]
+set_instance_assignment -name IO_STANDARD LVTTL -to SW[3]
+set_instance_assignment -name IO_STANDARD LVTTL -to SW[4]
+set_instance_assignment -name IO_STANDARD LVTTL -to SW[5]
+set_instance_assignment -name IO_STANDARD LVTTL -to SW[6]
+set_instance_assignment -name IO_STANDARD LVTTL -to SW[7]
+set_instance_assignment -name IO_STANDARD LVTTL -to SW[8]
+set_instance_assignment -name IO_STANDARD LVTTL -to SW[9]
+set_instance_assignment -name IO_STANDARD LVTTL -to HEX0[0]
+set_instance_assignment -name IO_STANDARD LVTTL -to HEX0[1]
+set_instance_assignment -name IO_STANDARD LVTTL -to HEX0[2]
+set_instance_assignment -name IO_STANDARD LVTTL -to HEX0[3]
+set_instance_assignment -name IO_STANDARD LVTTL -to HEX0[4]
+set_instance_assignment -name IO_STANDARD LVTTL -to HEX0[5]
+set_instance_assignment -name IO_STANDARD LVTTL -to HEX0[6]
+set_instance_assignment -name IO_STANDARD LVTTL -to HEX1[0]
+set_instance_assignment -name IO_STANDARD LVTTL -to HEX1[1]
+set_instance_assignment -name IO_STANDARD LVTTL -to HEX1[2]
+set_instance_assignment -name IO_STANDARD LVTTL -to HEX1[3]
+set_instance_assignment -name IO_STANDARD LVTTL -to HEX1[4]
+set_instance_assignment -name IO_STANDARD LVTTL -to HEX1[5]
+set_instance_assignment -name IO_STANDARD LVTTL -to HEX1[6]
+set_instance_assignment -name IO_STANDARD LVTTL -to HEX2[0]
+set_instance_assignment -name IO_STANDARD LVTTL -to HEX2[1]
+set_instance_assignment -name IO_STANDARD LVTTL -to HEX2[2]
+set_instance_assignment -name IO_STANDARD LVTTL -to HEX2[3]
+set_instance_assignment -name IO_STANDARD LVTTL -to HEX2[4]
+set_instance_assignment -name IO_STANDARD LVTTL -to HEX2[5]
+set_instance_assignment -name IO_STANDARD LVTTL -to HEX2[6]
+set_instance_assignment -name IO_STANDARD LVTTL -to HEX3[0]
+set_instance_assignment -name IO_STANDARD LVTTL -to HEX3[1]
+set_instance_assignment -name IO_STANDARD LVTTL -to HEX3[2]
+set_instance_assignment -name IO_STANDARD LVTTL -to HEX3[3]
+set_instance_assignment -name IO_STANDARD LVTTL -to HEX3[4]
+set_instance_assignment -name IO_STANDARD LVTTL -to HEX3[5]
+set_instance_assignment -name IO_STANDARD LVTTL -to HEX3[6]
+set_instance_assignment -name IO_STANDARD LVTTL -to KEY[0]
+set_instance_assignment -name IO_STANDARD LVTTL -to KEY[1]
+set_instance_assignment -name IO_STANDARD LVTTL -to KEY[2]
+set_instance_assignment -name IO_STANDARD LVTTL -to KEY[3]
+set_instance_assignment -name IO_STANDARD LVTTL -to LEDR[0]
+set_instance_assignment -name IO_STANDARD LVTTL -to LEDR[1]
+set_instance_assignment -name IO_STANDARD LVTTL -to LEDR[2]
+set_instance_assignment -name IO_STANDARD LVTTL -to LEDR[3]
+set_instance_assignment -name IO_STANDARD LVTTL -to LEDR[4]
+set_instance_assignment -name IO_STANDARD LVTTL -to LEDR[5]
+set_instance_assignment -name IO_STANDARD LVTTL -to LEDR[6]
+set_instance_assignment -name IO_STANDARD LVTTL -to LEDR[7]
+set_instance_assignment -name IO_STANDARD LVTTL -to LEDR[8]
+set_instance_assignment -name IO_STANDARD LVTTL -to LEDR[9]
+set_instance_assignment -name IO_STANDARD LVTTL -to LEDG[0]
+set_instance_assignment -name IO_STANDARD LVTTL -to LEDG[1]
+set_instance_assignment -name IO_STANDARD LVTTL -to LEDG[2]
+set_instance_assignment -name IO_STANDARD LVTTL -to LEDG[3]
+set_instance_assignment -name IO_STANDARD LVTTL -to LEDG[4]
+set_instance_assignment -name IO_STANDARD LVTTL -to LEDG[5]
+set_instance_assignment -name IO_STANDARD LVTTL -to LEDG[6]
+set_instance_assignment -name IO_STANDARD LVTTL -to LEDG[7]
+set_instance_assignment -name IO_STANDARD LVTTL -to CLOCK_27_0
+set_instance_assignment -name IO_STANDARD LVTTL -to CLOCK_27_1
+set_instance_assignment -name IO_STANDARD LVTTL -to CLOCK_24_0
+set_instance_assignment -name IO_STANDARD LVTTL -to CLOCK_24_1
+set_instance_assignment -name IO_STANDARD LVTTL -to CLOCK_50
+set_instance_assignment -name IO_STANDARD LVTTL -to EXT_CLOCK
+set_instance_assignment -name IO_STANDARD LVTTL -to PS2_CLK
+set_instance_assignment -name IO_STANDARD LVTTL -to PS2_DAT
+set_instance_assignment -name IO_STANDARD LVTTL -to UART_RXD
+set_instance_assignment -name IO_STANDARD LVTTL -to UART_TXD
+set_instance_assignment -name IO_STANDARD LVTTL -to VGA_R[0]
+set_instance_assignment -name IO_STANDARD LVTTL -to VGA_R[1]
+set_instance_assignment -name IO_STANDARD LVTTL -to VGA_R[2]
+set_instance_assignment -name IO_STANDARD LVTTL -to VGA_R[3]
+set_instance_assignment -name IO_STANDARD LVTTL -to VGA_G[0]
+set_instance_assignment -name IO_STANDARD LVTTL -to VGA_G[1]
+set_instance_assignment -name IO_STANDARD LVTTL -to VGA_G[2]
+set_instance_assignment -name IO_STANDARD LVTTL -to VGA_G[3]
+set_instance_assignment -name IO_STANDARD LVTTL -to VGA_B[0]
+set_instance_assignment -name IO_STANDARD LVTTL -to VGA_B[1]
+set_instance_assignment -name IO_STANDARD LVTTL -to VGA_B[2]
+set_instance_assignment -name IO_STANDARD LVTTL -to VGA_B[3]
+set_instance_assignment -name IO_STANDARD LVTTL -to VGA_HS
+set_instance_assignment -name IO_STANDARD LVTTL -to VGA_VS
+set_instance_assignment -name IO_STANDARD LVTTL -to I2C_SCLK
+set_instance_assignment -name IO_STANDARD LVTTL -to I2C_SDAT
+set_instance_assignment -name IO_STANDARD LVTTL -to AUD_ADCLRCK
+set_instance_assignment -name IO_STANDARD LVTTL -to AUD_ADCDAT
+set_instance_assignment -name IO_STANDARD LVTTL -to AUD_DACLRCK
+set_instance_assignment -name IO_STANDARD LVTTL -to AUD_DACDAT
+set_instance_assignment -name IO_STANDARD LVTTL -to AUD_XCK
+set_instance_assignment -name IO_STANDARD LVTTL -to AUD_BCLK
+
+set_global_assignment -name CYCLONEII_OPTIMIZATION_TECHNIQUE BALANCED
+set_global_assignment -name SYNTH_TIMING_DRIVEN_SYNTHESIS OFF
+set_global_assignment -name POWER_PRESET_COOLING_SOLUTION "23 MM HEAT SINK WITH 200 LFPM AIRFLOW"
+set_global_assignment -name POWER_BOARD_THERMAL_MODEL "NONE (CONSERVATIVE)"
+set_global_assignment -name PARTITION_FITTER_PRESERVATION_LEVEL PLACEMENT_AND_ROUTING -section_id Top
+set_global_assignment -name PARTITION_NETLIST_TYPE SOURCE -section_id Top
+set_global_assignment -name PARTITION_COLOR 16764057 -section_id Top
+set_global_assignment -name LL_ROOT_REGION ON -section_id "Root Region"
+set_global_assignment -name LL_MEMBER_STATE LOCKED -section_id "Root Region"
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to VGA_R[0]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to VGA_VS
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to VGA_R[1]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to VGA_R[2]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to VGA_R[3]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to VGA_HS
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to VGA_G[0]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to VGA_G[1]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to VGA_G[2]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to VGA_G[3]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to VGA_B[0]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to VGA_B[1]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to VGA_B[2]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to VGA_B[3]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to UART_TXD
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to UART_RXD
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to SW[0]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to SW[1]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to SW[2]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to SW[3]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to SW[4]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to SW[5]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to SW[6]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to SW[7]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to SW[8]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to SW[9]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to SRAM_WE_N
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to SRAM_UB_N
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to SRAM_OE_N
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to SRAM_LB_N
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to SRAM_DQ[0]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to SRAM_DQ[1]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to SRAM_DQ[2]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to SRAM_DQ[3]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to SRAM_DQ[4]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to SRAM_DQ[5]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to SRAM_DQ[6]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to SRAM_DQ[7]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to SRAM_DQ[8]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to SRAM_DQ[9]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to SRAM_DQ[10]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to SRAM_DQ[11]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to SRAM_DQ[12]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to SRAM_DQ[13]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to SRAM_DQ[14]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to SRAM_DQ[15]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to SRAM_CE_N
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to SRAM_ADDR[0]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to SRAM_ADDR[1]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to SRAM_ADDR[2]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to SRAM_ADDR[3]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to SRAM_ADDR[4]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to SRAM_ADDR[5]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to SRAM_ADDR[6]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to SRAM_ADDR[7]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to SRAM_ADDR[8]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to SRAM_ADDR[9]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to SRAM_ADDR[10]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to SRAM_ADDR[11]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to SRAM_ADDR[12]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to SRAM_ADDR[13]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to SRAM_ADDR[14]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to SRAM_ADDR[15]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to SRAM_ADDR[16]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to SRAM_ADDR[17]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to SD_SCLK
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to SD_nCS
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to SD_MOSI
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to SD_MISO
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to PS2_DAT
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to PS2_CLK
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to LEDR[0]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to LEDR[1]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to LEDR[2]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to LEDR[3]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to LEDR[4]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to LEDR[5]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to LEDR[6]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to LEDR[7]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to LEDR[8]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to LEDR[9]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to LEDG[0]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to LEDG[1]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to LEDG[2]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to LEDG[3]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to LEDG[4]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to LEDG[5]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to LEDG[6]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to LEDG[7]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to KEY[0]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to KEY[1]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to KEY[2]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to KEY[3]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to I2C_SDAT
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to I2C_SCLK
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to HEX3[0]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to HEX3[1]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to HEX3[2]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to HEX3[3]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to HEX3[4]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to HEX3[5]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to HEX3[6]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to HEX2[0]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to HEX2[1]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to HEX2[2]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to HEX2[3]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to HEX2[4]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to HEX2[5]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to HEX2[6]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to HEX1[0]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to HEX1[1]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to HEX1[2]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to HEX1[3]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to HEX1[4]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to HEX1[5]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to HEX1[6]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to HEX0[0]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to HEX0[1]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to HEX0[2]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to HEX0[3]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to HEX0[4]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to HEX0[5]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to HEX0[6]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to GPIO_1[0]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to GPIO_1[1]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to GPIO_1[2]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to GPIO_1[3]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to GPIO_1[4]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to GPIO_1[5]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to GPIO_1[6]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to GPIO_1[7]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to GPIO_1[8]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to GPIO_1[9]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to GPIO_1[10]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to GPIO_1[11]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to GPIO_1[12]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to GPIO_1[13]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to GPIO_1[14]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to GPIO_1[15]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to GPIO_1[16]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to GPIO_1[17]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to GPIO_1[18]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to GPIO_1[19]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to GPIO_1[20]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to GPIO_1[21]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to GPIO_1[22]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to GPIO_1[23]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to GPIO_1[24]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to GPIO_1[25]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to GPIO_1[26]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to GPIO_1[27]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to GPIO_1[28]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to GPIO_1[29]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to GPIO_1[30]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to GPIO_1[31]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to GPIO_1[32]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to GPIO_1[33]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to GPIO_1[34]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to GPIO_1[35]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to GPIO_0[0]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to GPIO_0[1]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to GPIO_0[2]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to GPIO_0[3]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to GPIO_0[4]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to GPIO_0[5]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to GPIO_0[6]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to GPIO_0[7]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to GPIO_0[8]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to GPIO_0[9]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to GPIO_0[10]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to GPIO_0[11]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to GPIO_0[12]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to GPIO_0[13]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to GPIO_0[14]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to GPIO_0[15]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to GPIO_0[16]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to GPIO_0[17]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to GPIO_0[18]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to GPIO_0[19]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to GPIO_0[20]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to GPIO_0[21]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to GPIO_0[22]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to GPIO_0[23]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to GPIO_0[24]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to GPIO_0[25]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to GPIO_0[26]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to GPIO_0[27]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to GPIO_0[28]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to GPIO_0[29]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to GPIO_0[30]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to GPIO_0[31]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to GPIO_0[32]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to GPIO_0[33]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to GPIO_0[34]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to GPIO_0[35]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to FL_WE_N
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to FL_RST_N
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to FL_OE_N
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to FL_DQ[0]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to FL_DQ[1]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to FL_DQ[2]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to FL_DQ[3]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to FL_DQ[4]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to FL_DQ[5]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to FL_DQ[6]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to FL_DQ[7]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to FL_CE_N
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to FL_ADDR[0]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to FL_ADDR[1]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to FL_ADDR[2]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to FL_ADDR[3]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to FL_ADDR[4]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to FL_ADDR[5]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to FL_ADDR[6]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to FL_ADDR[7]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to FL_ADDR[8]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to FL_ADDR[9]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to FL_ADDR[10]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to FL_ADDR[11]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to FL_ADDR[12]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to FL_ADDR[13]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to FL_ADDR[14]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to FL_ADDR[15]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to FL_ADDR[16]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to FL_ADDR[17]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to FL_ADDR[18]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to FL_ADDR[19]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to FL_ADDR[20]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to FL_ADDR[21]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to EXT_CLOCK
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to DRAM_WE_N
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to DRAM_UDQM
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to DRAM_RAS_N
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to DRAM_LDQM
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to DRAM_DQ[0]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to DRAM_DQ[1]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to DRAM_DQ[2]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to DRAM_DQ[3]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to DRAM_DQ[4]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to DRAM_DQ[5]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to DRAM_DQ[6]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to DRAM_DQ[7]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to DRAM_DQ[8]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to DRAM_DQ[9]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to DRAM_DQ[10]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to DRAM_DQ[11]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to DRAM_DQ[12]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to DRAM_DQ[13]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to DRAM_DQ[14]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to DRAM_DQ[15]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to DRAM_CS_N
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to DRAM_CLK
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to DRAM_CKE
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to DRAM_CAS_N
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to DRAM_BA_1
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to DRAM_BA_0
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to DRAM_ADDR[0]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to DRAM_ADDR[1]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to DRAM_ADDR[2]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to DRAM_ADDR[3]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to DRAM_ADDR[4]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to DRAM_ADDR[5]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to DRAM_ADDR[6]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to DRAM_ADDR[7]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to DRAM_ADDR[8]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to DRAM_ADDR[9]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to DRAM_ADDR[10]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to DRAM_ADDR[11]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to CLOCK_50
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to CLOCK_27_1
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to CLOCK_27_0
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to CLOCK_24_1
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to CLOCK_24_0
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to AUD_XCK
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to AUD_DACLRCK
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to AUD_DACDAT
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to AUD_BCLK
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to AUD_ADCLRCK
+set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to AUD_ADCDAT
+set_global_assignment -name VERILOG_FILE ../src/common/ROM/expansion_rom.v
+set_global_assignment -name VHDL_FILE ../src/altera/ElectronULA_max10.vhd
+set_global_assignment -name VHDL_FILE ../src/altera/pll1.vhd
+set_global_assignment -name VHDL_FILE ../src/altera/pll2.vhd
+set_global_assignment -name VHDL_FILE ../src/altera/i2s_intf.vhd
+set_global_assignment -name VHDL_FILE ../src/altera/i2c_loader.vhd
+set_global_assignment -name VHDL_FILE ../src/altera/WatchEvents.vhd
+set_global_assignment -name VHDL_FILE ../src/common/ElectronFpga_core.vhd
+set_global_assignment -name VHDL_FILE ../src/common/ElectronULA.vhd
+set_global_assignment -name VHDL_FILE ../src/common/MC6522/m6522.vhd
+set_global_assignment -name VHDL_FILE ../src/common/mist_scandoubler.vhd
+set_global_assignment -name VHDL_FILE ../src/common/mode7/mc6845.vhd
+set_global_assignment -name VHDL_FILE ../src/common/AlanD/R65Cx2.vhd
+set_global_assignment -name VHDL_FILE ../src/common/mode7/saa5050_rom_dual_port.vhd
+set_global_assignment -name VHDL_FILE ../src/common/mode7/saa5050.vhd
+set_global_assignment -name VHDL_FILE ../src/common/ps2kybrd/keyboard.vhd
+set_global_assignment -name VHDL_FILE ../src/common/ps2kybrd/ps2_intf.vhd
+set_global_assignment -name VHDL_FILE ../src/common/RAM/RAM_20K_DualPort.vhd
+set_global_assignment -name VHDL_FILE ../src/common/RAM/RAM_32K_DualPort.vhd
+set_global_assignment -name VHDL_FILE ../src/common/T6502/T65_ALU.vhd
+set_global_assignment -name VHDL_FILE ../src/common/T6502/T65_MCode.vhd
+set_global_assignment -name VHDL_FILE ../src/common/T6502/T65_Pack.vhd
+set_global_assignment -name VHDL_FILE ../src/common/T6502/T65.vhd
+set_global_assignment -name VHDL_FILE ../AtomBusMon/src/oho_dy1/OhoPack.vhd
+set_global_assignment -name VHDL_FILE ../AtomBusMon/src/oho_dy1/Oho_Dy1.vhd
+set_global_assignment -name VHDL_FILE ../AtomBusMon/src/AVR8/spi_mod/spi_slv_sel_comp_pack.vhd
+set_global_assignment -name VHDL_FILE ../AtomBusMon/src/AVR8/Memory/XPM_T65.vhd
+set_global_assignment -name VHDL_FILE ../AtomBusMon/src/AVR8/Memory/XDM_Generic.vhd
+set_global_assignment -name VHDL_FILE ../AtomBusMon/src/AVR8/uC/ResetGenerator.vhd
+set_global_assignment -name VHDL_FILE ../AtomBusMon/src/AVR8/uC/RAMDataReg.vhd
+set_global_assignment -name VHDL_FILE ../AtomBusMon/src/AVR8/uC/ExtIRQ_Controller.vhd
+set_global_assignment -name VHDL_FILE ../AtomBusMon/src/AVR8/uC/external_mux.vhd
+set_global_assignment -name VHDL_FILE ../AtomBusMon/src/AVR8/uC/BusMastCompPack.vhd
+set_global_assignment -name VHDL_FILE ../AtomBusMon/src/AVR8/uC/AVR_uC_CompPack.vhd
+set_global_assignment -name VHDL_FILE ../AtomBusMon/src/AVR8/uC/AVR8.vhd
+set_global_assignment -name VHDL_FILE ../AtomBusMon/src/AVR8/spi_mod/spi_slv_sel.vhd
+set_global_assignment -name VHDL_FILE ../AtomBusMon/src/AVR8/spi_mod/spi_mod.vhd
+set_global_assignment -name VHDL_FILE ../AtomBusMon/src/AVR8/resync/rsnc_vect.vhd
+set_global_assignment -name VHDL_FILE ../AtomBusMon/src/AVR8/resync/rsnc_l_vect.vhd
+set_global_assignment -name VHDL_FILE ../AtomBusMon/src/AVR8/resync/rsnc_l_bit.vhd
+set_global_assignment -name VHDL_FILE ../AtomBusMon/src/AVR8/resync/rsnc_comp_pack.vhd
+set_global_assignment -name VHDL_FILE ../AtomBusMon/src/AVR8/resync/rsnc_bit.vhd
+set_global_assignment -name VHDL_FILE ../AtomBusMon/src/AVR8/Peripheral/uart.vhd
+set_global_assignment -name VHDL_FILE ../AtomBusMon/src/AVR8/Peripheral/Timer_Counter.vhd
+set_global_assignment -name VHDL_FILE ../AtomBusMon/src/AVR8/Peripheral/SynchronizerLatch.vhd
+set_global_assignment -name VHDL_FILE ../AtomBusMon/src/AVR8/Peripheral/SynchronizerDFF.vhd
+set_global_assignment -name VHDL_FILE ../AtomBusMon/src/AVR8/Peripheral/SynchronizerCompPack.vhd
+set_global_assignment -name VHDL_FILE ../AtomBusMon/src/AVR8/Peripheral/swap_pins.vhd
+set_global_assignment -name VHDL_FILE ../AtomBusMon/src/AVR8/Peripheral/portx.vhd
+set_global_assignment -name VHDL_FILE ../AtomBusMon/src/AVR8/MemArbAndMux/RAMAdrDcd.vhd
+set_global_assignment -name VHDL_FILE ../AtomBusMon/src/AVR8/MemArbAndMux/MemRdMux.vhd
+set_global_assignment -name VHDL_FILE ../AtomBusMon/src/AVR8/MemArbAndMux/MemAccessCtrlPack.vhd
+set_global_assignment -name VHDL_FILE ../AtomBusMon/src/AVR8/MemArbAndMux/MemAccessCompPack.vhd
+set_global_assignment -name VHDL_FILE ../AtomBusMon/src/AVR8/MemArbAndMux/ArbiterAndMux.vhd
+set_global_assignment -name VHDL_FILE ../AtomBusMon/src/AVR8/JTAG_OCD_Prg/Resync16b_TCK.vhd
+set_global_assignment -name VHDL_FILE ../AtomBusMon/src/AVR8/JTAG_OCD_Prg/Resync1b_TCK.vhd
+set_global_assignment -name VHDL_FILE ../AtomBusMon/src/AVR8/JTAG_OCD_Prg/Resync1b_cp2.vhd
+set_global_assignment -name VHDL_FILE ../AtomBusMon/src/AVR8/JTAG_OCD_Prg/OCDProgTCK.vhd
+set_global_assignment -name VHDL_FILE ../AtomBusMon/src/AVR8/JTAG_OCD_Prg/OCDProgcp2.vhd
+set_global_assignment -name VHDL_FILE ../AtomBusMon/src/AVR8/JTAG_OCD_Prg/JTAGTAPCtrlSMPack.vhd
+set_global_assignment -name VHDL_FILE ../AtomBusMon/src/AVR8/JTAG_OCD_Prg/JTAGProgrammerPack.vhd
+set_global_assignment -name VHDL_FILE ../AtomBusMon/src/AVR8/JTAG_OCD_Prg/JTAGPack.vhd
+set_global_assignment -name VHDL_FILE ../AtomBusMon/src/AVR8/JTAG_OCD_Prg/JTAGOCDPrgTop.vhd
+set_global_assignment -name VHDL_FILE ../AtomBusMon/src/AVR8/JTAG_OCD_Prg/JTAGDataPack.vhd
+set_global_assignment -name VHDL_FILE ../AtomBusMon/src/AVR8/JTAG_OCD_Prg/JTAGCompPack.vhd
+set_global_assignment -name VHDL_FILE ../AtomBusMon/src/AVR8/FrqDiv/FrqDiv.vhd
+set_global_assignment -name VHDL_FILE ../AtomBusMon/src/AVR8/Core/reg_file.vhd
+set_global_assignment -name VHDL_FILE ../AtomBusMon/src/AVR8/Core/pm_fetch_dec.vhd
+set_global_assignment -name VHDL_FILE ../AtomBusMon/src/AVR8/Core/io_reg_file.vhd
+set_global_assignment -name VHDL_FILE ../AtomBusMon/src/AVR8/Core/io_adr_dec.vhd
+set_global_assignment -name VHDL_FILE ../AtomBusMon/src/AVR8/Core/bit_processor.vhd
+set_global_assignment -name VHDL_FILE ../AtomBusMon/src/AVR8/Core/AVR_Core_CompPack.vhd
+set_global_assignment -name VHDL_FILE ../AtomBusMon/src/AVR8/Core/avr_core.vhd
+set_global_assignment -name VHDL_FILE ../AtomBusMon/src/AVR8/Core/alu_avr.vhd
+set_global_assignment -name VHDL_FILE ../AtomBusMon/src/AVR8/CommonPacks/SynthCtrlPack.vhd
+set_global_assignment -name VHDL_FILE ../AtomBusMon/src/AVR8/CommonPacks/std_library.vhd
+set_global_assignment -name VHDL_FILE ../AtomBusMon/src/AVR8/CommonPacks/spi_mod_comp_pack.vhd
+set_global_assignment -name VHDL_FILE ../AtomBusMon/src/AVR8/CommonPacks/AVRuCPackage.vhd
+set_global_assignment -name VHDL_FILE ../AtomBusMon/src/AVR8/CommonPacks/avr_adr_pack.vhd
+set_global_assignment -name VHDL_FILE ../AtomBusMon/src/BusMonCore.vhd
+set_global_assignment -name VHDL_FILE ../AtomBusMon/src/MOS6502CpuMonCore.vhd
+set_global_assignment -name QIP_FILE ../src/altera/max10_pll1.qip
+set_global_assignment -name FLOW_ENABLE_POWER_ANALYZER ON
+set_global_assignment -name POWER_DEFAULT_INPUT_IO_TOGGLE_RATE "12.5 %"
+set_instance_assignment -name PARTITION_HIERARCHY root_partition -to | -section_id Top
