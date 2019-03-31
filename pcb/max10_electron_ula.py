@@ -178,9 +178,9 @@ ula = myelin_kicad_pcb.Component(
 
 ### FPGA
 
-# IO requirements: max 130 IO in U169 package.
+# IO requirements: max 130 IO in U169 package, practically 118 IO + 12 special
 
-# So far 113 IO used:
+# So far 114 IO used -- see fpga_pins.txt.
 
 # TODO Serial flash: 6 (flash_nCE, flash_SCK, flash_IO0, flash_IO1, flash_IO2, flash_IO3)
 # TODO flash_nCE pullup
@@ -192,24 +192,34 @@ ula = myelin_kicad_pcb.Component(
 
 # TODO USB signals: 3 (USB_M, USB_P, USB_PU)
 
-# TODO clock_osc
+# TODO clock_osc: 1
 
 # TODO DAC signals: 5 (dac_dacdat, dac_lrclk, dac_bclk, dac_mclk, dac_nmute)
 
-# TODO 32 x 74lvt162245 signals, A_buf_dir, A_buf_nOE, D_buf_dir, D_buf_nOE, input_buf_nOE (misc dir fixed)
+# = 60 signals not from the ULA socket
+
+# TODO 32+5 x 74lvt162245 signals, A_buf_dir, A_buf_nOE, D_buf_dir, D_buf_nOE, input_buf_nOE (misc dir fixed)
 
 # TODO 5 x 74hct125 signals (CAPS_LOCK, nRESET_out, nIRQ_out, RnW_out, RnW_nOE)
 
 # TODO nRESET_in via diode
 
-# TODO 8 x 74hct245 signals, fixed direction, nOE
+# TODO 8+1 x 74hct245 signals, fixed direction, nOE
 
-# TODO CAS IN via comparator
-# TODO nROMCS signal
+# TODO CAS_IN via comparator
+# TODO nROMCS direct
+
+# = 54 signals from the ULA socket
 
 # TODO check that all 44 digital + 1 analog ULA pins are connected
 # TODO check that three signals have two connections (nRST, nIRQ, RnW)
 # TODO check clocks (clock_osc, CLK_16MHZ) and make sure they work with PLLs
+
+# CLOCK PLANNING
+
+# - Signals that drive PLLs must be on CLK*, not DPCLK*.
+
+# - Each PLL has 5 outputs.
 
 # Pullup resistors on all enables to ensure we don't do anything bad to the
 # host machine during FPGA programming
@@ -251,6 +261,12 @@ fpga = [
             # plus CONFIG_SEL, nCONFIG, and CRC_ERROR connected to power pins
             # = 130
 
+            # So we have:
+            # - Top: 29 IO + nSTATUS, CONF_DONE, JTAGEN, DEV_OE, DEV_CLRn
+            # - Right: 31 IO
+            # - Bottom: 31 IO
+            # - Left: 27 IO + TCK, TMS, TDI, TDO
+
             # Outer ring -- 45 IOs (4 x 13 - 1 for TMS on G1)
             Pin("A2",  "", conn[0]),
             Pin("A3",  "", conn[1]),
@@ -270,24 +286,24 @@ fpga = [
             Pin("N8",  "", conn[15]),
             Pin("N9",  "", conn[16]),
             Pin("N10", "", conn[17]),
-            Pin("N11", "", conn[18]),
+            Pin("N11", "VREFB3N0", conn[18]),
             Pin("N12", "", conn[19]),
             Pin("B1",  "", conn[20]),
             Pin("C1",  "", conn[21]),
             Pin("D1",  "", conn[22]),
             Pin("E1",  "", conn[23]),
             Pin("F1",  "", conn[24]),
-            Pin("H1",  "", conn[25]),
+            Pin("H1",  "VREFB1N0", conn[25]),
             Pin("J1",  "", conn[26]),
             Pin("K1",  "", conn[27]),
             Pin("M1",  "", conn[28]),
             Pin("B13", "", conn[29]),
             Pin("C13", "", conn[30]),
-            Pin("D13", "", conn[31]),
+            Pin("D13", "VREFB6N0", conn[31]),
             Pin("G13", "", conn[32]),
             Pin("H13", "", conn[33]),
             Pin("J13", "", conn[34]),
-            Pin("K13", "", conn[35]),
+            Pin("K13", "VREFB5N0", conn[35]),
             Pin("L13", "", conn[36]),
             Pin("M13", "", conn[37]),
 
@@ -297,11 +313,11 @@ fpga = [
             Pin("B4",  "", conn[40]),
             Pin("B5",  "", conn[41]),
             Pin("B6",  "", conn[42]),
-            Pin("B7",  "", conn[43]),
+            Pin("B7",  "VREFB8N0", conn[43]),
             Pin("B10", "", conn[44]),
             Pin("B11", "", conn[45]),
             Pin("M2",  "", conn[46]),
-            Pin("M3",  "", conn[47]),
+            Pin("M3",  "PLL_L_CLKOUTn", conn[47]),
             Pin("M4",  "", conn[48]),
             Pin("M5",  "", conn[49]),
             Pin("M7",  "", conn[40]),
@@ -316,7 +332,7 @@ fpga = [
             Pin("J2",  "", conn[58]),
             Pin("K2",  "", conn[59]),
             Pin("L2",  "", conn[60]),
-            Pin("L3",  "", conn[61]),
+            Pin("L3",  "PLL_L_CLKOUTp", conn[61]),
             Pin("C9",  "", conn[62]),
             Pin("C10", "", conn[63]),
             Pin("B12", "", conn[64]),
@@ -353,8 +369,6 @@ fpga = [
             Pin("K10", "", conn[93]),
             Pin("L4",  "", conn[94]),
 
-            # TODO one pin is missing from here
-
             Pin("E9",  "", conn[95]),
             Pin("F4",  "", conn[96]),
             Pin("H9",  "", conn[97]),
@@ -365,6 +379,7 @@ fpga = [
             Pin("K5",  "", conn[102]),
             Pin("K6",  "", conn[103]),
             Pin("H3",  "", conn[104]),
+            Pin("L1",  "VREFB2N0", conn[117]),
 
             # Clocks and VREF -- also usable as IO
             Pin("G5",  "CLK0n",    conn[105]),
@@ -379,7 +394,6 @@ fpga = [
             Pin("N3",  "DPCLK1",   conn[114]),
             Pin("F10", "DPCLK2",   conn[115]),
             Pin("F9",  "DPCLK3",   conn[116]),
-            Pin("L1",  "VREFB2N0", conn[117]),
 
             # 12 JTAG and other special pins
             Pin("E5",  "JTAGEN",     "fpga_JTAGEN"),
@@ -438,10 +452,128 @@ fpga = [
         ],
     )
     for conn in [[
-        "conn%d" % n
-        for n in range(130)
+        "flash_nCE",
+        "flash_SCK",
+        "flash_IO0",
+        "flash_IO1",
+        "flash_IO2",
+        "flash_IO3",
+        "sdram_DQ0",
+        "sdram_DQ1",
+        "sdram_DQ2",
+        "sdram_DQ3",
+        "sdram_DQ4",
+        "sdram_DQ5",
+        "sdram_DQ6",
+        "sdram_DQ7",
+        "sdram_DQ8",
+        "sdram_DQ9",
+        "sdram_DQ10",
+        "sdram_DQ11",
+        "sdram_DQ12",
+        "sdram_DQ13",
+        "sdram_DQ14",
+        "sdram_DQ15",
+        "sdram_A0",
+        "sdram_A1",
+        "sdram_A2",
+        "sdram_A3",
+        "sdram_A4",
+        "sdram_A5",
+        "sdram_A6",
+        "sdram_A7",
+        "sdram_A8",
+        "sdram_A9",
+        "sdram_A10",
+        "sdram_A11",
+        "sdram_A12",
+        "sdram_BA0",
+        "sdram_BA1",
+        "sdram_nCS",
+        "sdram_nWE",
+        "sdram_nCAS",
+        "sdram_nRAS",
+        "sdram_CLK",
+        "sdram_CKE",
+        "sdram_UDQM",
+        "sdram_LDQM",
+        "sd_CLK_SCK",
+        "sd_CMD_MOSI",
+        "sd_DAT0_MISO",
+        "sd_DAT1",
+        "sd_DAT2",
+        "sd_DAT3_nCS",
+        "USB_M",
+        "USB_P",
+        "USB_PU",
+        "clock_osc",
+        "dac_dacdat",
+        "dac_lrclk",
+        "dac_bclk",
+        "dac_mclk",
+        "dac_nmute",
+        "A_buf_nOE",
+        "A_buf_DIR",
+        "A0",
+        "A1",
+        "A2",
+        "A3",
+        "A4",
+        "A5",
+        "A6",
+        "A7",
+        "A8",
+        "A9",
+        "A10",
+        "A11",
+        "A12",
+        "A13",
+        "A14",
+        "A15",
+        "D_buf_nOE",
+        "D_buf_DIR",
+        "D0",
+        "D1",
+        "D2",
+        "D3",
+        "D4",
+        "D5",
+        "D6",
+        "D7",
+        "input_buf_nOE",
+        "KBD0",
+        "KBD1",
+        "KBD2",
+        "KBD3",
+        "nNMI_in",
+        "nIRQ_in",
+        "RnW_in",
+        "CLK_16MHZ",
+        "CAPS_LOCK",
+        "nRESET_out",
+        "nIRQ_out",
+        "RnW_out",
+        "RnW_nOE",
+        "nRESET_in",
+        "misc_buf_nOE",
+        "PHI_OUT",
+        "nHS",
+        "RED",
+        "GREEN",
+        "BLUE",
+        "nCSYNC",
+        "CAS_MO",
+        "CAS_OUT",
+        "CAS_IN",
+        "nROMCS",
+        "fpga_dummy0",
+        "fpga_dummy1",
+        "fpga_dummy2",
+        "fpga_dummy3",
     ]]
 ]
+#myelin_kicad_pcb.update_intel_qsf(
+#    cpld, os.path.join(here, "../altera/ElectronULA_max10.qsf"))
 
 # chip won't init unless this is pulled high
 conf_done_pullup = myelin_kicad_pcb.R0805("10k", "fpga_CONF_DONE", "3V3", ref="R1", handsoldering=False)
