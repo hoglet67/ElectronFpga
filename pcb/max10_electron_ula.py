@@ -103,7 +103,7 @@ ula = myelin_kicad_pcb.Component(
         Pin(58, "nRST", "nRESET_5V"),  # OC I (diode/resistor buf + HCT125 OC)
 
         # nROM is the TTL ROM chip select, so doesn't need a buffer.
-        Pin(61, "nROM", "nROM"),    # O (direct output from FPGA)
+        Pin(61, "nROM", "ROM_n"),    # O (direct output from FPGA)
 
         # Address bus: input; use 74lvth162245 with A-port (with 22R series
         # resistors) connected to Electron.
@@ -147,14 +147,14 @@ ula = myelin_kicad_pcb.Component(
         Pin(55, "DIV13_IN"),                  # NC - unused by FPGA
         Pin(68, "GND", "GND"),
         Pin(51, "GND", "GND"),
-        Pin(49, "CLOCK_IN", "CLK_16MHZ_5V"),  # I (LVT buf)
+        Pin(49, "CLOCK_IN", "clk_in_5V"),  # I (LVT buf)
 
         # Video: direct from FPGA ok as all go straight to buffers
         Pin(67, "nHS",    "nHS_5V"),     # O (HCT245 out) - horizontal sync
-        Pin( 3, "RED",    "RED_5V"),     # O (HCT245 out)
-        Pin( 4, "GREEN",  "GREEN_5V"),   # O (HCT245 out)
-        Pin(66, "BLUE",   "BLUE_5V"),    # O (HCT245 out)
-        Pin(65, "nCSYNC", "nCSYNC_5V"),  # O (HCT245 out) - composite sync
+        Pin( 3, "red",    "red_5V"),     # O (HCT245 out)
+        Pin( 4, "green",  "green_5V"),   # O (HCT245 out)
+        Pin(66, "blue",   "blue_5V"),    # O (HCT245 out)
+        Pin(65, "csync",  "csync_5V"),  # O (HCT245 out) - composite sync
 
         # Power-on reset
         Pin(54, "nPOR"),  # NC - FPGA already has power on detect
@@ -170,7 +170,7 @@ ula = myelin_kicad_pcb.Component(
 
         # Power
         Pin(48, "VCC1", "5V"),  # direct to 5V
-        Pin( 9, "VCC2", "5V"),  # 5V via 24R
+        Pin( 9, "VCC2"),        # 5V via 24R
         Pin(43, "VCC2", "5V"),  # 5V via 24R
     ],
 )
@@ -192,7 +192,7 @@ ula = myelin_kicad_pcb.Component(
 
 # TODO USB signals: 3 (USB_M, USB_P, USB_PU)
 
-# TODO clock_osc: 1
+# TODO clk_osc: 1
 
 # TODO DAC signals: 5 (dac_dacdat, dac_lrclk, dac_bclk, dac_mclk, dac_nmute)
 
@@ -200,20 +200,20 @@ ula = myelin_kicad_pcb.Component(
 
 # TODO 32+5 x 74lvt162245 signals, A_buf_dir, A_buf_nOE, D_buf_dir, D_buf_nOE, input_buf_nOE (misc dir fixed)
 
-# TODO 5 x 74hct125 signals (CAPS_LOCK, nRESET_out, nIRQ_out, RnW_out, RnW_nOE)
+# TODO 5 x 74hct125 signals (caps, RST_n_out, IRQ_n_out, RnW_out, RnW_nOE)
 
-# TODO nRESET_in via diode
+# TODO RST_n_in via diode
 
 # TODO 8+1 x 74hct245 signals, fixed direction, nOE
 
-# TODO CAS_IN via comparator
-# TODO nROMCS direct
+# TODO casIn via comparator
+# TODO ROM_n direct
 
 # = 54 signals from the ULA socket
 
 # TODO check that all 44 digital + 1 analog ULA pins are connected
 # TODO check that three signals have two connections (nRST, nIRQ, RnW)
-# TODO check clocks (clock_osc, CLK_16MHZ) and make sure they work with PLLs
+# TODO check clocks (clk_osc, clk_in) and make sure they work with PLLs
 
 # CLOCK PLANNING
 
@@ -234,8 +234,8 @@ pullups = [
     myelin_kicad_pcb.R0805("10k", "input_buf_nOE", "3V3", ref="PR?"),
     myelin_kicad_pcb.R0805("10k", "misc_buf_nOE", "5V", ref="PR?"),
     # open collector outputs
-    myelin_kicad_pcb.R0805("10k", "nRESET_out", "3V3", ref="PR?"),
-    myelin_kicad_pcb.R0805("10k", "nIRQ_out", "3V3", ref="PR?"),
+    myelin_kicad_pcb.R0805("10k", "RST_n_out", "3V3", ref="PR?"),
+    myelin_kicad_pcb.R0805("10k", "IRQ_n_out", "3V3", ref="PR?"),
     myelin_kicad_pcb.R0805("10k", "RnW_nOE", "3V3", ref="PR?"),
 ]
 
@@ -244,15 +244,53 @@ fpga = [
         footprint="myelin-kicad:intel_ubga169",
         identifier="FPGA",
         value="10M08SCU169",
-        pins=[
+        pins=(([
             # IOs
 
             # The Max 10 Overview says that the U169 package can have up to 130
             # IOs -- but only if you use everything (including the JTAG pins) as
-            # IO.  There are 12 "global" pins (JTAGEN, TCK, TMS, TDI, TDO,
-            # DEV_CLRn, DEV_OE, CONFIG_SEL, nCONFIG, CRC_ERROR, nSTATUS,
-            # CONF_DONE) that should probably be left alone, but we can have all
-            # the others, so 118 IO.  Just enough -- only five spare right now!
+            # IO.
+
+            # Summary, in order of usefulness:
+            # - 112 ordinary IOs that have low capacitance
+            # - 2 config pins that we can reconfigure safely (DEV_CLRn, DEV_OE)
+            # - 6 VREF pins that have 48pF capacitance rather than 7-8pF
+            # --- 120 so far
+            # - 2 config pins that are a little more dangerous (CRC_ERROR, JTAGEN) -- not using these
+            # - 8 required config pins
+            # --- total 130
+
+            # So we have 114 normal IOs, plus 6 VREF (slow) IOs, for a grand
+            # total of 120.  VREF IOs can be used for slower/fixed outputs like 
+            # A_buf_DIR, A_buf_nOE, input_buf_nOE, RnW_nOE, RST_n_out, USB_PU.
+
+            # There are 12 config pins:
+            # TCK, TMS, TDI, TDO = required
+            # CONFIG_SEL, CONF_DONE, nCONFIG, nSTATUS = required during startup
+            # CRC_ERROR, DEV_CLRn, DEV_OE, JTAGEN = usable as IO
+
+            # So there's really 8 global pins that we shouldn't touch, and 4
+            # that are fine as IO.
+
+            # The 6 VREFB*N0 pins have higher capacitance, which will affect
+            # IO timing.  48 pF instead of 7-9 pF (Table 16, Max 10
+            # datasheet).  T=4.8 ns with 100 ohm driver output impedance,
+            # T=14.4 ns with 300 ohm, T=4.8 us with 10k.  So no good for
+            # SDRAM, fine for anything from Elk except maybe open collector
+            # pins.
+
+            # Looks like 10M08 doesn't have bank 4 and 7. 
+            # H1 normal: bank=1B elec=IO special=VREFB1N0 diffio= diffout= speed= pin=H1
+            # L1 normal: bank=2 elec=IO special=VREFB2N0 diffio= diffout= speed= pin=L1
+            # N11 normal: bank=3 elec=IO special=VREFB3N0 diffio= diffout= speed= pin=N11
+            # K13 normal: bank=5 elec=IO special=VREFB5N0 diffio= diffout= speed= pin=K13
+            # D13 normal: bank=6 elec=IO special=VREFB6N0 diffio= diffout= speed= pin=D13
+            # B7 normal: bank=8 elec=IO special=VREFB8N0 diffio= diffout= speed= pin=B7
+
+            # There are 5 pins (A5, C13, L2, N12, L13) that aren't listed as
+            # Low_Speed or High_Speed or special or config.  In Quartus these
+            # show up as "other dual function, High_Speed", so these are good
+            # to use 
 
             # Escape routing:
             # 35 on bottom layer (8 R 11 B 8 L 8 T)
@@ -262,103 +300,122 @@ fpga = [
             # = 130
 
             # So we have:
-            # - Top: 29 IO + nSTATUS, CONF_DONE, JTAGEN, DEV_OE, DEV_CLRn
+            # - Top: 31 IO (incl DEV_OE, DEV_CLRn) + nSTATUS, CONF_DONE, JTAGEN
             # - Right: 31 IO
             # - Bottom: 31 IO
             # - Left: 27 IO + TCK, TMS, TDI, TDO
 
-            # Outer ring -- 45 IOs (4 x 13 - 1 for TMS on G1)
+            # Top and left and include banks 1 and 8 (low speed IO, so those
+            # should be used for the ULA (requires 54/58 available IO).  Right
+            # and bottom are fast, and provide 62 IO.  SDRAM can go on the
+            # right, and everything else on top.
+
+
+            # Top row, left to right
+            Pin("B3",  "", conn[39]),
             Pin("A2",  "", conn[0]),
             Pin("A3",  "", conn[1]),
+            Pin("B4",  "", conn[40]),
             Pin("A4",  "", conn[2]),
             Pin("A5",  "", conn[3]),
+            Pin("B5",  "", conn[41]),
+            Pin("E6",  "", conn[82]),
             Pin("A6",  "", conn[4]),
+            Pin("B6",  "", conn[42]),
+            Pin("F8",  "", conn[85]),
             Pin("A7",  "", conn[5]),
+            Pin("B7",  "VREFB8N0", conn[43]),
             Pin("A8",  "", conn[6]),
+            Pin("D9",  "", conn[80]),
+            Pin("E8",  "", conn[83]),
+            Pin("E9",  "", conn[95]),
             Pin("A9",  "", conn[7]),
             Pin("A10", "", conn[8]),
-            Pin("A11", "", conn[9]),
-            Pin("A12", "", conn[10]),
-            Pin("N4",  "", conn[11]),
-            Pin("N5",  "", conn[12]),
-            Pin("N6",  "", conn[13]),
-            Pin("N7",  "", conn[14]),
-            Pin("N8",  "", conn[15]),
-            Pin("N9",  "", conn[16]),
-            Pin("N10", "", conn[17]),
-            Pin("N11", "VREFB3N0", conn[18]),
-            Pin("N12", "", conn[19]),
-            Pin("B1",  "", conn[20]),
-            Pin("C1",  "", conn[21]),
-            Pin("D1",  "", conn[22]),
-            Pin("E1",  "", conn[23]),
-            Pin("F1",  "", conn[24]),
-            Pin("H1",  "VREFB1N0", conn[25]),
-            Pin("J1",  "", conn[26]),
-            Pin("K1",  "", conn[27]),
-            Pin("M1",  "", conn[28]),
-            Pin("B13", "", conn[29]),
-            Pin("C13", "", conn[30]),
-            Pin("D13", "VREFB6N0", conn[31]),
-            Pin("G13", "", conn[32]),
-            Pin("H13", "", conn[33]),
-            Pin("J13", "", conn[34]),
-            Pin("K13", "VREFB5N0", conn[35]),
-            Pin("L13", "", conn[36]),
-            Pin("M13", "", conn[37]),
-
-            # Next ring in -
-            Pin("B2",  "", conn[38]),
-            Pin("B3",  "", conn[39]),
-            Pin("B4",  "", conn[40]),
-            Pin("B5",  "", conn[41]),
-            Pin("B6",  "", conn[42]),
-            Pin("B7",  "VREFB8N0", conn[43]),
             Pin("B10", "", conn[44]),
-            Pin("B11", "", conn[45]),
-            Pin("M2",  "", conn[46]),
-            Pin("M3",  "PLL_L_CLKOUTn", conn[47]),
-            Pin("M4",  "", conn[48]),
-            Pin("M5",  "", conn[49]),
-            Pin("M7",  "", conn[40]),
-            Pin("M8",  "", conn[51]),
-            Pin("M9",  "", conn[52]),
-            Pin("M10", "", conn[53]),
-            Pin("M11", "", conn[54]),
-            Pin("M12", "", conn[55]),
-
-            Pin("C2",  "", conn[56]),
-            Pin("H2",  "", conn[57]),
-            Pin("J2",  "", conn[58]),
-            Pin("K2",  "", conn[59]),
-            Pin("L2",  "", conn[60]),
-            Pin("L3",  "PLL_L_CLKOUTp", conn[61]),
-            Pin("C9",  "", conn[62]),
             Pin("C10", "", conn[63]),
+            Pin("A11", "", conn[9]),
+            Pin("B11", "", conn[45]),
+            Pin("A12", "", conn[10]),
             Pin("B12", "", conn[64]),
-            Pin("C12", "", conn[65]),
-            Pin("D11", "", conn[66]),
-            Pin("D12", "", conn[67]),
-            Pin("E12", "", conn[68]),
-            Pin("F12", "", conn[69]),
-            Pin("G12", "", conn[70]),
-            Pin("J12", "", conn[71]),
-            Pin("K11", "", conn[72]),
-            Pin("K12", "", conn[73]),
-            Pin("L11", "", conn[74]),
-            Pin("L12", "", conn[75]),
-            Pin("L10", "", conn[76]),
-            Pin("C11", "", conn[77]),
-            Pin("E3",  "", conn[78]),
-            Pin("L5",  "", conn[79]),
 
-            # These were used as VCC/GND in the two layer version
-            Pin("D9",  "", conn[80]),
-            Pin("E4",  "", conn[81]),
-            Pin("E6",  "", conn[82]),
-            Pin("E8",  "", conn[83]),
+            # Right column, top to bottom
+            Pin("C11", "", conn[77]),
+            Pin("B13", "", conn[29]),
+            Pin("C12", "", conn[65]),
+            Pin("C13", "", conn[30]),
+            Pin("D12", "", conn[67]),
+            Pin("D13", "VREFB6N0", conn[31]),
+            Pin("F9",  "DPCLK3",   conn[116]),
             Pin("E10", "", conn[84]),
-            Pin("F8",  "", conn[85]),
+            Pin("F10", "DPCLK2",   conn[115]),
+            Pin("D11", "", conn[66]),
+            Pin("E13", "CLK3n",    conn[111]),
+            Pin("E12", "", conn[68]),
+            Pin("F13", "CLK3p",    conn[112]),
+            Pin("F12", "", conn[69]),
+            Pin("G13", "", conn[32]),
+            Pin("G12", "", conn[70]),
+            Pin("H13", "", conn[33]),
+            Pin("J12", "", conn[71]),
+            Pin("J13", "", conn[34]),
+            Pin("K11", "", conn[72]),
+            Pin("K13", "VREFB5N0", conn[35]),
+            Pin("K12", "", conn[73]),
+            Pin("L13", "", conn[36]),
+            Pin("L12", "", conn[75]),
+            Pin("M13", "", conn[37]),
+            Pin("L11", "", conn[74]),
+
+            # Bottom row, right to left
+            Pin("M12", "", conn[55]),
+            Pin("N12", "", conn[19]),
+            Pin("M11", "", conn[54]),
+            Pin("N11", "VREFB3N0", conn[18]),
+            Pin("L10", "", conn[76]),
+            Pin("N10", "", conn[17]),
+            Pin("M10", "", conn[53]),
+            Pin("N9",  "", conn[16]),
+            Pin("M9",  "", conn[52]),
+            Pin("N8",  "", conn[15]),
+            Pin("M8",  "", conn[51]),
+            Pin("N7",  "", conn[14]),
+            Pin("M7",  "", conn[40]),
+            Pin("N6",  "", conn[13]),
+            Pin("L5",  "", conn[79]),
+            Pin("N5",  "", conn[12]),
+            Pin("M5",  "", conn[49]),
+            Pin("N4",  "", conn[11]),
+            Pin("M4",  "", conn[48]),
+            Pin("N3",  "DPCLK1",   conn[114]),
+            Pin("M3",  "PLL_L_CLKOUTn", conn[47]),
+            Pin("N2",  "DPCLK0",   conn[113]),
+            Pin("L3",  "PLL_L_CLKOUTp", conn[61]),
+
+            # Left column, bottom to top
+            Pin("M2",  "", conn[46]),
+            Pin("M1",  "", conn[28]),
+            Pin("L2",  "", conn[60]),
+            Pin("L1",  "VREFB2N0", conn[117]),
+            Pin("L4",  "", conn[94]),
+            Pin("K1",  "", conn[27]),
+            Pin("K2",  "", conn[59]),
+            Pin("J1",  "", conn[26]),
+            Pin("J2",  "", conn[58]),
+            Pin("H1",  "VREFB1N0", conn[25]),
+            Pin("H2",  "", conn[57]),
+            Pin("H3",  "", conn[104]),
+            Pin("F1",  "", conn[24]),
+            Pin("E1",  "", conn[23]),
+            Pin("E3",  "", conn[78]),
+            Pin("D1",  "", conn[22]),
+            Pin("E4",  "", conn[81]),
+            Pin("C1",  "", conn[21]),
+            Pin("C2",  "", conn[56]),
+            Pin("B1",  "", conn[20]),
+            Pin("B2",  "", conn[38]),
+
+            # TODO move these above here
+            Pin("C9",  "", conn[62]),
             Pin("G4",  "", conn[86]),
             Pin("H8",  "", conn[87]),
             Pin("J5",  "", conn[88]),
@@ -367,9 +424,6 @@ fpga = [
             Pin("K7",  "", conn[91]),
             Pin("K8",  "", conn[92]),
             Pin("K10", "", conn[93]),
-            Pin("L4",  "", conn[94]),
-
-            Pin("E9",  "", conn[95]),
             Pin("F4",  "", conn[96]),
             Pin("H9",  "", conn[97]),
             Pin("H10", "", conn[98]),
@@ -378,36 +432,29 @@ fpga = [
             Pin("J9",  "", conn[101]),
             Pin("K5",  "", conn[102]),
             Pin("K6",  "", conn[103]),
-            Pin("H3",  "", conn[104]),
-            Pin("L1",  "VREFB2N0", conn[117]),
-
-            # Clocks and VREF -- also usable as IO
             Pin("G5",  "CLK0n",    conn[105]),
             Pin("H6",  "CLK0p",    conn[106]),
             Pin("H5",  "CLK1n",    conn[107]),
             Pin("H4",  "CLK1p",    conn[108]),
             Pin("G10", "CLK2n",    conn[109]),
             Pin("G9",  "CLK2p",    conn[110]),
-            Pin("E13", "CLK3n",    conn[111]),
-            Pin("F13", "CLK3p",    conn[112]),
-            Pin("N2",  "DPCLK0",   conn[113]),
-            Pin("N3",  "DPCLK1",   conn[114]),
-            Pin("F10", "DPCLK2",   conn[115]),
-            Pin("F9",  "DPCLK3",   conn[116]),
 
             # 12 JTAG and other special pins
-            Pin("E5",  "JTAGEN",     "fpga_JTAGEN"),
-            Pin("G1",  "TMS",        "fpga_TMS"),
-            Pin("G2",  "TCK",        "fpga_TCK"),
-            Pin("F5",  "TDI",        "fpga_TDI"),
-            Pin("F6",  "TDO",        "fpga_TDO"),
-            Pin("B9",  "DEV_CLRn",   "fpga_DEV_CLRn"),
-            Pin("D8",  "DEV_OE",     "fpga_DEV_OE"),
-            Pin("D7",  "CONFIG_SEL", "GND"),  # unused, so connected to GND
-            Pin("E7",  "nCONFIG",    "3V3"),  # can be connected straight to VCCIO
-            Pin("D6",  "CRC_ERROR",  "GND"),  # WARNING: disable Error Detection CRC option
+            Pin("B9",  "DEV_CLRn",   "fpga_DEV_CLRn"),  # TODO use as IO
+            Pin("D8",  "DEV_OE",     "fpga_DEV_OE"),  # TODO use as IO
+
+            Pin("E5",  "JTAGEN"),  # NC because we always want JTAG, even in we've pushed a bad config
+            Pin("D6",  "CRC_ERROR",  "GND"),  # WARNING: make sure to disable Error Detection CRC option
+
+            # These are reserved by the fitter by default -- leave them alone
             Pin("C4",  "nSTATUS",    "fpga_nSTATUS"),
             Pin("C5",  "CONF_DONE",  "fpga_CONF_DONE"),
+            Pin("D7",  "CONFIG_SEL", "GND"),  # unused, so connected to GND
+            Pin("E7",  "nCONFIG",    "3V3"),  # can be connected straight to VCCIO
+            Pin("F5",  "TDI",        "fpga_TDI"),
+            Pin("F6",  "TDO",        "fpga_TDO"),
+            Pin("G1",  "TMS",        "fpga_TMS"),
+            Pin("G2",  "TCK",        "fpga_TCK"),
 
             # 39 power and ground pins
             Pin("D2",  "GND",     "GND"),
@@ -505,72 +552,242 @@ fpga = [
         "sd_DAT3_nCS",
         "USB_M",
         "USB_P",
-        "USB_PU",
-        "clock_osc",
+        "USB_PU",  # slow OK
+        "clk_osc",
         "dac_dacdat",
         "dac_lrclk",
         "dac_bclk",
         "dac_mclk",
-        "dac_nmute",
-        "A_buf_nOE",
-        "A_buf_DIR",
-        "A0",
-        "A1",
-        "A2",
-        "A3",
-        "A4",
-        "A5",
-        "A6",
-        "A7",
-        "A8",
-        "A9",
-        "A10",
-        "A11",
-        "A12",
-        "A13",
-        "A14",
-        "A15",
+        "dac_nmute",  # slow OK
+        "A_buf_nOE",  # slow OK
+        "A_buf_DIR",  # slow OK
+        "addr0",
+        "addr1",
+        "addr2",
+        "addr3",
+        "addr4",
+        "addr5",
+        "addr6",
+        "addr7",
+        "addr8",
+        "addr9",
+        "addr10",
+        "addr11",
+        "addr12",
+        "addr13",
+        "addr14",
+        "addr15",
         "D_buf_nOE",
         "D_buf_DIR",
-        "D0",
-        "D1",
-        "D2",
-        "D3",
-        "D4",
-        "D5",
-        "D6",
-        "D7",
-        "input_buf_nOE",
-        "KBD0",
-        "KBD1",
-        "KBD2",
-        "KBD3",
-        "nNMI_in",
-        "nIRQ_in",
+        "data0",
+        "data1",
+        "data2",
+        "data3",
+        "data4",
+        "data5",
+        "data6",
+        "data7",
+        "input_buf_nOE",  # slow OK
+        "kbd0",
+        "kbd1",
+        "kbd2",
+        "kbd3",
+        "NMI_n_in",
+        "IRQ_n_in",
         "RnW_in",
-        "CLK_16MHZ",
-        "CAPS_LOCK",
-        "nRESET_out",
-        "nIRQ_out",
+        "clk_in",
+        "caps",  # slow OK
+        "RST_n_out",  # slow OK
+        "IRQ_n_out",
         "RnW_out",
         "RnW_nOE",
-        "nRESET_in",
-        "misc_buf_nOE",
-        "PHI_OUT",
-        "nHS",
-        "RED",
-        "GREEN",
-        "BLUE",
-        "nCSYNC",
-        "CAS_MO",
-        "CAS_OUT",
-        "CAS_IN",
-        "nROMCS",
+        "RST_n_in",
+        "misc_buf_nOE",  # slow OK
+        "clk_out",
+        "HS_n",
+        "red",
+        "green",
+        "blue",
+        "csync",
+        "casMO",
+        "casOut",
+        "casIn",
+        "ROM_n",
         "fpga_dummy0",
         "fpga_dummy1",
         "fpga_dummy2",
         "fpga_dummy3",
-    ]]
+    ]]) if 0 else [
+Pin("D1", "", "io_b1A_L1n_D1"),
+Pin("C2", "", "io_b1A_L1p_C2"),
+Pin("E3", "", "io_b1A_L3n_E3"),
+Pin("E4", "", "io_b1A_L3p_E4"),
+Pin("C1", "", "io_b1A_L5n_C1"),
+Pin("B1", "", "io_b1A_L5p_B1"),
+Pin("F1", "", "io_b1A_L7n_F1"),
+Pin("E1", "", "io_b1A_L7p_E1"),
+Pin("E5", "", "fpga_JTAGEN"),
+Pin("G1", "", "fpga_TMS"),
+Pin("H1", "", "special_VREFB1N0_nodiff_H1"),
+Pin("G2", "", "fpga_TCK"),
+Pin("F5", "", "fpga_TDI"),
+Pin("F6", "", "fpga_TDO"),
+Pin("F4", "", "io_b1B_L14n_F4"),
+Pin("G4", "", "io_b1B_L14p_G4"),
+Pin("H2", "", "io_b1B_L16n_H2"),
+Pin("H3", "", "io_b1B_L16p_H3"),
+Pin("G5", "", "special_b2_CLK0n_L18n_G5"),
+Pin("J1", "", "io_b2_L19n_J1"),
+Pin("H6", "", "special_b2_CLK0p_L18p_H6"),
+Pin("J2", "", "io_b2_L19p_J2"),
+Pin("H5", "", "special_b2_CLK1n_L20n_H5"),
+Pin("M1", "", "io_b2_L21n_M1"),
+Pin("H4", "", "special_b2_CLK1p_L20p_H4"),
+Pin("M2", "", "io_b2_L21p_M2"),
+Pin("N2", "", "special_b2_DPCLK0_L22n_N2"),
+Pin("L1", "", "special_VREFB2N0_nodiff_L1"),
+Pin("N3", "", "special_b2_DPCLK1_L22p_N3"),
+Pin("L2", "", "TODO_unknown_b2_L2"),
+Pin("M3", "", "special_b2_PLL_L_CLKOUTn_L27n_M3"),
+Pin("K1", "", "io_b2_L28n_K1"),
+Pin("L3", "", "special_b2_PLL_L_CLKOUTp_L27p_L3"),
+Pin("K2", "", "io_b2_L28p_K2"),
+Pin("L5", "", "io_b3_B1n_L5"),
+Pin("M4", "", "io_b3_B2n_M4"),
+Pin("L4", "", "io_b3_B1p_L4"),
+Pin("M5", "", "io_b3_B2p_M5"),
+Pin("K5", "", "io_b3_B3n_K5"),
+Pin("N4", "", "io_b3_B4n_N4"),
+Pin("J5", "", "io_b3_B3p_J5"),
+Pin("N5", "", "io_b3_B4p_N5"),
+Pin("N6", "", "io_b3_B5n_N6"),
+Pin("N7", "", "io_b3_B6n_N7"),
+Pin("M7", "", "io_b3_B5p_M7"),
+Pin("N8", "", "io_b3_B6p_N8"),
+Pin("J6", "", "io_b3_B7n_J6"),
+Pin("M8", "", "io_b3_B8n_M8"),
+Pin("K6", "", "io_b3_B7p_K6"),
+Pin("M9", "", "io_b3_B8p_M9"),
+Pin("J7", "", "io_b3_B9n_J7"),
+Pin("N11", "", "special_VREFB3N0_nodiff_N11"),
+Pin("K7", "", "io_b3_B9p_K7"),
+Pin("N12", "", "TODO_unknown_b3_N12"),
+Pin("M13", "", "io_b3_B10n_M13"),
+Pin("N10", "", "io_b3_B11n_N10"),
+Pin("M12", "", "io_b3_B10p_M12"),
+Pin("N9", "", "io_b3_B11p_N9"),
+Pin("M11", "", "io_b3_B12n_M11"),
+Pin("L11", "", "io_b3_B12p_L11"),
+Pin("J8", "", "io_b3_B14n_J8"),
+Pin("K8", "", "io_b3_B14p_K8"),
+Pin("M10", "", "io_b3_B16n_M10"),
+Pin("L10", "", "io_b3_B16p_L10"),
+Pin("K10", "", "io_b5_R1p_K10"),
+Pin("K11", "", "io_b5_R2p_K11"),
+Pin("J10", "", "io_b5_R1n_J10"),
+Pin("L12", "", "io_b5_R2n_L12"),
+Pin("K12", "", "io_b5_R7p_K12"),
+Pin("L13", "", "TODO_unknown_b5_L13"),
+Pin("J12", "", "io_b5_R7n_J12"),
+Pin("K13", "", "special_VREFB5N0_nodiff_K13"),
+Pin("J9", "", "io_b5_R8p_J9"),
+Pin("J13", "", "io_b5_R9p_J13"),
+Pin("H10", "", "io_b5_R8n_H10"),
+Pin("H13", "", "io_b5_R9n_H13"),
+Pin("H9", "", "io_b5_R10p_H9"),
+Pin("G13", "", "io_b5_R11p_G13"),
+Pin("H8", "", "io_b5_R10n_H8"),
+Pin("G12", "", "io_b5_R11n_G12"),
+Pin("G9", "", "special_b6_CLK2p_R14p_G9"),
+Pin("G10", "", "special_b6_CLK2n_R14n_G10"),
+Pin("F13", "", "special_b6_CLK3p_R16p_F13"),
+Pin("E13", "", "special_b6_CLK3n_R16n_E13"),
+Pin("F12", "", "io_b6_R18p_F12"),
+Pin("E12", "", "io_b6_R18n_E12"),
+Pin("F9", "", "special_b6_DPCLK3_R26p_F9"),
+Pin("D13", "", "special_VREFB6N0_nodiff_D13"),
+Pin("F10", "", "special_b6_DPCLK2_R26n_F10"),
+Pin("C13", "", "TODO_unknown_b6_C13"),
+Pin("F8", "", "io_b6_R27p_F8"),
+Pin("B12", "", "io_b6_R28p_B12"),
+Pin("E9", "", "io_b6_R27n_E9"),
+Pin("B11", "", "io_b6_R28n_B11"),
+Pin("C12", "", "io_b6_R29p_C12"),
+Pin("B13", "", "io_b6_R30p_B13"),
+Pin("C11", "", "io_b6_R29n_C11"),
+Pin("A12", "", "io_b6_R30n_A12"),
+Pin("E10", "", "io_b6_R31p_E10"),
+Pin("D9", "", "io_b6_R31n_D9"),
+Pin("D12", "", "io_b6_R33p_D12"),
+Pin("D11", "", "io_b6_R33n_D11"),
+Pin("C10", "", "io_b8_T14p_C10"),
+Pin("A8", "", "io_b8_T15p_A8"),
+Pin("C9", "", "io_b8_T14n_C9"),
+Pin("A9", "", "io_b8_T15n_A9"),
+Pin("B10", "", "io_b8_T16p_B10"),
+Pin("A10", "", "io_b8_T17p_A10"),
+Pin("B9", "", "fpga_DEV_CLRn"),
+Pin("A11", "", "io_b8_T17n_A11"),
+Pin("D8", "", "fpga_DEV_OE"),
+Pin("E8", "", "io_b8_T18n_E8"),
+Pin("B7", "", "special_VREFB8N0_nodiff_B7"),
+Pin("D7", "", "fpga_CONFIG_SEL"),
+Pin("A7", "", "io_b8_T19p_A7"),
+Pin("E7", "", "fpga_nCONFIG"),
+Pin("A6", "", "io_b8_T19n_A6"),
+Pin("B6", "", "io_b8_T20p_B6"),
+Pin("A4", "", "io_b8_T21p_A4"),
+Pin("B5", "", "io_b8_T20n_B5"),
+Pin("A3", "", "io_b8_T21n_A3"),
+Pin("E6", "", "io_b8_T22p_E6"),
+Pin("B3", "", "io_b8_T23p_B3"),
+Pin("D6", "", "fpga_CRC_ERROR"),
+Pin("B4", "", "io_b8_T23n_B4"),
+Pin("C4", "", "fpga_nSTATUS"),
+Pin("A5", "", "TODO_unknown_b8_A5"),
+Pin("C5", "", "fpga_CONF_DONE"),
+Pin("A2", "", "io_b8_T26p_A2"),
+Pin("B2", "", "io_b8_T26n_B2"),
+Pin("D2", "", "GND"),
+Pin("E2", "", "GND"),
+Pin("N13", "", "GND"),
+Pin("N1", "", "GND"),
+Pin("M6", "", "GND"),
+Pin("L9", "", "GND"),
+Pin("J4", "", "GND"),
+Pin("H12", "", "GND"),
+Pin("G7", "", "GND"),
+Pin("F3", "", "GND"),
+Pin("E11", "", "GND"),
+Pin("D5", "", "GND"),
+Pin("C3", "", "GND"),
+Pin("B8", "", "GND"),
+Pin("A13", "", "GND"),
+Pin("A1", "", "GND"),
+Pin("F2", "", "3V3"),
+Pin("G3", "", "3V3"),
+Pin("K3", "", "3V3"),
+Pin("J3", "", "3V3"),
+Pin("L8", "", "3V3"),
+Pin("L7", "", "3V3"),
+Pin("L6", "", "3V3"),
+Pin("J11", "", "3V3"),
+Pin("H11", "", "3V3"),
+Pin("G11", "", "3V3"),
+Pin("F11", "", "3V3"),
+Pin("C8", "", "3V3"),
+Pin("C7", "", "3V3"),
+Pin("C6", "", "3V3"),
+Pin("K4", "", "3V3"),
+Pin("D10", "", "3V3"),
+Pin("D3", "", "3V3"),
+Pin("D4", "", "3V3"),
+Pin("K9", "", "3V3"),
+Pin("H7", "", "3V3"),
+Pin("G8", "", "3V3"),
+Pin("G6", "", "3V3"),
+Pin("F7", "", "3V3"),
+    ])
 ]
 #myelin_kicad_pcb.update_intel_qsf(
 #    cpld, os.path.join(here, "../altera/ElectronULA_max10.qsf"))
@@ -683,7 +900,7 @@ osc = myelin_kicad_pcb.Component(
     pins=[
         Pin(1, "STANDBY#",  "3V3"),
         Pin(2, "GND",       "GND"),
-        Pin(3, "OUT",       "clock_osc"),  # TODO connect to a clock pin on the FPGA
+        Pin(3, "OUT",       "clk_osc"),  # TODO connect to a clock pin on the FPGA
         Pin(4, "VDD",       "3V3"),
     ],
 )
@@ -893,6 +1110,8 @@ ram = [
 
 ### DAC for audio output
 
+# TODO make a jumper option to not use dac and just have one IO for sound_out
+
 # This is a bit of a stretch because I've never worked with DACs before.  The
 # WM8524 is $2 at Digikey and apparently good quality.  It has some
 # interesting clocking requirements -- MCLK needs to be 128 or 256 times the
@@ -949,9 +1168,9 @@ audio_filters = [
 ]
 ula_audio_output = [
     # pulldown for dac_out_left to prevent startup pops (maybe unnecessary)
-    myelin_kicad_pcb.R0805("NF 10k", "dac_out_left", "GND", ref="AR3"),
+    myelin_kicad_pcb.R0805("NF 10k", "dac_out_right", "GND", ref="AR3"),
     # coupling capacitor for dac output (center voltage 0V) to SOUND_OUT_5V (center 2.5V)
-    myelin_kicad_pcb.C0805("10u", "dac_out_left", "SOUND_OUT_5V", ref="AC8"),
+    myelin_kicad_pcb.C0805("10u", "dac_out_right", "SOUND_OUT_5V", ref="AC8"),
     # pull resistor to center sound output on 2.5V
     myelin_kicad_pcb.R0805("10k", "SOUND_OUT_5V", "audio_bias", ref="AR4"),
     # voltage divider to generate ~2.5V
@@ -971,8 +1190,8 @@ ula_audio_output = [
 # directly to CAS_OUT_5V.
 
 # Reset level conversion using diode + pullup
-reset_3v3_pullup = myelin_kicad_pcb.R0805("10k", "3V3", "nRESET_in", ref="R?")
-reset_3v3_diode = myelin_kicad_pcb.DSOD323("BAT54", "nRESET_5V", "nRESET_in", ref="D?")
+reset_3v3_pullup = myelin_kicad_pcb.R0805("10k", "3V3", "RST_n_in", ref="R?")
+reset_3v3_diode = myelin_kicad_pcb.DSOD323("BAT54", "nRESET_5V", "RST_n_in", ref="D?")
 
 big_buffers = [
     [
@@ -1049,26 +1268,26 @@ big_buffers = [
         "A_buf_DIR",
         [
             # [A port, B port]
-            ["A0_5V",  "A0"],
-            ["A1_5V",  "A1"],
-            ["A2_5V",  "A2"],
-            ["A3_5V",  "A3"],
-            ["A4_5V",  "A4"],
-            ["A5_5V",  "A5"],
-            ["A6_5V",  "A6"],
-            ["A7_5V",  "A7"],
+            ["A15_5V", "addr15"],
+            ["A10_5V", "addr10"],
+            ["A9_5V",  "addr9"],
+            ["A11_5V", "addr11"],
+            ["A3_5V",  "addr3"],
+            ["A4_5V",  "addr4"],
+            ["A5_5V",  "addr5"],
+            ["A13_5V", "addr13"],
         ],
         "A_buf_nOE",  # pulled up
         "A_buf_DIR",
         [
-            ["A8_5V",  "A8"],
-            ["A9_5V",  "A9"],
-            ["A10_5V", "A10"],
-            ["A11_5V", "A11"],
-            ["A12_5V", "A12"],
-            ["A13_5V", "A13"],
-            ["A14_5V", "A14"],
-            ["A15_5V", "A15"],
+            ["A6_5V",  "addr6"],
+            ["A2_5V",  "addr2"],
+            ["A7_5V",  "addr7"],
+            ["A14_5V", "addr14"],
+            ["A12_5V", "addr12"],
+            ["A8_5V",  "addr8"],
+            ["A0_5V",  "addr0"],
+            ["A1_5V",  "addr1"],
         ],
     ],
     [
@@ -1076,31 +1295,31 @@ big_buffers = [
         "DBUF",
         # A port (with series 22R) should connect to ULA pins, B port should connect to FPGA
         "D_buf_nOE",  # pulled up
-        "D_buf_DIR",
+        "D_buf_DIR",  # 1 = A->B (ULA->FPGA), 0 = B->A (FPGA->ULA)
         [
             # [A port, B port]
-            ["PD0_5V", "PD0"],
-            ["PD1_5V", "PD1"],
-            ["PD2_5V", "PD2"],
-            ["PD3_5V", "PD3"],
-            ["PD4_5V", "PD4"],
-            ["PD5_5V", "PD5"],
-            ["PD6_5V", "PD6"],
-            ["PD7_5V", "PD7"],
+            ["PD7_5V", "data7"],
+            ["PD4_5V", "data4"],
+            ["PD5_5V", "data5"],
+            ["PD1_5V", "data1"],
+            ["PD2_5V", "data2"],
+            ["PD3_5V", "data3"],
+            ["PD6_5V", "data6"],
+            ["PD0_5V", "data0"],
         ],
         # These are always inputs - fixed direction
         "input_buf_nOE",  # pulled up
         "3V3",  # input_buf_DIR = A -> B
         [
             # [A port, B port]
-            ["KBD0_5V",      "KBD0"],
-            ["KBD1_5V",      "KBD1"],
-            ["KBD2_5V",      "KBD2"],
-            ["KBD3_5V",      "KBD3"],
-            ["nNMI_5V",      "nNMI_in"],
-            ["nIRQ_5V",      "nIRQ_in"],
+            ["clk_in_5V",    "clk_in"],
             ["RnW_5V",       "RnW_in"],
-            ["CLK_16MHZ_5V", "CLK_16MHZ"],
+            ["KBD3_5V",      "kbd3"],
+            ["KBD2_5V",      "kbd2"],
+            ["nIRQ_5V",      "IRQ_n_in"],
+            ["nNMI_5V",      "NMI_n_in"],
+            ["KBD1_5V",      "kbd1"],
+            ["KBD0_5V",      "kbd0"],
         ]
     ],
 ]
@@ -1136,10 +1355,10 @@ oc_buf = [
             "5V",
             [
                 # [nOE, input, output]
-                ["GND",        "CAPS_LOCK", "CAPS_LOCK_5V"],
-                ["nRESET_out", "GND",       "nRESET_5V"],
-                ["nIRQ_out",   "GND",       "nIRQ_5V"],
+                ["GND",        "caps",      "CAPS_LOCK_5V"],
+                ["RST_n_out",  "GND",       "nRESET_5V"],
                 ["RnW_out",    "RnW_nOE",   "RnW_5V"],
+                ["IRQ_n_out",  "GND",       "nIRQ_5V"],
             ]
         )
     ]
@@ -1185,14 +1404,14 @@ misc_buf = [
             "misc_buf_nOE",  # pulled up
             [
                 # [A port, B port]
-                ["PHI_OUT", "PHI_OUT_5V_prefilter"],
-                ["nHS",     "nHS_5V"],
-                ["RED",     "RED_5V"],
-                ["GREEN",   "GREEN_5V"],
-                ["BLUE",    "BLUE_5V"],
-                ["nCSYNC",  "nCSYNC_5V"],
-                ["CAS_MO",  "CAS_MO_5V"],
-                ["CAS_OUT", "CAS_OUT_5V"],
+                ["casOut",  "CAS_OUT_5V"],
+                ["casMO",   "CAS_MO_5V"],
+                ["csync",   "csync_5V"],
+                ["blue",    "blue_5V"],
+                ["green",   "green_5V"],
+                ["red",     "red_5V"],
+                ["HS_n",    "nHS_5V"],
+                ["clk_out", "PHI_OUT_5V_prefilter"],
             ]
         )
     ]
@@ -1207,11 +1426,11 @@ phi_out_filter = [
 # MIC7221 comparator for CAS IN
 comparator = [
     myelin_kicad_pcb.Component(
-        footprint="", # TODO
+        footprint="Package_TO_SOT_SMD:SOT-23-5_HandSoldering",
         identifier="CMP",
         value="MIC7221",
         pins=[
-            Pin( 1, "OUT", "CAS_IN"),  # open drain, pulled to 3V3
+            Pin( 1, "OUT", "casIn"),  # open drain, pulled to 3V3
             Pin( 2, "V+",  "5V"),
             Pin( 3, "IN+", "CAS_IN_5V"),
             Pin( 4, "IN-", "CAS_IN_divider"),
@@ -1222,12 +1441,12 @@ comparator = [
 
 comparator_misc = [
     # MIC7221 pullup to 3V3
-    myelin_kicad_pcb.R0805("1k", "CAS_IN", "3V3", ref="R?"),
-    # TODO calculate CAS_IN_divider values to make the center voltage for CAS_IN
+    myelin_kicad_pcb.R0805("1k", "casIn", "3V3", ref="R?"),
+    # TODO calculate CAS_IN_divider values to make the center voltage for casIn
     myelin_kicad_pcb.R0805("1k", "GND", "CAS_IN_divider", ref="R?"),
     myelin_kicad_pcb.R0805("1k", "CAS_IN_divider", "5V", ref="R?"),
     # decoupling
-    myelin_kicad_pcb.C0805("100n", "3V3", "GND", ref="DC?"),
+    myelin_kicad_pcb.C0805("100n", "5V", "GND", ref="DC?"),
 ]
 
 
