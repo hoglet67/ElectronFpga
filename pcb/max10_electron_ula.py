@@ -244,12 +244,10 @@ pullups = [
 def roll_array(a, n):
     return a[n:] + a[:n]
 
-fpga = [
-    myelin_kicad_pcb.Component(
-        footprint="myelin-kicad:intel_ubga169",
-        identifier="FPGA",
-        value="10M08SCU169",
-        pins=[[
+if True:
+    # allocate FPGA pins dynamically
+
+    fpga_pins = [
             # IOs
 
             # The Max 10 Overview says that the U169 package can have up to 130
@@ -258,7 +256,7 @@ fpga = [
 
             # Summary, in order of usefulness:
             # - 112 ordinary IOs that have low capacitance
-            # - 2 config pins that we can reconfigure safely (DEV_CLRn, DEV_OE)
+            # - 2 config pins that we can reconfigure safely (DEV_CLRn, xxx)
             # - 6 VREF pins that have 48pF capacitance rather than 7-8pF
             # --- 120 so far
             # - 2 config pins that are a little more dangerous (CRC_ERROR, JTAGEN) -- not using these
@@ -317,129 +315,129 @@ fpga = [
 
 
             # Top row, left to right
-            Pin("B3",  "",         conn[0]),
-            Pin("A2",  "",         conn[1]),
-            Pin("A3",  "",         conn[2]),
-            Pin("B4",  "",         conn[3]),
-            Pin("A4",  "",         conn[4]),
-            Pin("A5",  "",         conn[5]),
-            Pin("B5",  "",         conn[6]),
-            Pin("E6",  "",         conn[7]),
-            Pin("A6",  "",         conn[8]),
-            Pin("B6",  "",         conn[9]),
-            Pin("F8",  "",         conn[10]),
-            Pin("A7",  "",         conn[11]),
-            Pin("B7",  "VREFB8N0", conn[12]),
-            Pin("A8",  "",         conn[13]),
-            Pin("E8",  "",         conn[14]),
-            Pin("E9",  "",         conn[15]),
-            Pin("D9",  "",         conn[16]),
-            Pin("A9",  "",         conn[17]),
-            Pin("C9",  "",         conn[18]),
-            Pin("A10", "",         conn[19]),
-            Pin("B10", "",         conn[20]),
-            Pin("C10", "",         conn[21]),
-            Pin("A11", "",         conn[22]),
-            Pin("B11", "",         conn[23]),
-            Pin("A12", "",         conn[24]),
-            Pin("B12", "",         conn[25]),
+            Pin("B3",  "",         "NEXT_CONN"),
+            Pin("A2",  "",         "NEXT_CONN"),
+            Pin("A3",  "",         "NEXT_CONN"),
+            Pin("B4",  "",         "NEXT_CONN"),
+            Pin("A4",  "",         "NEXT_CONN"),
+            Pin("A5",  "",         "NEXT_CONN"),
+            Pin("B5",  "",         "NEXT_CONN"),
+            Pin("E6",  "",         "NEXT_CONN"),
+            Pin("A6",  "",         "NEXT_CONN"),
+            Pin("B6",  "",         "NEXT_CONN"),
+            Pin("F8",  "",         "NEXT_CONN"),
+            Pin("A7",  "",         "NEXT_CONN"),
+            Pin("B7",  "VREFB8N0", "fpga_dummy3"),
+            Pin("A8",  "",         "NEXT_CONN"),
+            Pin("E8",  "",         "NEXT_CONN"),
+            Pin("E9",  "",         "NEXT_CONN"),
+            Pin("D9",  "",         "NEXT_CONN"),
+            Pin("A9",  "",         "NEXT_CONN"),
+            Pin("C9",  "",         "NEXT_CONN"),
+            Pin("A10", "",         "NEXT_CONN"),
+            Pin("B10", "",         "NEXT_CONN"),
+            Pin("C10", "",         "NEXT_CONN"),
+            Pin("A11", "",         "NEXT_CONN"),
+            Pin("B11", "",         "NEXT_CONN"),
+            Pin("A12", "",         "NEXT_CONN"),
+            Pin("B12", "",         "NEXT_CONN"),
 
             # Right column, top to bottom
-            Pin("C11", "",         conn[26]),
-            Pin("B13", "",         conn[27]),
-            Pin("C12", "",         conn[28]),
-            Pin("C13", "",         conn[29]),
-            Pin("D12", "",         conn[30]),
-            Pin("D13", "VREFB6N0", conn[31]),
-            Pin("F9",  "DPCLK3",   conn[32]),
-            Pin("E10", "",         conn[33]),
-            Pin("F10", "DPCLK2",   conn[34]),
-            Pin("D11", "",         conn[35]),
-            Pin("E13", "CLK3n",    conn[36]),
-            Pin("E12", "",         conn[37]),
-            Pin("F13", "CLK3p",    conn[38]),
-            Pin("G9",  "CLK2p",    conn[39]),
-            Pin("F12", "",         conn[40]),
-            Pin("G13", "",         conn[41]),
-            Pin("G10", "CLK2n",    conn[42]),
-            Pin("G12", "",         conn[43]),
-            Pin("H13", "",         conn[44]),
-            Pin("H10", "",         conn[45]),
-            Pin("J12", "",         conn[46]),
-            Pin("J13", "",         conn[47]),
-            Pin("K11", "",         conn[48]),
-            Pin("K13", "VREFB5N0", conn[49]),
-            Pin("K12", "",         conn[50]),
-            Pin("J10", "",         conn[51]),
-            Pin("L12", "",         conn[52]),
-            Pin("K10", "",         conn[53]),
-            Pin("L13", "",         conn[54]),
-            Pin("M13", "",         conn[55]),
-            Pin("L11", "",         conn[56]),
+            Pin("C11", "",         "NEXT_CONN"),
+            Pin("B13", "",         "NEXT_CONN"),
+            Pin("C12", "",         "NEXT_CONN"),
+            Pin("C13", "",         "NEXT_CONN"),
+            Pin("D12", "",         "NEXT_CONN"),
+            Pin("D13", "VREFB6N0", "fpga_dummy1"),
+            Pin("F9",  "DPCLK3",   "NEXT_CONN"),
+            Pin("E10", "",         "NEXT_CONN"),
+            Pin("F10", "DPCLK2",   "NEXT_CONN"),
+            Pin("D11", "",         "NEXT_CONN"),
+            Pin("E13", "CLK3n",    "NEXT_CONN"),
+            Pin("E12", "",         "NEXT_CONN"),
+            Pin("F13", "CLK3p",    "NEXT_CONN"),
+            Pin("G9",  "CLK2p",    "clk_osc"),
+            Pin("F12", "",         "NEXT_CONN"),
+            Pin("G13", "",         "NEXT_CONN"),
+            Pin("G10", "CLK2n",    "NEXT_CONN"),
+            Pin("G12", "",         "NEXT_CONN"),
+            Pin("H13", "",         "NEXT_CONN"),
+            Pin("H10", "",         "NEXT_CONN"),
+            Pin("J12", "",         "NEXT_CONN"),
+            Pin("J13", "",         "NEXT_CONN"),
+            Pin("K11", "",         "NEXT_CONN"),
+            Pin("K13", "VREFB5N0", "fpga_dummy0"),
+            Pin("K12", "",         "NEXT_CONN"),
+            Pin("J10", "",         "NEXT_CONN"),
+            Pin("L12", "",         "NEXT_CONN"),
+            Pin("K10", "",         "NEXT_CONN"),
+            Pin("L13", "",         "NEXT_CONN"),
+            Pin("M13", "",         "NEXT_CONN"),
+            Pin("L11", "",         "NEXT_CONN"),
             # Bottom row, right to left
-            Pin("M12", "",         conn[57]),
-            Pin("N12", "",         conn[58]),
-            Pin("M11", "",         conn[59]),
-            Pin("N11", "VREFB3N0", conn[60]),
-            Pin("L10", "",         conn[61]),
-            Pin("H9",  "",         conn[62]),
-            Pin("N10", "",         conn[63]),
-            Pin("J9",  "",         conn[64]),
-            Pin("M10", "",         conn[65]),
-            Pin("N9",  "",         conn[66]),
-            Pin("J8",  "",         conn[67]),
-            Pin("H8",  "",         conn[68]),
-            Pin("M9",  "",         conn[69]),
-            Pin("N8",  "",         conn[70]),
-            Pin("M8",  "",         conn[71]),
-            Pin("K7",  "",         conn[72]),
-            Pin("K8",  "",         conn[73]),
-            Pin("N7",  "",         conn[74]),
-            Pin("M7",  "",         conn[75]),
-            Pin("N6",  "",         conn[76]),
-            Pin("J7",  "",         conn[77]),
-            Pin("K6",  "",         conn[78]),
-            Pin("L5",  "",         conn[79]),
-            Pin("N5",  "",         conn[80]),
-            Pin("J6",  "",         conn[81]),
-            Pin("M5",  "",         conn[82]),
-            Pin("K5",  "",         conn[83]),
-            Pin("N4",  "",         conn[84]),
-            Pin("M4",  "",         conn[85]),
-            Pin("J5",  "",         conn[86]),
-            Pin("N3",  "DPCLK1",   conn[87]),
-            Pin("M3",  "PLL_L_CLKOUTn", conn[88]),
-            Pin("N2",  "DPCLK0",   conn[89]),
-            Pin("L3",  "PLL_L_CLKOUTp", conn[90]),
+            Pin("M12", "",         "NEXT_CONN"),
+            Pin("N12", "",         "NEXT_CONN"),
+            Pin("M11", "",         "NEXT_CONN"),
+            Pin("N11", "VREFB3N0", "fpga_dummy2"),
+            Pin("L10", "",         "NEXT_CONN"),
+            Pin("H9",  "",         "NEXT_CONN"),
+            Pin("N10", "",         "NEXT_CONN"),
+            Pin("J9",  "",         "NEXT_CONN"),
+            Pin("M10", "",         "NEXT_CONN"),
+            Pin("N9",  "",         "NEXT_CONN"),
+            Pin("J8",  "",         "NEXT_CONN"),
+            Pin("H8",  "",         "NEXT_CONN"),
+            Pin("M9",  "",         "NEXT_CONN"),
+            Pin("N8",  "",         "NEXT_CONN"),
+            Pin("M8",  "",         "NEXT_CONN"),
+            Pin("K7",  "",         "NEXT_CONN"),
+            Pin("K8",  "",         "NEXT_CONN"),
+            Pin("N7",  "",         "NEXT_CONN"),
+            Pin("M7",  "",         "NEXT_CONN"),
+            Pin("N6",  "",         "NEXT_CONN"),
+            Pin("J7",  "",         "NEXT_CONN"),
+            Pin("K6",  "",         "NEXT_CONN"),
+            Pin("L5",  "",         "NEXT_CONN"),
+            Pin("N5",  "",         "NEXT_CONN"),
+            Pin("J6",  "",         "NEXT_CONN"),
+            Pin("M5",  "",         "NEXT_CONN"),
+            Pin("K5",  "",         "NEXT_CONN"),
+            Pin("N4",  "",         "NEXT_CONN"),
+            Pin("M4",  "",         "NEXT_CONN"),
+            Pin("J5",  "",         "NEXT_CONN"),
+            Pin("N3",  "DPCLK1",   "NEXT_CONN"),
+            Pin("M3",  "PLL_L_CLKOUTn", "NEXT_CONN"),
+            Pin("N2",  "DPCLK0",   "NEXT_CONN"),
+            Pin("L3",  "PLL_L_CLKOUTp", "NEXT_CONN"),
 
             # Left column, bottom to top
-            Pin("M2",  "",         conn[91]),
-            Pin("M1",  "",         conn[92]),
-            Pin("L2",  "",         conn[93]),
-            Pin("L1",  "VREFB2N0", conn[94]),
-            Pin("L4",  "",         conn[95]),
-            Pin("K1",  "",         conn[96]),
-            Pin("K2",  "",         conn[97]),
-            Pin("H5",  "CLK1n",    conn[98]),
-            Pin("J1",  "",         conn[99]),
-            Pin("J2",  "",         conn[100]),
-            Pin("H1",  "VREFB1N0", conn[101]),
-            Pin("G4",  "",         conn[102]),
-            Pin("H6",  "CLK0p",    conn[103]),
-            Pin("H4",  "CLK1p",    conn[104]),
-            Pin("H2",  "",         conn[105]),
-            Pin("H3",  "",         conn[106]),
-            Pin("F1",  "",         conn[107]),
-            Pin("G5",  "CLK0n",    conn[108]),
-            Pin("F4",  "",         conn[109]),
-            Pin("E1",  "",         conn[110]),
-            Pin("E3",  "",         conn[111]),
-            Pin("D1",  "",         conn[112]),
-            Pin("E4",  "",         conn[113]),
-            Pin("C1",  "",         conn[114]),
-            Pin("C2",  "",         conn[115]),
-            Pin("B1",  "",         conn[116]),
-            Pin("B2",  "",         conn[117]),
+            Pin("M2",  "",         "NEXT_CONN"),
+            Pin("M1",  "",         "NEXT_CONN"),
+            Pin("L2",  "",         "NEXT_CONN"),
+            Pin("L1",  "VREFB2N0", "dac_nmute"),
+            Pin("L4",  "",         "NEXT_CONN"),
+            Pin("K1",  "",         "NEXT_CONN"),
+            Pin("K2",  "",         "NEXT_CONN"),
+            Pin("H5",  "CLK1n",    "NEXT_CONN"),
+            Pin("J1",  "",         "NEXT_CONN"),
+            Pin("J2",  "",         "NEXT_CONN"),
+            Pin("H1",  "VREFB1N0", "D_buf_DIR"),
+            Pin("G4",  "",         "NEXT_CONN"),
+            Pin("H6",  "CLK0p",    "NEXT_CONN"),
+            Pin("H4",  "CLK1p",    "NEXT_CONN"),
+            Pin("H2",  "",         "NEXT_CONN"),
+            Pin("H3",  "",         "NEXT_CONN"),
+            Pin("F1",  "",         "NEXT_CONN"),
+            Pin("G5",  "CLK0n",    "NEXT_CONN"),
+            Pin("F4",  "",         "NEXT_CONN"),
+            Pin("E1",  "",         "NEXT_CONN"),
+            Pin("E3",  "",         "NEXT_CONN"),
+            Pin("D1",  "",         "NEXT_CONN"),
+            Pin("E4",  "",         "NEXT_CONN"),
+            Pin("C1",  "",         "NEXT_CONN"),
+            Pin("C2",  "",         "NEXT_CONN"),
+            Pin("B1",  "",         "NEXT_CONN"),
+            Pin("B2",  "",         "NEXT_CONN"),
 
             # 12 JTAG and other special pins
             Pin("B9",  "DEV_CLRn",   "fpga_DEV_CLRn"),  # TODO use as IO
@@ -498,149 +496,170 @@ fpga = [
             Pin("G8",  "VCC_ONE", "3V3"),
             Pin("G6",  "VCC_ONE", "3V3"),
             Pin("F7",  "VCC_ONE", "3V3"),
-        ]
-        for conn in [roll_array([
-            # USB
-            "USB_M",
-            "USB_P",
-            "USB_PU",  # slow OK
+    ]
 
-            # SD card
-            "sd_CLK_SCK",
-            "sd_CMD_MOSI",
-            "sd_DAT0_MISO",
-            "sd_DAT1",
-            "sd_DAT2",
-            "sd_DAT3_nCS",
+    conns_to_allocate = roll_array([
+        # USB
+        "USB_M",
+        "USB_P",
+        "USB_PU",  # slow OK
 
-            # Serial flash
-            "flash_nCE",
-            "flash_SCK",
-            "flash_IO0",
-            "flash_IO1",
-            "flash_IO2",
-            "flash_IO3",
+        # SD card
+        "sd_CLK_SCK",
+        "sd_CMD_MOSI",
+        "sd_DAT0_MISO",
+        "sd_DAT1",
+        "sd_DAT2",
+        "sd_DAT3_nCS",
 
-            # Oscillator
-            "clk_osc",
+        # Serial flash
+        "flash_nCE",
+        "flash_SCK",
+        "flash_IO0",
+        "flash_IO1",
+        "flash_IO2",
+        "flash_IO3",
 
-            # SDRAM
-            "sdram_DQ15",
-            "sdram_DQ14",
-            "sdram_DQ13",
-            "sdram_DQ12",
-            "sdram_DQ11",
-            "sdram_DQ10",
-            "sdram_DQ9",
-            "sdram_DQ8",
-            "sdram_UDQM",
-            "sdram_A12",
-            "sdram_A8",
-            "sdram_A11",
-            "sdram_A5",
-            "sdram_A7",
-            "sdram_A4",
-            "sdram_A6",
-            "sdram_A9",
-            "sdram_CKE",
-            "sdram_CLK",
-            "sdram_BA0",
-            "sdram_A0",
-            "sdram_A3",
-            "sdram_nCAS",
-            "sdram_A2",
-            "sdram_A1",
-            "sdram_A10",
-            "sdram_BA1",
-            "sdram_nCS",
-            "sdram_nRAS",
-            "sdram_nWE",
-            "sdram_LDQM",
-            "sdram_DQ7",
-            "sdram_DQ6",
-            "sdram_DQ5",
-            "sdram_DQ4",
-            "sdram_DQ3",
-            "sdram_DQ2",
-            "sdram_DQ1",
-            "sdram_DQ0",
+        # Oscillator
+        "clk_osc",
 
-            # DAC
-            "dac_lrclk",
-            "dac_dacdat",
-            "dac_nmute",  # slow OK
-            "dac_mclk",
-            "dac_bclk",
+        # SDRAM
+        "sdram_DQ15",
+        "sdram_DQ14",
+        "sdram_DQ13",
+        "sdram_DQ12",
+        "sdram_DQ11",
+        "sdram_DQ10",
+        "sdram_DQ9",
+        "sdram_DQ8",
+        "sdram_UDQM",
+        "sdram_A12",
+        "sdram_A8",
+        "sdram_A11",
+        "sdram_A5",
+        "sdram_A7",
+        "sdram_A4",
+        "sdram_A6",
+        "sdram_A9",
+        "sdram_CKE",
+        "sdram_CLK",
+        "sdram_BA0",
+        "sdram_A0",
+        "sdram_A3",
+        "sdram_nCAS",
+        "sdram_A2",
+        "sdram_A1",
+        "sdram_A10",
+        "sdram_BA1",
+        "sdram_nCS",
+        "sdram_nRAS",
+        "sdram_nWE",
+        "sdram_LDQM",
+        "sdram_DQ7",
+        "sdram_DQ6",
+        "sdram_DQ5",
+        "sdram_DQ4",
+        "sdram_DQ3",
+        "sdram_DQ2",
+        "sdram_DQ1",
+        "sdram_DQ0",
 
-            # ULA
-            # - Comparator
-            "casIn",
-            # - Diode buffer
-            "RST_n_in",
-            # - DBUF
-            "D_buf_DIR",
-            "D_buf_nOE",
-            "data7",
-            "data4",
-            "data5",
-            "data1",
-            "data2",
-            "data3",
-            "data6",
-            "data0",
-            "clk_in",
-            "RnW_in",
-            "kbd3",
-            "kbd2",
-            "IRQ_n_in",
-            "NMI_n_in",
-            "kbd1",
-            "input_buf_nOE",  # slow OK
-            "kbd0",
-            # - Direct
-            "ROM_n",
-            # - ABUF
-            "addr15",
-            "addr9",
-            "addr10",
-            "addr3",
-            "addr11",
-            "addr5",
-            "addr4",
-            "addr6",
-            "addr13",
-            "addr7",
-            "addr2",
-            "addr12",
-            "addr14",
-            "addr0",
-            "addr8",
-            "addr1",
-            "A_buf_nOE",  # slow OK
-            "A_buf_DIR",  # slow OK
-            # - HCT245
-            "misc_buf_nOE",  # slow OK
-            "casOut",
-            "casMO",
-            "csync",
-            "blue",
-            "green",
-            "red",
-            "HS_n",
-            "clk_out",
-            # - HCT125
-            "RST_n_out",  # slow OK
-            "caps",  # slow OK
-            "RnW_nOE",
-            "RnW_out",
-            "IRQ_n_out",
+        # DAC
+        "dac_lrclk",
+        "dac_dacdat",
+        "dac_nmute",  # slow OK
+        "dac_mclk",
+        "dac_bclk",
 
-            # Unused
-            "fpga_dummy0",
-            "fpga_dummy1",
-            "fpga_dummy2",
-            "fpga_dummy3",
-        ], 80)]][0] if True else [
+        # ULA
+        # - Comparator
+        "casIn",
+        # - Diode buffer
+        "RST_n_in",
+        # - DBUF
+        "D_buf_DIR",
+        "D_buf_nOE",
+        "data7",
+        "data5",
+        "data4",
+        "data2",
+        "data3",
+        "data6",
+        "data1",
+        "data0",
+        "clk_in",
+        "RnW_in",
+        "kbd3",
+        "kbd2",
+        "NMI_n_in",
+        "IRQ_n_in",
+        "kbd1",
+        "input_buf_nOE",  # slow OK
+        "ROM_n",  # direct
+        "kbd0",
+        "addr15",
+        "addr9",
+        "addr10",
+        "addr3",
+        "addr11",
+        "addr14",
+        "addr0",
+        "addr8",
+        "addr1",
+        "A_buf_nOE",  # slow OK
+        "addr5",
+        "A_buf_DIR",  # slow OK
+        "misc_buf_nOE",  # slow OK
+        "addr4",
+        "casMO",
+        "casOut",
+        "addr6",
+        "addr13",
+        "addr7",
+        "blue",
+        "addr2",
+        "csync",
+        "HS_n",
+        "addr12",
+        "green",
+        "red",
+        "clk_out",
+        # - HCT125
+        "RST_n_out",  # slow OK
+        "caps",  # slow OK
+        "RnW_nOE",
+        "RnW_out",
+        "IRQ_n_out",
+
+        # Unused
+        "fpga_dummy0",
+        "fpga_dummy1",
+        "fpga_dummy2",
+        "fpga_dummy3",
+    ], 85)
+
+    for pin in fpga_pins:
+        if not pin.nets: continue
+        net, = pin.nets
+        # remove already-allocated connections
+        if net in conns_to_allocate:
+            print('already allocated fpga pin: %s' % net)
+            conns_to_allocate.remove(net)
+
+    for pin in fpga_pins:
+        if not pin.nets:
+            print('fpga pin %s has no nets' % pin.number)
+            continue
+
+        net, = pin.nets
+
+        if net == 'NEXT_CONN':
+            pin.nets = [conns_to_allocate.pop(0)]
+            print('allocating first available connection for fpga pin %s: new nets==%s' % (pin.number, pin.nets))
+ 
+else:
+    # static FPGA pin allocation
+    fpga_pins = [
 Pin("D1", "", "io_b1A_L1n_D1"),
 Pin("C2", "", "io_b1A_L1p_C2"),
 Pin("E3", "", "io_b1A_L3n_E3"),
@@ -810,10 +829,18 @@ Pin("H7", "", "3V3"),
 Pin("G8", "", "3V3"),
 Pin("G6", "", "3V3"),
 Pin("F7", "", "3V3"),
-    ])
+    ]
+
+fpga = [
+    myelin_kicad_pcb.Component(
+        footprint="myelin-kicad:intel_ubga169",
+        identifier="FPGA",
+        value="10M08SCU169",
+        pins=fpga_pins)
 ]
 #myelin_kicad_pcb.update_intel_qsf(
 #    cpld, os.path.join(here, "../altera/ElectronULA_max10.qsf"))
+print("FPGA: %s" % repr(fpga))
 
 # chip won't init unless this is pulled high
 conf_done_pullup = myelin_kicad_pcb.R0805("10k", "fpga_CONF_DONE", "3V3", ref="R1", handsoldering=False)
@@ -1427,13 +1454,13 @@ misc_buf = [
             "misc_buf_nOE",  # pulled up
             [
                 # [A port, B port]
-                ["casOut",  "CAS_OUT_5V"],
                 ["casMO",   "CAS_MO_5V"],
-                ["csync",   "csync_5V"],
+                ["casOut",  "CAS_OUT_5V"],
                 ["blue",    "blue_5V"],
+                ["csync",   "csync_5V"],
+                ["HS_n",    "nHS_5V"],
                 ["green",   "green_5V"],
                 ["red",     "red_5V"],
-                ["HS_n",    "nHS_5V"],
                 ["clk_out", "PHI_OUT_5V_prefilter"],
             ]
         )
