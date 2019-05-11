@@ -1,3 +1,5 @@
+from __future__ import print_function
+
 #!/usr/bin/python
 
 # Copyright 2019 Google LLC
@@ -24,7 +26,7 @@
 # A PCB for the Electron ULA replacement project, using an Intel Max 10 FPGA
 # chip (10M08).
 
-import sys, os
+import re, sys, os
 here = os.path.dirname(sys.argv[0])
 sys.path.insert(0, os.path.join(here, "myelin-kicad.pretty"))
 import myelin_kicad_pcb
@@ -424,7 +426,7 @@ if True:
             Pin("H1",  "VREFB1N0", "D_buf_DIR"),
             Pin("G4",  "",         "NEXT_CONN"),
             Pin("H6",  "CLK0p",    "NEXT_CONN"),
-            Pin("H4",  "CLK1p",    "NEXT_CONN"),
+            Pin("H4",  "CLK1p",    "clk_in"),
             Pin("H2",  "",         "NEXT_CONN"),
             Pin("H3",  "",         "NEXT_CONN"),
             Pin("F1",  "",         "NEXT_CONN"),
@@ -500,25 +502,21 @@ if True:
 
     conns_to_allocate = roll_array([
         # USB
-        "USB_M",
-        "USB_P",
-        "USB_PU",  # slow OK
-
-        # SD card
-        "sd_CLK_SCK",
-        "sd_CMD_MOSI",
-        "sd_DAT0_MISO",
-        "sd_DAT1",
-        "sd_DAT2",
+        "USB_PU",
         "sd_DAT3_nCS",
-
-        # Serial flash
+        "sd_CMD_MOSI",
+        "sd_DAT2",
+        "USB_P",
+        "USB_M",
+        "sd_DAT1",
         "flash_nCE",
-        "flash_SCK",
-        "flash_IO0",
         "flash_IO1",
         "flash_IO2",
+        "sd_CLK_SCK",
         "flash_IO3",
+        "flash_SCK",
+        "sd_DAT0_MISO",
+        "flash_IO0",
 
         # Oscillator
         "clk_osc",
@@ -586,8 +584,8 @@ if True:
         "data3",
         "data6",
         "data1",
+        #"clk_in",
         "data0",
-        "clk_in",
         "RnW_in",
         "kbd3",
         "kbd2",
@@ -636,7 +634,7 @@ if True:
         "fpga_dummy1",
         "fpga_dummy2",
         "fpga_dummy3",
-    ], 85)
+    ], 84)
 
     for pin in fpga_pins:
         if not pin.nets: continue
@@ -831,16 +829,50 @@ Pin("G6", "", "3V3"),
 Pin("F7", "", "3V3"),
     ]
 
-fpga = [
-    myelin_kicad_pcb.Component(
-        footprint="myelin-kicad:intel_ubga169",
-        identifier="FPGA",
-        value="10M08SCU169",
-        pins=fpga_pins)
-]
+fpga = myelin_kicad_pcb.Component(
+    footprint="myelin-kicad:intel_ubga169",
+    identifier="FPGA",
+    value="10M08SCU169",
+    buses=['addr', 'data', 'sdram_DQ', 'sdram_A', 'sdram_BA', 'kbd'],
+    pins=fpga_pins)
+
 #myelin_kicad_pcb.update_intel_qsf(
 #    cpld, os.path.join(here, "../altera/ElectronULA_max10.qsf"))
 print("FPGA: %s" % repr(fpga))
+
+# Rewrite pin assignment CSV file
+lines = open('../altera/ElectronULA_max10.csv').read()
+print(repr(lines))
+csv = ''
+for line in lines.split("\n"):
+    line = line.rstrip()
+    if line and not line.startswith('#') and not line.startswith('To,Direction,Location') and "PIN_" in line:
+        try:
+            signal, a, pin, b = re.search('^(.*?)(,.*?)(PIN_.*?)(,.*)$', line).groups()
+        except AttributeError:
+            raise Exception("failed to parse %s" % repr(line))
+        # update PIN_... section
+        munged_signal = re.sub(r'[\[\]]', '', signal)
+        pins = [p for p in fpga_pins if p.nets == [munged_signal]]
+        print('pins found for %s: %s' % (signal, repr(pins)))
+        pin = 'PIN_%s' % pins[0].number
+        line = ''.join([signal, a, pin, b])
+    csv += "%s\r\n" % line
+print(repr(csv))
+open('../altera/ElectronULA_max10_from_pcb.csv', 'w').write(csv)
+
+# Write out qsf snippet for pin locations
+with open('../altera/ElectronULA_max10_from_pcb_pins_qsf.txt', 'w') as f:
+    for pin in fpga_pins:
+        if not pin.nets: continue
+        net, = pin.nets
+        if net in ('3V3', 'GND'): continue
+        if net.startswith('fpga_'): continue
+        for bus in fpga.buses:
+            if net.startswith(bus):
+                net = "%s[%s]" % (net[:len(bus)], net[len(bus):])
+        print("set_location_assignment PIN_%s -to %s" % (pin.number, net), file=f)
+
 
 # chip won't init unless this is pulled high
 conf_done_pullup = myelin_kicad_pcb.R0805("10k", "fpga_CONF_DONE", "3V3", ref="R1", handsoldering=False)

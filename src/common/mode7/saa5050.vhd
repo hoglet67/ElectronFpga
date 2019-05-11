@@ -473,13 +473,15 @@ begin
     rom_address2 <= rom_address1 + 1 when ((double_high = '0' and CRS = '1') or (double_high = '1' and line_counter(0) = '1')) else
                     rom_address1 - 1;
 
-    char_rom : entity work.saa5050_rom_dual_port port map (
-        clock    => CLOCK,
-        addressA => rom_address1,
-        QA       => rom_data1,
-        addressB => rom_address2,
-        QB       => rom_data2
-    );
+    -- TODO(myelin) figure out why max 10 doesn't like this
+
+    -- char_rom : entity work.saa5050_rom_dual_port port map (
+    --     clock    => CLOCK,
+    --     addressA => rom_address1,
+    --     QA       => rom_data1,
+    --     addressB => rom_address2,
+    --     QB       => rom_data2
+    -- );
 
     --------------------------------------------------------------------
     -- Shift register

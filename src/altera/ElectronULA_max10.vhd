@@ -9,24 +9,63 @@ use ieee.std_logic_unsigned.all;
 use ieee.numeric_std.all;
 
 -- TODO:
--- NMI_n needs adding
 -- HS_n  needs adding
--- RAM lines need adding (RA7..0, RD3..0, RAS, CAS, WE)
 
 entity ElectronULA_max10 is
     port (
+        -- 16 MHz clock from Electron
         clk_in        : in  std_logic;
+        -- 16 (32?) MHz clock from oscillator
+        clk_osc       : in std_logic;
+
+        -- QSPI flash chpi
+        flash_nCE     : inout std_logic := '1';
+        flash_SCK     : inout std_logic := '1';
+        flash_IO0     : inout std_logic := 'Z';
+        flash_IO1     : inout std_logic := 'Z';
+        flash_IO2     : inout std_logic := 'Z';
+        flash_IO3     : inout std_logic := 'Z';
+
+        -- SDRAM
+        sdram_DQ      : inout std_logic_vector(15 downto 0) := (others => 'Z');
+        sdram_A       : inout std_logic_vector(12 downto 0) := (others => '1');
+        sdram_BA      : inout std_logic_vector(1 downto 0) := (others => '1');
+        sdram_nCS     : inout std_logic := '1';
+        sdram_nWE     : inout std_logic := '1';
+        sdram_nCAS    : inout std_logic := '1';
+        sdram_nRAS    : inout std_logic := '1';
+        sdram_CLK     : inout std_logic := '1';
+        sdram_CKE     : inout std_logic := '0';
+        sdram_UDQM    : inout std_logic := '1';
+        sdram_LDQM    : inout std_logic := '1';
+
+        -- USB
+        USB_M         : inout std_logic := 'Z';
+        USB_P         : inout std_logic := 'Z';
+        USB_PU        : out std_logic := 'Z';
+
+        -- Enable input buffer for kbd[3:0], NMI_n_in, IRQ_n_in, RnW_in, clk_in
+        input_buf_nOE : out std_logic := '0';
+
+        -- Enable output buffer for clk_out, nHS, red, green, blue, csync, casMO, casOut
+        misc_buf_nOE  : inout std_logic := '0';
 
         -- CPU Interface
-        clk_out       : out   std_logic;
-        addr          : in    std_logic_vector(15 downto 0);
+        clk_out       : out std_logic;
+        A_buf_nOE     : out std_logic := '0';  -- default on
+        A_buf_DIR     : out std_logic := '1';  -- default to buffer from Elk to FPGA
+        addr          : inout std_logic_vector(15 downto 0);
+        D_buf_nOE     : out std_logic := '1';  -- default off
+        D_buf_DIR     : out std_logic := '1';  -- default to buffer from Elk to FPGA
         data          : inout std_logic_vector(7 downto 0);
-        R_W_n         : in  std_logic;
-        RST_n         : inout  std_logic;
-        IRQ_n         : out std_logic;
-
-        -- Data Bus Enble
-        DBE_n         : out std_logic;
+        RnW_in        : in std_logic;
+        RnW_out       : out std_logic := '1';
+        RnW_nOE       : out std_logic := '1';
+        RST_n_out     : inout std_logic := '1';
+        RST_n_in      : inout std_logic;
+        IRQ_n_out     : inout std_logic := '1';
+        IRQ_n_in      : inout std_logic;
+        NMI_n_in      : inout std_logic;
 
         -- Rom Enable
         ROM_n         : out std_logic;
@@ -36,9 +75,14 @@ entity ElectronULA_max10 is
         green         : out std_logic;
         blue          : out std_logic;
         csync         : out std_logic;
+        HS_n          : out std_logic := '1';  -- TODO is this unused?
 
-        -- Audio
-        sound         : out std_logic;
+        -- Audio DAC
+        dac_dacdat    : inout std_logic;
+        dac_lrclk     : inout std_logic;
+        dac_bclk      : inout std_logic;
+        dac_mclk      : inout std_logic;
+        dac_nmute     : inout std_logic;
 
         -- Keyboard
         kbd           : in  std_logic_vector(3 downto 0);
@@ -47,19 +91,16 @@ entity ElectronULA_max10 is
         -- Cassette
         casIn         : in  std_logic;
         casOut        : out std_logic;
-        casMO         : out std_logic;
+        casMO         : out std_logic := '1';
 
-        -- SD Card
-        SDMISO        : in  std_logic;
-        SDSS          : out std_logic;
-        SDCLK         : out std_logic;
-        SDMOSI        : out std_logic;
-
-        -- Misc
-        ARDUINO_RESET : out std_logic;
-        SW1           : in std_logic;
-        LED           : out std_logic
-        );
+        -- SD card
+        sd_CLK_SCK    : out std_logic;
+        sd_CMD_MOSI   : out std_logic;
+        sd_DAT0_MISO  : inout std_logic;
+        sd_DAT1       : inout std_logic := 'Z';
+        sd_DAT2       : inout std_logic := 'Z';
+        sd_DAT3_nCS   : inout std_logic
+    );
 end;
 
 architecture behavioral of ElectronULA_max10 is
@@ -161,10 +202,10 @@ begin
         data_in   => data_in,
         data_out  => ula_data,
         data_en   => ula_enable,
-        R_W_n     => R_W_n,
-        RST_n     => RST_n,
+        R_W_n     => RnW_in,
+        RST_n     => RST_n_out,
         IRQ_n     => ula_irq_n,
-        NMI_n     => '1',
+        NMI_n     => '1',  -- TODO connect to NMI_n_in
 
         -- Rom Enable
         ROM_n     => ROM_n,
@@ -177,13 +218,13 @@ begin
         hsync     => video_hsync,
 
         -- Audio
-        sound     => sound,
+        sound     => dac_dacdat,  -- TODO support DAC interface / add jumper on PCB
 
         -- SD Card
-        SDMISO    => SDMISO,
-        SDSS      => SDSS,
-        SDCLK     => SDCLK,
-        SDMOSI    => SDMOSI,
+        SDMISO    => sd_DAT0_MISO,
+        SDSS      => sd_DAT3_nCS,
+        SDCLK     => sd_CLK_SCK,
+        SDMOSI    => sd_CMD_MOSI,
 
         -- Casette
         casIn     => casIn,
@@ -213,15 +254,17 @@ begin
     caps  <= not caps_led;
     
     -- IRQ is open collector to avoid contention with the expansion bus
-    IRQ_n <= '0' when ula_irq_n = '0' else 'Z';
+    IRQ_n_out <= '0' when ula_irq_n = '0' else 'Z';
 
     -- Enable data bus transceiver when ULA or ROM selected
-    DBE_n <= '0' when ula_enable = '1' or rom_enable = '1' else '1';
+    D_buf_nOE <= '0' when ula_enable = '1' or rom_enable = '1' else '1';
+    -- DIR=1 buffers from Elk to FPGA, DIR=0 buffers from FPGA to Elk
+    D_buf_DIR <= '1' when RnW_in = '0' else '0';
 
     data_in <= data;
 
-    data <= rom_data      when R_W_n = '1' and rom_enable = '1' else
-            ula_data      when R_W_n = '1' and ula_enable = '1' else
+    data <= rom_data      when RnW_in = '1' and rom_enable = '1' else
+            ula_data      when RnW_in = '1' and ula_enable = '1' else
             "ZZZZZZZZ";
 
 --------------------------------------------------------
@@ -242,19 +285,6 @@ begin
     --     data_in  => data_in,
     --     data_out => rom_data
     -- );
-
---------------------------------------------------------
--- Speed LED
---------------------------------------------------------
-
-    led_gen : process(clock_16)
-    begin
-        if rising_edge(clock_16) then
-            led_counter <= led_counter + 1;
-        end if;
-    end process;
-
-    LED <= led_counter(led_counter'high - to_integer(unsigned(turbo)));
 
 --------------------------------------------------------
 -- Power Up Reset Generation
@@ -289,9 +319,6 @@ begin
     end process;
 
     -- Reset is open collector to avoid contention when BREAK pressed
-    RST_n <= '0' when powerup_reset_n = '0' else 'Z';
-
-    -- Hold the Duo's Arduino core in reset
-    ARDUINO_RESET <= SW1;
+    RST_n_out <= '0' when powerup_reset_n = '0' else 'Z';
 
 end behavioral;
