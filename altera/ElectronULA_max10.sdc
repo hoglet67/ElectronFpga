@@ -13,11 +13,17 @@ create_clock -period "16 MHz" -name clk_in [get_ports clk_in]
 #ElectronFpga_core:electron_core|ElectronULA:ula|clk_video
 
 # Generated clocks (via PLL from 16MHz clk_in)
-create_generated_clock -source {max10_pll1_inst|altpll_component|pll1|inclk[0]} -duty_cycle 50.00 -name clock_16 {max10_pll1_inst|altpll_component|pll1|clk[0]}
-create_generated_clock -source {max10_pll1_inst|altpll_component|pll1|inclk[0]} -divide_by 2 -multiply_by 3 -duty_cycle 50.00 -name clock_24 {max10_pll1_inst|altpll_component|pll1|clk[1]}
-create_generated_clock -source {max10_pll1_inst|altpll_component|pll1|inclk[0]} -multiply_by 2 -duty_cycle 50.00 -name clock_32 {max10_pll1_inst|altpll_component|pll1|clk[2]}
-create_generated_clock -source {max10_pll1_inst|altpll_component|pll1|inclk[0]} -divide_by 2 -multiply_by 5 -duty_cycle 50.00 -name clock_40 {max10_pll1_inst|altpll_component|pll1|clk[3]}
-create_generated_clock -source {max10_pll1_inst|altpll_component|pll1|inclk[0]} -divide_by 29 -multiply_by 60 -duty_cycle 50.00 -name clock_33 {max10_pll1_inst|altpll_component|pll1|clk[4]}
+# Commented out because derive_pll_clocks should do it
+#create_generated_clock -source max10_pll1_inst|inclk[0] -duty_cycle 50.00 -name clock_16 [get_pins max10_pll1_inst|clk[0]]
+#create_generated_clock -source max10_pll1_inst|inclk[0] -divide_by 2 -multiply_by 3 -duty_cycle 50.00 -name clock_24 [get_pins max10_pll1_inst|clk[1]]
+#create_generated_clock -source max10_pll1_inst|inclk[0] -multiply_by 2 -duty_cycle 50.00 -name clock_32 [get_pins max10_pll1_inst|clk[2]]
+#create_generated_clock -source max10_pll1_inst|inclk[0] -divide_by 2 -multiply_by 5 -duty_cycle 50.00 -name clock_40 [get_pins max10_pll1_inst|clk[3]]
+#create_generated_clock -source max10_pll1_inst|inclk[0] -divide_by 29 -multiply_by 60 -duty_cycle 50.00 -name clock_33 [get_pins max10_pll1_inst|clk[4]]
+
+# Clock muxes
+create_clock -period "16 MHz" -name clk_16M00_a [get_ports clk_16M00_a]
+create_clock -period "16 MHz" -name clk_16M00_b [get_ports clk_16M00_b]
+create_clock -period "16 MHz" -name clk_16M00_c [get_ports clk_16M00_c]
 
 # Include this if building with IncludeICEDebugger
 # create_clock -period "16 MHz"  -name clock_avr {electron_core:bbc_micro|clock_avr}
@@ -28,7 +34,7 @@ create_generated_clock -source {max10_pll1_inst|altpll_component|pll1|inclk[0]} 
 #**************************************************************
 
 # Doing this manually above so we can name the clock
-#derive_pll_clocks
+derive_pll_clocks
 
 
 #**************************************************************
