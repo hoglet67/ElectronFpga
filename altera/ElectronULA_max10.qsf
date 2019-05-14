@@ -157,6 +157,7 @@ set_location_assignment PIN_A6 -to A_buf_DIR
 set_location_assignment PIN_B6 -to misc_buf_nOE
 set_location_assignment PIN_F8 -to addr[4]
 set_location_assignment PIN_A7 -to casMO
+set_location_assignment PIN_B7 -to mcu_debug_RXD
 set_location_assignment PIN_A8 -to casOut
 set_location_assignment PIN_E8 -to addr[6]
 set_location_assignment PIN_E9 -to addr[13]
@@ -175,9 +176,10 @@ set_location_assignment PIN_B13 -to RnW_nOE
 set_location_assignment PIN_C12 -to RnW_out
 set_location_assignment PIN_C13 -to IRQ_n_out
 set_location_assignment PIN_D12 -to USB_PU
-set_location_assignment PIN_F9 -to sd_DAT3_nCS
-set_location_assignment PIN_E10 -to sd_CMD_MOSI
-set_location_assignment PIN_F10 -to sd_DAT2
+set_location_assignment PIN_D13 -to mcu_debug_TXD
+set_location_assignment PIN_F9 -to sd_DAT2
+set_location_assignment PIN_E10 -to sd_DAT3_nCS
+set_location_assignment PIN_F10 -to sd_CMD_MOSI
 set_location_assignment PIN_D11 -to USB_P
 set_location_assignment PIN_E13 -to USB_M
 set_location_assignment PIN_E12 -to sd_DAT1
@@ -192,6 +194,7 @@ set_location_assignment PIN_H10 -to sd_DAT0_MISO
 set_location_assignment PIN_J12 -to flash_IO0
 set_location_assignment PIN_J13 -to sdram_DQ[15]
 set_location_assignment PIN_K11 -to sdram_DQ[14]
+set_location_assignment PIN_K13 -to serial_TXD
 set_location_assignment PIN_K12 -to sdram_DQ[13]
 set_location_assignment PIN_J10 -to sdram_DQ[8]
 set_location_assignment PIN_L12 -to sdram_DQ[11]
@@ -202,6 +205,7 @@ set_location_assignment PIN_L11 -to sdram_DQ[9]
 set_location_assignment PIN_M12 -to sdram_UDQM
 set_location_assignment PIN_N12 -to sdram_A[12]
 set_location_assignment PIN_M11 -to sdram_A[8]
+set_location_assignment PIN_N11 -to serial_RXD
 set_location_assignment PIN_L10 -to sdram_A[5]
 set_location_assignment PIN_H9 -to sdram_A[4]
 set_location_assignment PIN_N10 -to sdram_A[7]
@@ -240,10 +244,10 @@ set_location_assignment PIN_L4 -to D_buf_nOE
 set_location_assignment PIN_K1 -to data[7]
 set_location_assignment PIN_K2 -to data[5]
 set_location_assignment PIN_H5 -to data[4]
-set_location_assignment PIN_J1 -to data[2]
+set_location_assignment PIN_J1 -to data[6]
 set_location_assignment PIN_J2 -to data[3]
 set_location_assignment PIN_H1 -to D_buf_DIR
-set_location_assignment PIN_G4 -to data[6]
+set_location_assignment PIN_G4 -to data[2]
 set_location_assignment PIN_H6 -to data[1]
 set_location_assignment PIN_H4 -to clk_in
 set_location_assignment PIN_H2 -to data[0]
@@ -259,6 +263,9 @@ set_location_assignment PIN_C1 -to kbd[0]
 set_location_assignment PIN_C2 -to addr[15]
 set_location_assignment PIN_B1 -to addr[9]
 set_location_assignment PIN_B2 -to addr[10]
-
+set_location_assignment PIN_B9 -to mcu_MOSI
+set_location_assignment PIN_D8 -to mcu_SCK
+set_location_assignment PIN_E5 -to mcu_MISO
+set_location_assignment PIN_D6 -to mcu_SS
 
 set_instance_assignment -name PARTITION_HIERARCHY root_partition -to | -section_id Top

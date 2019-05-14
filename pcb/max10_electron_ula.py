@@ -329,7 +329,7 @@ if True:
             Pin("B6",  "",         "NEXT_CONN"),
             Pin("F8",  "",         "NEXT_CONN"),
             Pin("A7",  "",         "NEXT_CONN"),
-            Pin("B7",  "VREFB8N0", "fpga_dummy3"),
+            Pin("B7",  "VREFB8N0", "mcu_debug_RXD"),
             Pin("A8",  "",         "NEXT_CONN"),
             Pin("E8",  "",         "NEXT_CONN"),
             Pin("E9",  "",         "NEXT_CONN"),
@@ -350,7 +350,7 @@ if True:
             Pin("C12", "",         "NEXT_CONN"),
             Pin("C13", "",         "NEXT_CONN"),
             Pin("D12", "",         "NEXT_CONN"),
-            Pin("D13", "VREFB6N0", "fpga_dummy1"),
+            Pin("D13", "VREFB6N0", "mcu_debug_TXD"),
             Pin("F9",  "DPCLK3",   "NEXT_CONN"),
             Pin("E10", "",         "NEXT_CONN"),
             Pin("F10", "DPCLK2",   "NEXT_CONN"),
@@ -368,7 +368,7 @@ if True:
             Pin("J12", "",         "NEXT_CONN"),
             Pin("J13", "",         "NEXT_CONN"),
             Pin("K11", "",         "NEXT_CONN"),
-            Pin("K13", "VREFB5N0", "fpga_dummy0"),
+            Pin("K13", "VREFB5N0", "serial_TXD"),
             Pin("K12", "",         "NEXT_CONN"),
             Pin("J10", "",         "NEXT_CONN"),
             Pin("L12", "",         "NEXT_CONN"),
@@ -380,7 +380,7 @@ if True:
             Pin("M12", "",         "NEXT_CONN"),
             Pin("N12", "",         "NEXT_CONN"),
             Pin("M11", "",         "NEXT_CONN"),
-            Pin("N11", "VREFB3N0", "fpga_dummy2"),
+            Pin("N11", "VREFB3N0", "serial_RXD"),
             Pin("L10", "",         "NEXT_CONN"),
             Pin("H9",  "",         "NEXT_CONN"),
             Pin("N10", "",         "NEXT_CONN"),
@@ -442,15 +442,15 @@ if True:
             Pin("B2",  "",         "NEXT_CONN"),
 
             # 12 JTAG and other special pins
-            Pin("B9",  "DEV_CLRn",   "fpga_DEV_CLRn"),  # TODO use as IO
-            Pin("D8",  "DEV_OE",     "fpga_DEV_OE"),  # TODO use as IO
-
-            Pin("E5",  "JTAGEN"),  # NC because we always want JTAG, even in we've pushed a bad config
-            Pin("D6",  "CRC_ERROR",  "GND"),  # WARNING: make sure to disable Error Detection CRC option
+            # These are IO by default unless enabled in Assignments > Device
+            Pin("B9",  "DEV_CLRn",   "mcu_MOSI"),  # TODO use as IO
+            Pin("D8",  "DEV_OE",     "mcu_SCK"),  # TODO use as IO
+            Pin("E5",  "JTAGEN",     "mcu_MISO"),  # TODO use as IO
+            Pin("D6",  "CRC_ERROR",  "mcu_SS"),  # NC might also work well here
 
             # These are reserved by the fitter by default -- leave them alone
-            Pin("C4",  "nSTATUS",    "fpga_nSTATUS"),
-            Pin("C5",  "CONF_DONE",  "fpga_CONF_DONE"),
+            Pin("C4",  "nSTATUS",    "fpga_nSTATUS"),  # MUST be pulled high during init
+            Pin("C5",  "CONF_DONE",  "fpga_CONF_DONE"),  # MUST be pulled high during init
             Pin("D7",  "CONFIG_SEL", "GND"),  # unused, so connected to GND
             Pin("E7",  "nCONFIG",    "3V3"),  # can be connected straight to VCCIO
             Pin("F5",  "TDI",        "fpga_TDI"),
@@ -503,9 +503,9 @@ if True:
     conns_to_allocate = roll_array([
         # USB
         "USB_PU",
+        "sd_DAT2",
         "sd_DAT3_nCS",
         "sd_CMD_MOSI",
-        "sd_DAT2",
         "USB_P",
         "USB_M",
         "sd_DAT1",
@@ -580,9 +580,9 @@ if True:
         "data7",
         "data5",
         "data4",
-        "data2",
-        "data3",
         "data6",
+        "data3",
+        "data2",
         "data1",
         #"clk_in",
         "data0",
@@ -628,12 +628,6 @@ if True:
         "RnW_nOE",
         "RnW_out",
         "IRQ_n_out",
-
-        # Unused
-        "fpga_dummy0",
-        "fpga_dummy1",
-        "fpga_dummy2",
-        "fpga_dummy3",
     ], 84)
 
     for pin in fpga_pins:
@@ -841,25 +835,25 @@ fpga = myelin_kicad_pcb.Component(
 print("FPGA: %s" % repr(fpga))
 
 # Rewrite pin assignment CSV file
-lines = open('../altera/ElectronULA_max10.csv').read()
-print(repr(lines))
-csv = ''
-for line in lines.split("\n"):
-    line = line.rstrip()
-    if line and not line.startswith('#') and not line.startswith('To,Direction,Location') and "PIN_" in line:
-        try:
-            signal, a, pin, b = re.search('^(.*?)(,.*?)(PIN_.*?)(,.*)$', line).groups()
-        except AttributeError:
-            raise Exception("failed to parse %s" % repr(line))
-        # update PIN_... section
-        munged_signal = re.sub(r'[\[\]]', '', signal)
-        pins = [p for p in fpga_pins if p.nets == [munged_signal]]
-        print('pins found for %s: %s' % (signal, repr(pins)))
-        pin = 'PIN_%s' % pins[0].number
-        line = ''.join([signal, a, pin, b])
-    csv += "%s\r\n" % line
-print(repr(csv))
-open('../altera/ElectronULA_max10_from_pcb.csv', 'w').write(csv)
+# lines = open('../altera/ElectronULA_max10.csv').read()
+# print(repr(lines))
+# csv = ''
+# for line in lines.split("\n"):
+#     line = line.rstrip()
+#     if line and not line.startswith('#') and not line.startswith('To,Direction,Location') and "PIN_" in line:
+#         try:
+#             signal, a, pin, b = re.search('^(.*?)(,.*?)(PIN_.*?)(,.*)$', line).groups()
+#         except AttributeError:
+#             raise Exception("failed to parse %s" % repr(line))
+#         # update PIN_... section
+#         munged_signal = re.sub(r'[\[\]]', '', signal)
+#         pins = [p for p in fpga_pins if p.nets == [munged_signal]]
+#         print('pins found for %s: %s' % (signal, repr(pins)))
+#         pin = 'PIN_%s' % pins[0].number
+#         line = ''.join([signal, a, pin, b])
+#     csv += "%s\r\n" % line
+# print(repr(csv))
+# open('../altera/ElectronULA_max10_from_pcb.csv', 'w').write(csv)
 
 # Write out qsf snippet for pin locations
 with open('../altera/ElectronULA_max10_from_pcb_pins_qsf.txt', 'w') as f:
@@ -938,6 +932,18 @@ tag_connect = myelin_kicad_pcb.Component(
     ],
 )
 
+# FPGA serial port
+serial_header = myelin_kicad_pcb.Component(
+    footprint="Connector_PinHeader_2.54mm:PinHeader_1x03_P2.54mm_Vertical",
+    identifier="SERIAL",
+    value="fpga serial port",
+    pins=[
+        Pin( 1, "", "GND"),
+        Pin( 2, "", "serial_TXD"),
+        Pin( 3, "", "serial_RXD"),
+    ],
+)
+
 
 ### POWER SUPPLY
 
@@ -982,7 +988,7 @@ osc = myelin_kicad_pcb.Component(
     pins=[
         Pin(1, "STANDBY#",  "3V3"),
         Pin(2, "GND",       "GND"),
-        Pin(3, "OUT",       "clk_osc"),  # TODO connect to a clock pin on the FPGA
+        Pin(3, "OUT",       "clk_osc"),
         Pin(4, "VDD",       "3V3"),
     ],
 )
@@ -1262,6 +1268,18 @@ ula_audio_output = [
     myelin_kicad_pcb.C0805("10u", "audio_bias", "GND", ref="AC9"),
 ]
 
+audio_out_header = myelin_kicad_pcb.Component(
+    footprint="Connector_PinHeader_2.54mm:PinHeader_2x02_P2.54mm_Vertical",
+    identifier="AUDIO_OUT",
+    value="audio out",
+    pins=[
+        Pin( 1, "", "GND"),
+        Pin( 2, "", "audio_out_right"),
+        Pin( 3, "", "GND"),
+        Pin( 4, "", "audio_out_left"),
+    ],
+)
+
 
 ### FPGA-ULA BUFFERS
 
@@ -1384,9 +1402,9 @@ big_buffers = [
             ["PD4_5V", "data4"],
             ["PD5_5V", "data5"],
             ["PD1_5V", "data1"],
-            ["PD2_5V", "data2"],
-            ["PD3_5V", "data3"],
             ["PD6_5V", "data6"],
+            ["PD3_5V", "data3"],
+            ["PD2_5V", "data2"],
             ["PD0_5V", "data0"],
         ],
         # These are always inputs - fixed direction
@@ -1582,6 +1600,114 @@ sd_card = myelin_kicad_pcb.Component(
 )
 # Just in case -- I don't think this is needed for [micro] SD cards
 sd_cmd_pullup = myelin_kicad_pcb.R0805("10k NF", "3V3", "sd_CMD_MOSI", ref="PR?")
+
+
+### DEBUG SERIAL PORT / MCU
+
+# Micro USB socket
+mcu_micro_usb = myelin_kicad_pcb.Component(
+    footprint="myelin-kicad:micro_usb_b_smd_molex",
+    identifier="MUSB",
+    value="usb",
+    desc="Molex 1050170001 (Digikey WM1399CT-ND) surface mount micro USB socket with mounting holes.",
+    pins=[
+        Pin(1, "V", ["mcu_VUSB"]),
+        Pin(2, "-", ["mcu_USBDM"]),
+        Pin(3, "+", ["mcu_USBDP"]),
+        Pin(4, "ID"),
+        Pin(5, "G", ["GND"]),
+    ],
+)
+
+# SWD header for programming and debug using a Tag-Connect TC2030-CTX
+mcu_swd = myelin_kicad_pcb.Component(
+    footprint="Tag-Connect_TC2030-IDC-FP_2x03_P1.27mm_Vertical",
+    identifier="MSWD",
+    value="swd",
+    pins=[
+        # Tag-Connect SWD layout: http://www.tag-connect.com/Materials/TC2030-CTX.pdf
+        Pin(1, "VCC",       "3V3"),
+        Pin(2, "SWDIO/TMS", "mcu_SWDIO"),
+        Pin(3, "nRESET",    "mcu_RESET"),
+        Pin(4, "SWCLK/TCK", "mcu_SWCLK"),
+        Pin(5, "GND",       "GND"),
+        Pin(6, "SWO/TDO"),  # NC because Cortex-M0 doesn't use these
+    ],
+)
+
+# 0.1" header bringing out most of the microcontroller pins
+mcu_header = myelin_kicad_pcb.Component(
+    footprint="Connector_PinHeader_2.54mm:PinHeader_2x06_P2.54mm_Vertical",
+    identifier="MSWD2",
+    value="swd",
+    pins=[
+        Pin( 1, "SWDIO/TMS", "mcu_SWDIO"),
+        Pin( 2, "VCC",       "3V3"),
+        Pin( 3, "SWCLK/TCK", "mcu_SWCLK"),
+        Pin( 4, "GND",       "GND"),
+        Pin( 5, "nRESET",    "mcu_RESET"),
+        Pin( 6, "gpio",      "mcu_debug_RXD"),
+        Pin( 7, "TXD",       "mcu_MISO"),
+        Pin( 8, "RXD",       "mcu_debug_TXD"),
+        Pin( 9, "SPI",       "mcu_SCK"),
+        Pin(10, "SPI",       "mcu_SS"),
+        Pin(11, "SPI",       "mcu_MOSI"),
+        Pin(12, "SPI",       "mcu_PA02"),
+    ],
+)
+
+# ATSAMD11C microcontroller (tiny SO-14 version)
+mcu = myelin_kicad_pcb.Component(
+    footprint="Package_SO:SOIC-14_3.9x8.7mm_P1.27mm",
+    identifier="MCU",
+    value="atsamd11c",
+    pins=[
+        # SERCOM notes:
+
+        # UART: any pin can be RXD, and options are TXD=0 XCK=1 or TXD=2 XCK=3
+        # SPI: any pin can be MISO, and options are MOSI=0 SCK=1 SS=2 / MOSI=2 SCK=3 SS=1 /
+        #                                           MOSI=3 SCK=1 SS=2 / MOSI=0 SCK=3 SS=1
+
+        # connecting PA04/05/08/09/14/15 through to the FPGA gives us:
+        # - one full SPI connection (sercom0.*) + one UART (sercom2.{0, 1})
+        # - three UARTs (sercom0.{0, 1}, sercom1.{2, 3}, sercom2.{0, 1})
+
+        # connecting PA14/15 up to some VREF pins is also an option -- they
+        # should still work fine up to 20MHz or so.
+
+        Pin( 1, "PA05",        "mcu_SCK"),       # sercom0.1/0.3: 0.1 SPI
+        Pin( 2, "PA08",        "mcu_SS"),        # sercom0.2/1.2: 0.2 SPI or 1.2 TXD
+        Pin( 3, "PA09",        "mcu_MISO"),      # sercom0.3/1.3: 0.3 SPI or 1.3 RXD
+        Pin( 4, "PA14",        "mcu_debug_TXD"), # sercom0.0/2.0: 2.0 TXD
+        Pin( 5, "PA15",        "mcu_debug_RXD"), # sercom0.1/2.1: 2.1 RXD
+        Pin( 6, "PA28_nRESET", "mcu_RESET"),
+        Pin( 7, "PA30_SWCLK",  "mcu_SWCLK"),
+        Pin( 8, "PA31_SWDIO",  "mcu_SWDIO"),
+        Pin( 9, "PA24_USBDM",  "mcu_USBDM"),
+        Pin(10, "PA25_USBDP",  "mcu_USBDP"),
+        Pin(11, "GND",         "GND"),
+        Pin(12, "VDD",         "3V3"),
+        Pin(13, "PA02",        "mcu_PA02"),      # no sercom
+        Pin(14, "PA04",        "mcu_MOSI"),      # sercom0.2/0.0: 0.0 SPI
+    ],
+)
+mcu_cap = myelin_kicad_pcb.C0805("100n", "GND", "3V3", ref="MC1")
+# SAM D11 has an internal pull-up, so this is optional
+mcu_reset_pullup = myelin_kicad_pcb.R0805("10k", "mcu_RESET", "3V3", ref="MR1")
+# The SAM D11 datasheet says a 1k pullup on SWCLK is critical for reliability
+mcu_swclk_pullup = myelin_kicad_pcb.R0805("1k", "mcu_SWCLK", "3V3", ref="MR2")
+
+### Ground staples
+
+staples = [
+    myelin_kicad_pcb.Component(
+        footprint="myelin-kicad:via_single",
+        identifier="staple_single%d" % (n+1),
+        value="",
+        pins=[Pin(1, "GND", ["GND"])],
+    )
+    for n in range(53)
+]
 
 
 ### END
