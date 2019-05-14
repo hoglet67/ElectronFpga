@@ -33,8 +33,6 @@ import myelin_kicad_pcb
 Pin = myelin_kicad_pcb.Pin
 
 
-# TODO renumber resistors and capacitors
-
 ### ULA
 
 # Electron ULA header -- this will plug into the PGA socket once one has been
@@ -61,7 +59,7 @@ Pin = myelin_kicad_pcb.Pin
 
 # 16 + 8 + 16 buffers needed
 
-# TODO wire up direction select for all buffers, to give the option of implementing the CPU inside the ULA.
+# (done) wire up direction select for all buffers, to give the option of implementing the CPU inside the ULA.
 
 # Sanity check:
 # - 32 x LVT buf (input)
@@ -69,7 +67,7 @@ Pin = myelin_kicad_pcb.Pin
 # - 8 x HCT245 (output)
 
 ula = myelin_kicad_pcb.Component(
-    footprint="modified-kicad:PLCC-68_THT-Socket-Electron-ULA",
+    footprint="modified-kicad:PLCC-68_THT-Socket-Electron-ULA",  # TODO check + pinout
     identifier="ULA",
     value="ULA header",
     desc="Set of pin headers to plug into an Acorn Electron ULA socket",
@@ -185,37 +183,37 @@ ula = myelin_kicad_pcb.Component(
 # So far 114 IO used -- see fpga_pins.txt.
 
 # TODO Serial flash: 6 (flash_nCE, flash_SCK, flash_IO0, flash_IO1, flash_IO2, flash_IO3)
-# TODO flash_nCE pullup
+# (done) flash_nCE pullup
 
-# TODO SDRAM: 39 (D x 16, A x 13, BA x 2, nCS, nWE, nCAS, nRAS, CLK, CKE, UDQM, LDQM)
-# TODO SDRAM nCS pullup
+# (done) SDRAM: 39 (D x 16, A x 13, BA x 2, nCS, nWE, nCAS, nRAS, CLK, CKE, UDQM, LDQM)
+# (done) SDRAM nCS pullup
 
-# TODO SD card signals: 6 (sd_CLK_SCK, sd_CMD_MOSI, sd_DAT0_MISO, sd_DAT1, sd_DAT2, sd_DAT3_nCS)
+# (done) SD card signals: 6 (sd_CLK_SCK, sd_CMD_MOSI, sd_DAT0_MISO, sd_DAT1, sd_DAT2, sd_DAT3_nCS)
 
-# TODO USB signals: 3 (USB_M, USB_P, USB_PU)
+# (done) USB signals: 3 (USB_M, USB_P, USB_PU)
 
-# TODO clk_osc: 1
+# (done) clk_osc: 1
 
-# TODO DAC signals: 5 (dac_dacdat, dac_lrclk, dac_bclk, dac_mclk, dac_nmute)
+# (done) DAC signals: 5 (dac_dacdat, dac_lrclk, dac_bclk, dac_mclk, dac_nmute)
 
 # = 60 signals not from the ULA socket
 
-# TODO 32+5 x 74lvt162245 signals, A_buf_dir, A_buf_nOE, D_buf_dir, D_buf_nOE, input_buf_nOE (misc dir fixed)
+# (done) 32+5 x 74lvt162245 signals, A_buf_dir, A_buf_nOE, D_buf_dir, D_buf_nOE, input_buf_nOE (misc dir fixed)
 
-# TODO 5 x 74hct125 signals (caps, RST_n_out, IRQ_n_out, RnW_out, RnW_nOE)
+# (done) 5 x 74hct125 signals (caps, RST_n_out, IRQ_n_out, RnW_out, RnW_nOE)
 
-# TODO RST_n_in via diode
+# (done) RST_n_in via diode
 
-# TODO 8+1 x 74hct245 signals, fixed direction, nOE
+# (done) 8+1 x 74hct245 signals, fixed direction, nOE
 
-# TODO casIn via comparator
-# TODO ROM_n direct
+# (done) casIn via comparator
+# (done) ROM_n direct
 
 # = 54 signals from the ULA socket
 
-# TODO check that all 44 digital + 1 analog ULA pins are connected
-# TODO check that three signals have two connections (nRST, nIRQ, RnW)
-# TODO check clocks (clk_osc, clk_in) and make sure they work with PLLs
+# (done) check that all 44 digital + 1 analog ULA pins are connected
+# (done) check that three signals have two connections (nRST, nIRQ, RnW)
+# (done) check clocks (clk_osc, clk_in) and make sure they work with PLLs
 
 # CLOCK PLANNING
 
@@ -443,10 +441,10 @@ if True:
 
             # 12 JTAG and other special pins
             # These are IO by default unless enabled in Assignments > Device
-            Pin("B9",  "DEV_CLRn",   "mcu_MOSI"),  # TODO use as IO
-            Pin("D8",  "DEV_OE",     "mcu_SCK"),  # TODO use as IO
-            Pin("E5",  "JTAGEN",     "mcu_MISO"),  # TODO use as IO
-            Pin("D6",  "CRC_ERROR",  "mcu_SS"),  # NC might also work well here
+            Pin("B9",  "DEV_CLRn",   "mcu_MOSI"),
+            Pin("D8",  "DEV_OE",     "mcu_SCK"),
+            Pin("E5",  "JTAGEN",     "mcu_MISO"),
+            Pin("D6",  "CRC_ERROR",  "mcu_SS"),
 
             # These are reserved by the fitter by default -- leave them alone
             Pin("C4",  "nSTATUS",    "fpga_nSTATUS"),  # MUST be pulled high during init
@@ -681,7 +679,7 @@ Pin("M2", "", "io_b2_L21p_M2"),
 Pin("N2", "", "special_b2_DPCLK0_L22n_N2"),
 Pin("L1", "", "special_VREFB2N0_nodiff_L1"),
 Pin("N3", "", "special_b2_DPCLK1_L22p_N3"),
-Pin("L2", "", "TODO_unknown_b2_L2"),
+Pin("L2", "", "singleended_unknown_b2_L2"),
 Pin("M3", "", "special_b2_PLL_L_CLKOUTn_L27n_M3"),
 Pin("K1", "", "io_b2_L28n_K1"),
 Pin("L3", "", "special_b2_PLL_L_CLKOUTp_L27p_L3"),
@@ -705,7 +703,7 @@ Pin("M9", "", "io_b3_B8p_M9"),
 Pin("J7", "", "io_b3_B9n_J7"),
 Pin("N11", "", "special_VREFB3N0_nodiff_N11"),
 Pin("K7", "", "io_b3_B9p_K7"),
-Pin("N12", "", "TODO_unknown_b3_N12"),
+Pin("N12", "", "singleended_unknown_b3_N12"),
 Pin("M13", "", "io_b3_B10n_M13"),
 Pin("N10", "", "io_b3_B11n_N10"),
 Pin("M12", "", "io_b3_B10p_M12"),
@@ -721,7 +719,7 @@ Pin("K11", "", "io_b5_R2p_K11"),
 Pin("J10", "", "io_b5_R1n_J10"),
 Pin("L12", "", "io_b5_R2n_L12"),
 Pin("K12", "", "io_b5_R7p_K12"),
-Pin("L13", "", "TODO_unknown_b5_L13"),
+Pin("L13", "", "singleended_unknown_b5_L13"),
 Pin("J12", "", "io_b5_R7n_J12"),
 Pin("K13", "", "special_VREFB5N0_nodiff_K13"),
 Pin("J9", "", "io_b5_R8p_J9"),
@@ -741,7 +739,7 @@ Pin("E12", "", "io_b6_R18n_E12"),
 Pin("F9", "", "special_b6_DPCLK3_R26p_F9"),
 Pin("D13", "", "special_VREFB6N0_nodiff_D13"),
 Pin("F10", "", "special_b6_DPCLK2_R26n_F10"),
-Pin("C13", "", "TODO_unknown_b6_C13"),
+Pin("C13", "", "singleended_unknown_b6_C13"),
 Pin("F8", "", "io_b6_R27p_F8"),
 Pin("B12", "", "io_b6_R28p_B12"),
 Pin("E9", "", "io_b6_R27n_E9"),
@@ -778,7 +776,7 @@ Pin("B3", "", "io_b8_T23p_B3"),
 Pin("D6", "", "fpga_CRC_ERROR"),
 Pin("B4", "", "io_b8_T23n_B4"),
 Pin("C4", "", "fpga_nSTATUS"),
-Pin("A5", "", "TODO_unknown_b8_A5"),
+Pin("A5", "", "singleended_unknown_b8_A5"),
 Pin("C5", "", "fpga_CONF_DONE"),
 Pin("A2", "", "io_b8_T26p_A2"),
 Pin("B2", "", "io_b8_T26n_B2"),
@@ -947,12 +945,12 @@ serial_header = myelin_kicad_pcb.Component(
 
 ### POWER SUPPLY
 
+# Maybe want more of these?
 bulk = [
     myelin_kicad_pcb.C0805("1u", "3V3", "GND", ref="C%d" % r, handsoldering=False)
     for r in range(8, 10)
 ]
 
-# TODO maybe want more of these
 power_in_cap = myelin_kicad_pcb.C0805("10u", "GND", "5V", ref="C1")
 
 # Power regulation from 5V down to 3.3V.
@@ -970,6 +968,19 @@ regulator = myelin_kicad_pcb.Component(
 )
 reg_in_cap = myelin_kicad_pcb.C0805("1u", "GND", "5V", ref="C2")
 reg_out_cap = myelin_kicad_pcb.C0805("1u", "3V3", "GND", ref="C3")
+
+# Helpful power input/output
+ext_power = myelin_kicad_pcb.Component(
+    footprint="Connector_PinHeader_2.54mm:PinHeader_1x03_P2.54mm_Vertical",
+    identifier="EXTPWR",
+    value="ext pwr",
+    desc="1x3 0.1 inch male header",
+    pins=[
+        Pin(1, "A", ["GND"]),
+        Pin(2, "B", ["3V3"]),
+        Pin(3, "C", ["5V"]),
+    ],
+)
 
 
 ### OSCILLATOR (optional)
@@ -1013,7 +1024,7 @@ osc = myelin_kicad_pcb.Component(
 
 flash = [
     myelin_kicad_pcb.Component(
-        footprint="Package_SO:SOIJ-8_5.3x5.3mm_P1.27mm",
+        footprint="Package_SO:SOIJ-8_5.3x5.3mm_P1.27mm",  # TODO check + pinout
         identifier="FLASH",
         value="package TBD",
         pins=[
@@ -1198,7 +1209,7 @@ ram = [
 
 ### DAC for audio output
 
-# TODO make a jumper option to not use dac and just have one IO for sound_out
+# TODO(v2) make a jumper option to not use dac and just have one IO for sound_out
 
 # This is a bit of a stretch because I've never worked with DACs before.  The
 # WM8524 is $2 at Digikey and apparently good quality.  It has some
@@ -1214,7 +1225,7 @@ ram = [
 
 dac = [
     myelin_kicad_pcb.Component(
-        footprint="Package_SO:TSSOP-16_4.4x5mm_P0.65mm",
+        footprint="Package_SO:TSSOP-16_4.4x5mm_P0.65mm",  # TODO check + pinout
         identifier="DAC",
         value="WM8524",
         pins=[
@@ -1232,7 +1243,7 @@ dac = [
             Pin(12, "AIFMODE",   "3V3"),  # tie high for 12 bit i2s
             Pin(13, "AGND",      "GND"),
             Pin(14, "VMID",      "dac_power_vmid"),
-            # TODO use a ferrite between 3V3 and AVDD
+            # TODO(v2) use a ferrite between 3V3 and AVDD
             Pin(15, "AVDD",      "3V3"),
             Pin(16, "LINEVOUTR", "dac_out_right"),
         ],
@@ -1240,7 +1251,7 @@ dac = [
 ]
 audio_caps = [
     # as recommended in the WM8524 datasheet.
-    # TODO use very low ESR caps.
+    # use very low ESR caps.
     myelin_kicad_pcb.C0805("1u", "dac_power_cpvoutn", "GND", ref="AC1"),
     myelin_kicad_pcb.C0805("4.7u", "3V3", "GND", ref="AC2"),
     myelin_kicad_pcb.C0805("4.7u", "3V3", "GND", ref="AC3"),
@@ -1296,7 +1307,7 @@ reset_3v3_diode = myelin_kicad_pcb.DSOD323("BAT54", "nRESET_5V", "RST_n_in", ref
 big_buffers = [
     [
         myelin_kicad_pcb.Component(
-            footprint="myelin-kicad:ti_zrd_54_pbga",
+            footprint="myelin-kicad:ti_zrd_54_pbga",  # TODO check + pinout
             identifier=ident,
             value="74LVTH162245", # TODO exact part number
             pins=[
@@ -1427,7 +1438,7 @@ big_buffers = [
 oc_buf = [
     [
         myelin_kicad_pcb.Component(
-            footprint="Package_SO:TSSOP-14_4.4x5mm_P0.65mm",  # TODO the pins are really fat here, make my own?
+            footprint="Package_SO:TSSOP-14_4.4x5mm_P0.65mm",  # TODO check + pinout
             identifier=ident,
             value="74HCT125PW",
             pins=[
@@ -1468,7 +1479,7 @@ oc_buf = [
 misc_buf = [
     [
         myelin_kicad_pcb.Component(
-            footprint="Package_SO:SSOP-20_4.4x6.5mm_P0.65mm",
+            footprint="Package_SO:SSOP-20_4.4x6.5mm_P0.65mm",  # TODO check + pinout
             identifier=ident,
             value="74HCT245PW",
             pins=[
@@ -1526,7 +1537,7 @@ phi_out_filter = [
 # MIC7221 comparator for CAS IN
 comparator = [
     myelin_kicad_pcb.Component(
-        footprint="Package_TO_SOT_SMD:SOT-23-5_HandSoldering",
+        footprint="Package_TO_SOT_SMD:SOT-23-5_HandSoldering",  # TODO check + pinout
         identifier="CMP",
         value="MIC7221",
         pins=[
@@ -1658,7 +1669,7 @@ mcu_header = myelin_kicad_pcb.Component(
 
 # ATSAMD11C microcontroller (tiny SO-14 version)
 mcu = myelin_kicad_pcb.Component(
-    footprint="Package_SO:SOIC-14_3.9x8.7mm_P1.27mm",
+    footprint="Package_SO:SOIC-14_3.9x8.7mm_P1.27mm",  # TODO check + pinout
     identifier="MCU",
     value="atsamd11c",
     pins=[
