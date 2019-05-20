@@ -1,0 +1,97 @@
+Identifier	Value	Description	KiCad package
+ABUF	74LVTH162245ZRDR	https://www.digikey.com/product-detail/en/texas-instruments/74LVTH162245ZRDR/296-16878-1-ND	myelin-kicad:ti_zrd_54_pbga
+AC1	1u	1u capacitor in 0805 package	Capacitor_SMD:C_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+AC2	4.7u	4.7u capacitor in 0805 package	Capacitor_SMD:C_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+AC3	4.7u	4.7u capacitor in 0805 package	Capacitor_SMD:C_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+AC4	2.2u	2.2u capacitor in 0805 package	Capacitor_SMD:C_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+AC5	1u	1u capacitor in 0805 package	Capacitor_SMD:C_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+AC6	2.7n NF	2.7n NF capacitor in 0805 package	Capacitor_SMD:C_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+AC7	2.7n NF	2.7n NF capacitor in 0805 package	Capacitor_SMD:C_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+AC8	10u	10u capacitor in 0805 package	Capacitor_SMD:C_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+AC9	10u	10u capacitor in 0805 package	Capacitor_SMD:C_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+AR1	560R NF	560R NF resistor in 0805 package	Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+AR2	560R NF	560R NF resistor in 0805 package	Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+AR3	NF 10k	NF 10k resistor in 0805 package	Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+AR4	10k	10k resistor in 0805 package	Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+AR5	10k	10k resistor in 0805 package	Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+AR6	10k	10k resistor in 0805 package	Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+AUDIO_OUT	audio out		Connector_PinHeader_2.54mm:PinHeader_2x02_P2.54mm_Vertical
+C1	10u	10u capacitor in 0805 package	Capacitor_SMD:C_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+C2	1u	1u capacitor in 0805 package	Capacitor_SMD:C_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+C3	1u	1u capacitor in 0805 package	Capacitor_SMD:C_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+C4	2.7n	2.7n capacitor in 0805 package	Capacitor_SMD:C_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+C8	1u	1u capacitor in 0805 package	Capacitor_SMD:C_0805_2012Metric
+C9	1u	1u capacitor in 0805 package	Capacitor_SMD:C_0805_2012Metric
+CMP	MIC7221YM5-TR	https://www.digikey.com/product-detail/en/microchip-technology/MIC7221YM5-TR/576-2901-1-ND	Package_TO_SOT_SMD:SOT-23-5_HandSoldering
+D1	BAT54	BAT54 diode in SOD323 package	Diode_SMD:D_SOD-323_HandSoldering
+DAC	WM8524CGEDT	https://www.digikey.com/product-detail/en/cirrus-logic-inc/WM8524CGEDT/598-2458-ND	Package_SO:TSSOP-16_4.4x5mm_P0.65mm
+DBUF	74LVTH162245ZRDR	https://www.digikey.com/product-detail/en/texas-instruments/74LVTH162245ZRDR/296-16878-1-ND	myelin-kicad:ti_zrd_54_pbga
+DC1	100n	100n capacitor in 0402 package	Capacitor_SMD:C_0402_1005Metric
+DC10	100n	100n capacitor in 0402 package	Capacitor_SMD:C_0402_1005Metric
+DC11	100n	100n capacitor in 0402 package	Capacitor_SMD:C_0402_1005Metric
+DC12	100n	100n capacitor in 0402 package	Capacitor_SMD:C_0402_1005Metric
+DC13	100n	100n capacitor in 0402 package	Capacitor_SMD:C_0402_1005Metric
+DC14	100n	100n capacitor in 0402 package	Capacitor_SMD:C_0402_1005Metric
+DC15	100n	100n capacitor in 0805 package	Capacitor_SMD:C_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+DC16	100n	100n capacitor in 0402 package	Capacitor_SMD:C_0402_1005Metric
+DC17	100n	100n capacitor in 0402 package	Capacitor_SMD:C_0402_1005Metric
+DC18	100n	100n capacitor in 0402 package	Capacitor_SMD:C_0402_1005Metric
+DC19	100n	100n capacitor in 0402 package	Capacitor_SMD:C_0402_1005Metric
+DC2	100n	100n capacitor in 0402 package	Capacitor_SMD:C_0402_1005Metric
+DC20	100n	100n capacitor in 0402 package	Capacitor_SMD:C_0402_1005Metric
+DC21	100n	100n capacitor in 0402 package	Capacitor_SMD:C_0402_1005Metric
+DC22	100n	100n capacitor in 0402 package	Capacitor_SMD:C_0402_1005Metric
+DC23	100n	100n capacitor in 0402 package	Capacitor_SMD:C_0402_1005Metric
+DC24	100n	100n capacitor in 0805 package	Capacitor_SMD:C_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+DC25	100n	100n capacitor in 0805 package	Capacitor_SMD:C_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+DC26	100n	100n capacitor in 0805 package	Capacitor_SMD:C_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+DC3	100n	100n capacitor in 0402 package	Capacitor_SMD:C_0402_1005Metric
+DC4	100n	100n capacitor in 0402 package	Capacitor_SMD:C_0402_1005Metric
+DC5	100n	100n capacitor in 0402 package	Capacitor_SMD:C_0402_1005Metric
+DC6	100n	100n capacitor in 0402 package	Capacitor_SMD:C_0402_1005Metric
+DC7	100n	100n capacitor in 0402 package	Capacitor_SMD:C_0402_1005Metric
+DC8	100n	100n capacitor in 0402 package	Capacitor_SMD:C_0402_1005Metric
+DC9	100n	100n capacitor in 0402 package	Capacitor_SMD:C_0402_1005Metric
+EXTPWR	ext pwr	1x3 0.1 inch male header	Connector_PinHeader_2.54mm:PinHeader_1x03_P2.54mm_Vertical
+FLASH	W25Q128JVSIM	https://www.digikey.com/product-detail/en/winbond-electronics/W25Q128JVSIM/W25Q128JVSIM-ND/6819721	Package_SO:SOIJ-8_5.3x5.3mm_P1.27mm
+FPGA	10M08SCU169	https://www.digikey.com/product-detail/en/10M08SCU169C8G/544-3270-ND	myelin-kicad:intel_ubga169
+JTAG	jtag		myelin-kicad:jtag_shrouded_2x5
+JTAGTC	jtagtc		Tag-Connect_TC2030-IDC-FP_2x03_P1.27mm_Vertical
+MC1	100n	100n capacitor in 0805 package	Capacitor_SMD:C_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+MCU	atsamd11c	https://www.digikey.com/product-detail/en/microchip-technology/ATSAMD11C14A-SSUT/ATSAMD11C14A-SSUTCT-ND	Package_SO:SOIC-14_3.9x8.7mm_P1.27mm
+MISC	74HCT245PW	https://www.digikey.com/product-detail/en/nexperia-usa-inc/74HCT245PW118/1727-6353-1-ND	Package_SO:SSOP-20_4.4x6.5mm_P0.65mm
+MR1	10k	10k resistor in 0805 package	Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+MR2	1k	1k resistor in 0805 package	Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+MSWD	swd		Tag-Connect_TC2030-IDC-FP_2x03_P1.27mm_Vertical
+MSWD2	swd		Connector_PinHeader_2.54mm:PinHeader_2x06_P2.54mm_Vertical
+MUSB	usb	Molex 1050170001 (Digikey WM1399CT-ND) surface mount micro USB socket with mounting holes.	myelin-kicad:micro_usb_b_smd_molex
+OC	74HCT125PW	https://www.digikey.com/product-detail/en/nexperia-usa-inc/74HCT125PW112/1727-6443-ND	Package_SO:TSSOP-14_4.4x5mm_P0.65mm
+OSC	osc	https://www.digikey.com/product-detail/en/microchip-technology/DSC1001CL1-016.0000/DSC1001CL1-016.0000-ND	Oscillator:Oscillator_SMD_Abracon_ASE-4Pin_3.2x2.5mm_HandSoldering
+PR1	10k	10k resistor in 0805 package	Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+PR10	10k	10k resistor in 0805 package	Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+PR11	10k NF	10k NF resistor in 0805 package	Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+PR2	10k	10k resistor in 0805 package	Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+PR3	10k	10k resistor in 0805 package	Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+PR4	10k	10k resistor in 0805 package	Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+PR5	10k	10k resistor in 0805 package	Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+PR6	10k	10k resistor in 0805 package	Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+PR7	10k	10k resistor in 0805 package	Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+PR8	10k	10k resistor in 0805 package	Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+PR9	10k	10k resistor in 0805 package	Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+R1	10k	10k resistor in 0805 package	Resistor_SMD:R_0805_2012Metric
+R10	68R	68R resistor in 0805 package	Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+R11	1k5	1k5 resistor in 0805 package	Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+R2	10k	10k resistor in 0805 package	Resistor_SMD:R_0805_2012Metric
+R3	1-10k	1-10k resistor in 0805 package	Resistor_SMD:R_0805_2012Metric
+R4	10k	10k resistor in 0805 package	Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+R5	100R	100R resistor in 0805 package	Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+R6	1k	1k resistor in 0805 package	Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+R7	1k	1k resistor in 0805 package	Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+R8	1k	1k resistor in 0805 package	Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+R9	68R	68R resistor in 0805 package	Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+RAM	MT48LC16M16A2	MT48LC16M16A2F4-6A:GTR	myelin-kicad:sdram_54tfbga
+REG	AP7365-33YG-XX	3.3V LDO regulator, e.g. Digikey AP7365-33YG-13DICT-ND.  Search for the exact part number because there are many variants.	Package_TO_SOT_SMD:SOT-89-3
+SD	Micro SD socket		myelin-kicad:hirose_micro_sd_card_socket
+SERIAL	fpga serial port		Connector_PinHeader_2.54mm:PinHeader_1x03_P2.54mm_Vertical
+ULA	ULA header	Set of pin headers to plug into an Acorn Electron ULA socket	modified-kicad:PLCC-68_THT-Socket-Electron-ULA
+USB	usb	Molex 1050170001 (Digikey WM1399CT-ND) surface mount micro USB socket with mounting holes.	myelin-kicad:micro_usb_b_smd_molex

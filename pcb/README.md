@@ -1,24 +1,11 @@
 # ElectronFpga/pcb
 
-This is a start at a PCB for the Electron ULA replacement project.
+This is a PCB for the Electron ULA replacement project (the "Ultimate Electron Upgrade").
 
-Help welcome/wanted!  Open the .pro file in KiCad then open the PCB to see
-progress so far, and check in on the Stardot thread:
+Stardot thread:
 https://stardot.org.uk/forums/viewtopic.php?f=3&t=9223
 
-TO DO
------
-
-- ~~Make a KiCad footprint for the ULA, referring to dimensions in Dave Hitchins' DXF -- https://stardot.org.uk/forums/viewtopic.php?f=3&t=9223&start=180#p208507~~
-
-- Check that the bounding box is OK.  Right now it's 50 mm x 50 mm, to keep costs down (JLCPCB will do a 4-layer prototype run for $12 at this size).  Looks like the ULA will use up most of this!
-
-- Add ULA to the netlist file (max10_electron_ula.py) -- refer to Electron schematic at http://www.acornatom.nl/hardware/Electron-iss4.png
-  - Partly done: need to add all the signal names and copy over jms2's classifications
-
-- Figure out what buffers we need.  Which ULA pins are inputs, outputs, open collector?
-
-- Figure out what extra components might be handy.  Memory - flash/RAM?  SD socket?
+Status: v1 board sent to fab!
 
 Pictures
 --------

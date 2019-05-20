@@ -1,0 +1,22 @@
+Identifier	Value	Description	KiCad package
+BUF	74HCT245PW	https://www.digikey.com/product-detail/en/nexperia-usa-inc/74HCT245PW118/1727-6353-1-ND	Package_SO:SSOP-20_4.4x6.5mm_P0.65mm
+C1	10u	10u capacitor in 0805 package	Capacitor_SMD:C_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+C2	100n	100n capacitor in 0805 package	Capacitor_SMD:C_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+C3	100n	100n capacitor in 0805 package	Capacitor_SMD:C_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+C4	100n	100n capacitor in 0805 package	Capacitor_SMD:C_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+C5	100n	100n capacitor in 0805 package	Capacitor_SMD:C_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+R1	10k NF	10k NF resistor in 0805 package	Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+R10	100R	100R resistor in 0805 package	Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+R11	100R	100R resistor in 0805 package	Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+R12	681k 1%	681k 1% resistor in 0805 package	Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+R2	10k NF	10k NF resistor in 0805 package	Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+R3	10k NF	10k NF resistor in 0805 package	Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+R4	10k NF	10k NF resistor in 0805 package	Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+R5	4k TBD	4k TBD resistor in 0805 package	Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+R6	1k TBD	1k TBD resistor in 0805 package	Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+R7	480R	480R resistor in 0805 package	Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+R8	480R	480R resistor in 0805 package	Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+R9	480R	480R resistor in 0805 package	Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+RGB	RGB		Connector_PinHeader_2.54mm:PinHeader_1x06_P2.54mm_Vertical
+SYNC	EL1883		Package_SO:SOIC-8_3.9x4.9mm_P1.27mm
+VGA	VGA		Connector_Dsub:DSUB-15-HD_Female_Horizontal_P2.29x1.98mm_EdgePinOffset3.03mm_Housed_MountingHolesOffset4.94mm

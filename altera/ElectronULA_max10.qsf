@@ -151,9 +151,9 @@ set_location_assignment PIN_A3 -to addr[14]
 set_location_assignment PIN_B4 -to addr[0]
 set_location_assignment PIN_A4 -to addr[8]
 set_location_assignment PIN_A5 -to addr[1]
-set_location_assignment PIN_B5 -to A_buf_nOE
+set_location_assignment PIN_B5 -to A_buf_DIR
 set_location_assignment PIN_E6 -to addr[5]
-set_location_assignment PIN_A6 -to A_buf_DIR
+set_location_assignment PIN_A6 -to A_buf_nOE
 set_location_assignment PIN_B6 -to misc_buf_nOE
 set_location_assignment PIN_F8 -to addr[4]
 set_location_assignment PIN_A7 -to casMO
@@ -172,8 +172,8 @@ set_location_assignment PIN_B11 -to red
 set_location_assignment PIN_A12 -to clk_out
 set_location_assignment PIN_B12 -to RST_n_out
 set_location_assignment PIN_C11 -to caps
-set_location_assignment PIN_B13 -to RnW_nOE
-set_location_assignment PIN_C12 -to RnW_out
+set_location_assignment PIN_B13 -to RnW_out
+set_location_assignment PIN_C12 -to RnW_nOE
 set_location_assignment PIN_C13 -to IRQ_n_out
 set_location_assignment PIN_D12 -to USB_PU
 set_location_assignment PIN_D13 -to mcu_debug_TXD

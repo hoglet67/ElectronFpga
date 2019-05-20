@@ -59,7 +59,7 @@ Pin = myelin_kicad_pcb.Pin
 
 # 16 + 8 + 16 buffers needed
 
-# (done) wire up direction select for all buffers, to give the option of implementing the CPU inside the ULA.
+# done(v1) wire up direction select for all buffers, to give the option of implementing the CPU inside the ULA.
 
 # Sanity check:
 # - 32 x LVT buf (input)
@@ -67,7 +67,7 @@ Pin = myelin_kicad_pcb.Pin
 # - 8 x HCT245 (output)
 
 ula = myelin_kicad_pcb.Component(
-    footprint="modified-kicad:PLCC-68_THT-Socket-Electron-ULA",  # TODO check + pinout
+    footprint="modified-kicad:PLCC-68_THT-Socket-Electron-ULA",  # done(v1) check + pinout
     identifier="ULA",
     value="ULA header",
     desc="Set of pin headers to plug into an Acorn Electron ULA socket",
@@ -182,38 +182,38 @@ ula = myelin_kicad_pcb.Component(
 
 # So far 114 IO used -- see fpga_pins.txt.
 
-# TODO Serial flash: 6 (flash_nCE, flash_SCK, flash_IO0, flash_IO1, flash_IO2, flash_IO3)
-# (done) flash_nCE pullup
+# done(v1) Serial flash: 6 (flash_nCE, flash_SCK, flash_IO0, flash_IO1, flash_IO2, flash_IO3)
+# done(v1) flash_nCE pullup
 
-# (done) SDRAM: 39 (D x 16, A x 13, BA x 2, nCS, nWE, nCAS, nRAS, CLK, CKE, UDQM, LDQM)
-# (done) SDRAM nCS pullup
+# done(v1) SDRAM: 39 (D x 16, A x 13, BA x 2, nCS, nWE, nCAS, nRAS, CLK, CKE, UDQM, LDQM)
+# done(v1) SDRAM nCS pullup
 
-# (done) SD card signals: 6 (sd_CLK_SCK, sd_CMD_MOSI, sd_DAT0_MISO, sd_DAT1, sd_DAT2, sd_DAT3_nCS)
+# done(v1) SD card signals: 6 (sd_CLK_SCK, sd_CMD_MOSI, sd_DAT0_MISO, sd_DAT1, sd_DAT2, sd_DAT3_nCS)
 
-# (done) USB signals: 3 (USB_M, USB_P, USB_PU)
+# done(v1) USB signals: 3 (USB_M, USB_P, USB_PU)
 
-# (done) clk_osc: 1
+# done(v1) clk_osc: 1
 
-# (done) DAC signals: 5 (dac_dacdat, dac_lrclk, dac_bclk, dac_mclk, dac_nmute)
+# done(v1) DAC signals: 5 (dac_dacdat, dac_lrclk, dac_bclk, dac_mclk, dac_nmute)
 
 # = 60 signals not from the ULA socket
 
-# (done) 32+5 x 74lvt162245 signals, A_buf_dir, A_buf_nOE, D_buf_dir, D_buf_nOE, input_buf_nOE (misc dir fixed)
+# done(v1) 32+5 x 74lvt162245 signals, A_buf_dir, A_buf_nOE, D_buf_dir, D_buf_nOE, input_buf_nOE (misc dir fixed)
 
-# (done) 5 x 74hct125 signals (caps, RST_n_out, IRQ_n_out, RnW_out, RnW_nOE)
+# done(v1) 5 x 74hct125 signals (caps, RST_n_out, IRQ_n_out, RnW_out, RnW_nOE)
 
-# (done) RST_n_in via diode
+# done(v1) RST_n_in via diode
 
-# (done) 8+1 x 74hct245 signals, fixed direction, nOE
+# done(v1) 8+1 x 74hct245 signals, fixed direction, nOE
 
-# (done) casIn via comparator
-# (done) ROM_n direct
+# done(v1) casIn via comparator
+# done(v1) ROM_n direct
 
 # = 54 signals from the ULA socket
 
-# (done) check that all 44 digital + 1 analog ULA pins are connected
-# (done) check that three signals have two connections (nRST, nIRQ, RnW)
-# (done) check clocks (clk_osc, clk_in) and make sure they work with PLLs
+# done(v1) check that all 44 digital + 1 analog ULA pins are connected
+# done(v1) check that three signals have two connections (nRST, nIRQ, RnW)
+# done(v1) check clocks (clk_osc, clk_in) and make sure they work with PLLs
 
 # CLOCK PLANNING
 
@@ -602,9 +602,9 @@ if True:
         "addr0",
         "addr8",
         "addr1",
-        "A_buf_nOE",  # slow OK
-        "addr5",
         "A_buf_DIR",  # slow OK
+        "addr5",
+        "A_buf_nOE",  # slow OK
         "misc_buf_nOE",  # slow OK
         "addr4",
         "casMO",
@@ -623,8 +623,8 @@ if True:
         # - HCT125
         "RST_n_out",  # slow OK
         "caps",  # slow OK
-        "RnW_nOE",
         "RnW_out",
+        "RnW_nOE",
         "IRQ_n_out",
     ], 84)
 
@@ -825,6 +825,7 @@ fpga = myelin_kicad_pcb.Component(
     footprint="myelin-kicad:intel_ubga169",
     identifier="FPGA",
     value="10M08SCU169",
+    desc="https://www.digikey.com/product-detail/en/10M08SCU169C8G/544-3270-ND",
     buses=['addr', 'data', 'sdram_DQ', 'sdram_A', 'sdram_BA', 'kbd'],
     pins=fpga_pins)
 
@@ -884,12 +885,12 @@ fpga_decoupling = [
     for r in range(10, 24)
 ]
 
-# TODO fpga jtag - verify this works with USB Blaster / Intel Download Cable
+# done(v1) fpga jtag - verify this works with USB Blaster / Intel Download Cable
 # altera jtag header, like in the lc-electronics xc9572xl board
 # left column: tck tdo tms nc tdi
 # right column: gnd vcc nc nc gnd
 jtag = myelin_kicad_pcb.Component(
-    footprint="myelin-kicad:jtag_shrouded_2x5",  # TODO replace with bigger IDC footprint
+    footprint="myelin-kicad:jtag_shrouded_2x5",  # TODO(v2) replace with bigger IDC footprint
     identifier="JTAG",
     value="jtag",
     pins=[
@@ -898,7 +899,7 @@ jtag = myelin_kicad_pcb.Component(
         Pin( 3, "TDO", "fpga_TDO"),
         Pin( 4, "3V3", "3V3"),
         Pin( 5, "TMS", "fpga_TMS"),
-        Pin( 6, "NC"),  # TODO something intel-specific here?
+        Pin( 6, "NC"),
         Pin( 7, "NC"),
         Pin( 8, "NC"),
         Pin( 9, "TDI", "fpga_TDI"),
@@ -996,6 +997,7 @@ osc = myelin_kicad_pcb.Component(
     # When ordering: double check it's the 3.2x2.5mm package
     # http://ww1.microchip.com/downloads/en/DeviceDoc/20005529B.pdf
     #    DSC100X-C-X-X-096.000-X
+    desc="https://www.digikey.com/product-detail/en/microchip-technology/DSC1001CL1-016.0000/DSC1001CL1-016.0000-ND",
     pins=[
         Pin(1, "STANDBY#",  "3V3"),
         Pin(2, "GND",       "GND"),
@@ -1013,6 +1015,10 @@ osc = myelin_kicad_pcb.Component(
 # use it directly or copy it to RAM before use. This will make room for more
 # pins to use for RAM.
 
+# With a 190 ns window, 16 clocks means our clock has to be > 84MHz.  Our PLL
+# VCO runs at 960 MHz, so 96 MHz might work well to stay in sync with the
+# 16MHz ULA.
+
 # It looks like "QPI" chips can read the instruction in two clocks on all four
 # IOs, whereas "Quad SPI" chips typically require 8 clocks on one IO.
 
@@ -1024,9 +1030,12 @@ osc = myelin_kicad_pcb.Component(
 
 flash = [
     myelin_kicad_pcb.Component(
-        footprint="Package_SO:SOIJ-8_5.3x5.3mm_P1.27mm",  # TODO check + pinout
+        footprint="Package_SO:SOIJ-8_5.3x5.3mm_P1.27mm",  # done(v1) check + pinout
         identifier="FLASH",
-        value="package TBD",
+        value="W25Q128JVSIM",  # 133MHz max clock
+        desc="https://www.digikey.com/product-detail/en/winbond-electronics/W25Q128JVSIM/W25Q128JVSIM-ND/6819721",
+        # $1 2MB version: https://www.digikey.com/product-detail/en/issi-integrated-silicon-solution-inc/IS25LP016D-JBLE/706-1582-ND
+        # $2.50 16MB version: https://www.digikey.com/product-detail/en/issi-integrated-silicon-solution-inc/IS25LP128-JBLE/706-1341-ND
         pins=[
             Pin("1", "CE#",              "flash_nCE"),
             Pin("2", "SO_IO1",           "flash_IO1"),
@@ -1138,7 +1147,7 @@ ram = [
         footprint="myelin-kicad:sdram_54tfbga",
         identifier="RAM",
         value="MT48LC16M16A2",
-        desc="MT48LC16M16A2F4-6A:GTR",
+        desc="MT48LC16M16A2F4-6A:GTR",  # done(v1) check pinout
         buses=[""],
         pins=[
             Pin("A1", "VSS", "GND"),
@@ -1225,9 +1234,10 @@ ram = [
 
 dac = [
     myelin_kicad_pcb.Component(
-        footprint="Package_SO:TSSOP-16_4.4x5mm_P0.65mm",  # TODO check + pinout
+        footprint="Package_SO:TSSOP-16_4.4x5mm_P0.65mm",  # done(v1) check + pinout
         identifier="DAC",
-        value="WM8524",
+        value="WM8524CGEDT",
+        desc="https://www.digikey.com/product-detail/en/cirrus-logic-inc/WM8524CGEDT/598-2458-ND",
         pins=[
             Pin( 1, "LINEVOUTL", "dac_out_left"),
             Pin( 2, "CPVOUTN",   "dac_power_cpvoutn"),
@@ -1307,12 +1317,13 @@ reset_3v3_diode = myelin_kicad_pcb.DSOD323("BAT54", "nRESET_5V", "RST_n_in", ref
 big_buffers = [
     [
         myelin_kicad_pcb.Component(
-            footprint="myelin-kicad:ti_zrd_54_pbga",  # TODO check + pinout
+            footprint="myelin-kicad:ti_zrd_54_pbga",  # done(v1): check + pinout
             identifier=ident,
-            value="74LVTH162245", # TODO exact part number
+            value="74LVTH162245ZRDR",
+            desc="https://www.digikey.com/product-detail/en/texas-instruments/74LVTH162245ZRDR/296-16878-1-ND",
             pins=[
-                Pin("A3", "1DIR", nOE1),
-                Pin("A4", "1nOE", DIR1),
+                Pin("A3", "1DIR", DIR1),
+                Pin("A4", "1nOE", nOE1),
 
                 Pin("A6", "1A1", conn1[0][0]),
                 Pin("A1", "1B1", conn1[0][1]),
@@ -1331,8 +1342,8 @@ big_buffers = [
                 Pin("E5", "1A8", conn1[7][0]),
                 Pin("E2", "1B8", conn1[7][1]),
 
-                Pin("J3", "2DIR", nOE2),
-                Pin("J4", "2nOE", DIR2),
+                Pin("J3", "2DIR", DIR2),
+                Pin("J4", "2nOE", nOE2),
 
                 Pin("E6", "2A1", conn2[0][0]),
                 Pin("E1", "2B1", conn2[0][1]),
@@ -1438,9 +1449,10 @@ big_buffers = [
 oc_buf = [
     [
         myelin_kicad_pcb.Component(
-            footprint="Package_SO:TSSOP-14_4.4x5mm_P0.65mm",  # TODO check + pinout
+            footprint="Package_SO:TSSOP-14_4.4x5mm_P0.65mm",  # done(v1) check + pinout
             identifier=ident,
             value="74HCT125PW",
+            desc="https://www.digikey.com/product-detail/en/nexperia-usa-inc/74HCT125PW112/1727-6443-ND",
             pins=[
                 Pin( 1, "1nOE", conn[0][0]),
                 Pin( 2, "1A",   conn[0][1]),
@@ -1468,7 +1480,7 @@ oc_buf = [
                 # [nOE, input, output]
                 ["GND",        "caps",      "CAPS_LOCK_5V"],
                 ["RST_n_out",  "GND",       "nRESET_5V"],
-                ["RnW_out",    "RnW_nOE",   "RnW_5V"],
+                ["RnW_nOE",    "RnW_out",   "RnW_5V"],
                 ["IRQ_n_out",  "GND",       "nIRQ_5V"],
             ]
         )
@@ -1479,9 +1491,10 @@ oc_buf = [
 misc_buf = [
     [
         myelin_kicad_pcb.Component(
-            footprint="Package_SO:SSOP-20_4.4x6.5mm_P0.65mm",  # TODO check + pinout
+            footprint="Package_SO:SSOP-20_4.4x6.5mm_P0.65mm",  # done(v1) check + pinout
             identifier=ident,
             value="74HCT245PW",
+            desc="https://www.digikey.com/product-detail/en/nexperia-usa-inc/74HCT245PW118/1727-6353-1-ND",
             pins=[
                 Pin( 1, "A->B", DIR),
                 Pin( 2, "A0",   conn[0][0]),
@@ -1511,7 +1524,7 @@ misc_buf = [
         (
             "5V",
             "MISC",
-            "5V",  # misc_buf_DIR = A -> B  # TODO verify
+            "5V",  # misc_buf_DIR = A -> B
             "misc_buf_nOE",  # pulled up
             [
                 # [A port, B port]
@@ -1537,9 +1550,10 @@ phi_out_filter = [
 # MIC7221 comparator for CAS IN
 comparator = [
     myelin_kicad_pcb.Component(
-        footprint="Package_TO_SOT_SMD:SOT-23-5_HandSoldering",  # TODO check + pinout
+        footprint="Package_TO_SOT_SMD:SOT-23-5_HandSoldering",  # done(v1) check + pinout
         identifier="CMP",
-        value="MIC7221",
+        value="MIC7221YM5-TR",
+        desc="https://www.digikey.com/product-detail/en/microchip-technology/MIC7221YM5-TR/576-2901-1-ND",
         pins=[
             Pin( 1, "OUT", "casIn"),  # open drain, pulled to 3V3
             Pin( 2, "V+",  "5V"),
@@ -1553,7 +1567,8 @@ comparator = [
 comparator_misc = [
     # MIC7221 pullup to 3V3
     myelin_kicad_pcb.R0805("1k", "casIn", "3V3", ref="R?"),
-    # TODO calculate CAS_IN_divider values to make the center voltage for casIn
+    # TODO(v2) calculate CAS_IN_divider values to make the center voltage for casIn.
+    # Currently this gives 2.5V.
     myelin_kicad_pcb.R0805("1k", "GND", "CAS_IN_divider", ref="R?"),
     myelin_kicad_pcb.R0805("1k", "CAS_IN_divider", "5V", ref="R?"),
     # decoupling
@@ -1573,7 +1588,6 @@ micro_usb = myelin_kicad_pcb.Component(
     value="usb",
     desc="Molex 1050170001 (Digikey WM1399CT-ND) surface mount micro USB socket with mounting holes.",
     pins=[
-        # TODO add a jumper and/or a diode so we can power the system from VUSB during bringup
         Pin(1, "V", "VUSB"),
         Pin(2, "-", "USBDM"),
         Pin(3, "+", "USBDP"),
@@ -1669,9 +1683,10 @@ mcu_header = myelin_kicad_pcb.Component(
 
 # ATSAMD11C microcontroller (tiny SO-14 version)
 mcu = myelin_kicad_pcb.Component(
-    footprint="Package_SO:SOIC-14_3.9x8.7mm_P1.27mm",  # TODO check + pinout
+    footprint="Package_SO:SOIC-14_3.9x8.7mm_P1.27mm",  # done(v1) check + pinout
     identifier="MCU",
     value="atsamd11c",
+    desc="https://www.digikey.com/product-detail/en/microchip-technology/ATSAMD11C14A-SSUT/ATSAMD11C14A-SSUTCT-ND",
     pins=[
         # SERCOM notes:
 
@@ -1724,3 +1739,5 @@ staples = [
 ### END
 
 myelin_kicad_pcb.dump_netlist("max10_electron_ula.net")
+myelin_kicad_pcb.dump_bom("bill_of_materials.txt",
+                          "readable_bill_of_materials.txt")

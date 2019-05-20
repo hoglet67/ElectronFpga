@@ -1,0 +1,108 @@
+This is the human-readable bill of materials.
+See bill_of_materials.txt for a terser version suitable for spreadsheet import.
+
+BUF
+- Value: 74HCT245PW
+- Description: https://www.digikey.com/product-detail/en/nexperia-usa-inc/74HCT245PW118/1727-6353-1-ND
+- KiCad package: Package_SO:SSOP-20_4.4x6.5mm_P0.65mm
+
+C1
+- Value: 10u
+- Description: 10u capacitor in 0805 package
+- KiCad package: Capacitor_SMD:C_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+
+C2
+- Value: 100n
+- Description: 100n capacitor in 0805 package
+- KiCad package: Capacitor_SMD:C_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+
+C3
+- Value: 100n
+- Description: 100n capacitor in 0805 package
+- KiCad package: Capacitor_SMD:C_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+
+C4
+- Value: 100n
+- Description: 100n capacitor in 0805 package
+- KiCad package: Capacitor_SMD:C_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+
+C5
+- Value: 100n
+- Description: 100n capacitor in 0805 package
+- KiCad package: Capacitor_SMD:C_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+
+R1
+- Value: 10k NF
+- Description: 10k NF resistor in 0805 package
+- KiCad package: Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+
+R10
+- Value: 100R
+- Description: 100R resistor in 0805 package
+- KiCad package: Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+
+R11
+- Value: 100R
+- Description: 100R resistor in 0805 package
+- KiCad package: Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+
+R12
+- Value: 681k 1%
+- Description: 681k 1% resistor in 0805 package
+- KiCad package: Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+
+R2
+- Value: 10k NF
+- Description: 10k NF resistor in 0805 package
+- KiCad package: Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+
+R3
+- Value: 10k NF
+- Description: 10k NF resistor in 0805 package
+- KiCad package: Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+
+R4
+- Value: 10k NF
+- Description: 10k NF resistor in 0805 package
+- KiCad package: Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+
+R5
+- Value: 4k TBD
+- Description: 4k TBD resistor in 0805 package
+- KiCad package: Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+
+R6
+- Value: 1k TBD
+- Description: 1k TBD resistor in 0805 package
+- KiCad package: Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+
+R7
+- Value: 480R
+- Description: 480R resistor in 0805 package
+- KiCad package: Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+
+R8
+- Value: 480R
+- Description: 480R resistor in 0805 package
+- KiCad package: Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+
+R9
+- Value: 480R
+- Description: 480R resistor in 0805 package
+- KiCad package: Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+
+RGB
+- Value: RGB
+- Description: 
+- KiCad package: Connector_PinHeader_2.54mm:PinHeader_1x06_P2.54mm_Vertical
+
+SYNC
+- Value: EL1883
+- Description: 
+- KiCad package: Package_SO:SOIC-8_3.9x4.9mm_P1.27mm
+
+VGA
+- Value: VGA
+- Description: 
+- KiCad package: Connector_Dsub:DSUB-15-HD_Female_Horizontal_P2.29x1.98mm_EdgePinOffset3.03mm_Housed_MountingHolesOffset4.94mm
+
