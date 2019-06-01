@@ -316,6 +316,16 @@ PR10
 - Description: Resistor 0805: 10k
 - KiCad package: Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
 
+PR12
+- Value: 10k
+- Description: Resistor 0805: 10k
+- KiCad package: Resistor_SMD:R_0805_2012Metric
+
+PR13
+- Value: 10k
+- Description: Resistor 0805: 10k
+- KiCad package: Resistor_SMD:R_0805_2012Metric
+
 PR2
 - Value: 10k
 - Description: Resistor 0805: 10k
@@ -356,19 +366,14 @@ PR9
 - Description: Resistor 0805: 10k
 - KiCad package: Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
 
-R1
-- Value: 10k
-- Description: Resistor 0805: 10k
-- KiCad package: Resistor_SMD:R_0805_2012Metric
-
-R2
-- Value: 10k
-- Description: Resistor 0805: 10k
-- KiCad package: Resistor_SMD:R_0805_2012Metric
-
 R4
 - Value: 10k
 - Description: Resistor 0805: 10k
+- KiCad package: Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+
+AR3
+- Value: 10k NF
+- Description: Resistor 0805: 10k NF
 - KiCad package: Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
 
 PR11
@@ -419,11 +424,6 @@ R10
 R9
 - Value: 68R
 - Description: Resistor 0805: 68R
-- KiCad package: Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
-
-AR3
-- Value: NF 10k
-- Description: Resistor 0805: NF 10k
 - KiCad package: Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
 
 ULA

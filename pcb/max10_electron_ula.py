@@ -228,18 +228,18 @@ ula = myelin_kicad_pcb.Component(
 # host machine during FPGA programming
 pullups = [
     # chip enables
-    myelin_kicad_pcb.R0805("10k", "flash_nCE", "3V3", ref="PR?"),
-    myelin_kicad_pcb.R0805("10k", "sdram_nCS", "3V3", ref="PR?"),
-    myelin_kicad_pcb.R0805("10k", "sd_DAT3_nCS", "3V3", ref="PR?"),
+    myelin_kicad_pcb.R0805("10k", "flash_nCE", "3V3", ref="PR1"),
+    myelin_kicad_pcb.R0805("10k", "sdram_nCS", "3V3", ref="PR2"),
+    myelin_kicad_pcb.R0805("10k", "sd_DAT3_nCS", "3V3", ref="PR3"),
     # buffer enables
-    myelin_kicad_pcb.R0805("10k", "A_buf_nOE", "3V3", ref="PR?"),
-    myelin_kicad_pcb.R0805("10k", "D_buf_nOE", "3V3", ref="PR?"),
-    myelin_kicad_pcb.R0805("10k", "input_buf_nOE", "3V3", ref="PR?"),
-    myelin_kicad_pcb.R0805("10k", "misc_buf_nOE", "5V", ref="PR?"),
+    myelin_kicad_pcb.R0805("10k", "A_buf_nOE", "3V3", ref="PR4"),
+    myelin_kicad_pcb.R0805("10k", "D_buf_nOE", "3V3", ref="PR5"),
+    myelin_kicad_pcb.R0805("10k", "input_buf_nOE", "3V3", ref="PR6"),
+    myelin_kicad_pcb.R0805("10k", "misc_buf_nOE", "5V", ref="PR7"),
     # open collector outputs
-    myelin_kicad_pcb.R0805("10k", "RST_n_out", "3V3", ref="PR?"),
-    myelin_kicad_pcb.R0805("10k", "IRQ_n_out", "3V3", ref="PR?"),
-    myelin_kicad_pcb.R0805("10k", "RnW_nOE", "3V3", ref="PR?"),
+    myelin_kicad_pcb.R0805("10k", "RST_n_out", "3V3", ref="PR8"),
+    myelin_kicad_pcb.R0805("10k", "IRQ_n_out", "3V3", ref="PR9"),
+    myelin_kicad_pcb.R0805("10k", "RnW_nOE", "3V3", ref="PR10"),
 ]
 
 # rotate array n positions
@@ -871,10 +871,10 @@ with open('../altera/ElectronULA_max10_from_pcb_pins_qsf.txt', 'w') as f:
 
 
 # chip won't init unless this is pulled high
-conf_done_pullup = myelin_kicad_pcb.R0805("10k", "fpga_CONF_DONE", "3V3", ref="R1", handsoldering=False)
+conf_done_pullup = myelin_kicad_pcb.R0805("10k", "fpga_CONF_DONE", "3V3", ref="PR12", handsoldering=False)
 
 # chip goes into error state if this is pulled low
-nstatus_pullup = myelin_kicad_pcb.R0805("10k", "fpga_nSTATUS", "3V3", ref="R2", handsoldering=False)
+nstatus_pullup = myelin_kicad_pcb.R0805("10k", "fpga_nSTATUS", "3V3", ref="PR13", handsoldering=False)
 
 # prevent spurious jtag clocks
 tck_pulldown = myelin_kicad_pcb.R0805("1-10k", "fpga_TCK", "GND", ref="R3", handsoldering=False)
@@ -1280,7 +1280,7 @@ audio_filters = [
 ]
 ula_audio_output = [
     # pulldown for dac_out_right to prevent startup pops (maybe unnecessary)
-    myelin_kicad_pcb.R0805("NF 10k", "dac_out_right", "GND", ref="AR3"),
+    myelin_kicad_pcb.R0805("10k NF", "dac_out_right", "GND", ref="AR3"),
     # coupling capacitor for dac output (center voltage 0V) to SOUND_OUT_5V (center 2.5V)
     myelin_kicad_pcb.C0805("10u", "dac_out_right", "SOUND_OUT_5V", ref="AC8"),
     # pull resistor to center sound output on 2.5V
@@ -1627,7 +1627,7 @@ sd_card = myelin_kicad_pcb.Component(
     ],
 )
 # Just in case -- I don't think this is needed for [micro] SD cards
-sd_cmd_pullup = myelin_kicad_pcb.R0805("10k NF", "3V3", "sd_CMD_MOSI", ref="PR?")
+sd_cmd_pullup = myelin_kicad_pcb.R0805("10k NF", "3V3", "sd_CMD_MOSI", ref="PR11")
 
 
 ### DEBUG SERIAL PORT / MCU

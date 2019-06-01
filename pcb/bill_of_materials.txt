@@ -62,6 +62,8 @@ AR6	10k	Resistor 0805: 10k	Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSol
 MR1	10k	Resistor 0805: 10k	Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
 PR1	10k	Resistor 0805: 10k	Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
 PR10	10k	Resistor 0805: 10k	Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+PR12	10k	Resistor 0805: 10k	Resistor_SMD:R_0805_2012Metric
+PR13	10k	Resistor 0805: 10k	Resistor_SMD:R_0805_2012Metric
 PR2	10k	Resistor 0805: 10k	Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
 PR3	10k	Resistor 0805: 10k	Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
 PR4	10k	Resistor 0805: 10k	Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
@@ -70,9 +72,8 @@ PR6	10k	Resistor 0805: 10k	Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSol
 PR7	10k	Resistor 0805: 10k	Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
 PR8	10k	Resistor 0805: 10k	Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
 PR9	10k	Resistor 0805: 10k	Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
-R1	10k	Resistor 0805: 10k	Resistor_SMD:R_0805_2012Metric
-R2	10k	Resistor 0805: 10k	Resistor_SMD:R_0805_2012Metric
 R4	10k	Resistor 0805: 10k	Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+AR3	10k NF	Resistor 0805: 10k NF	Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
 PR11	10k NF	Resistor 0805: 10k NF	Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
 MR2	1k	Resistor 0805: 1k	Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
 R6	1k	Resistor 0805: 1k	Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
@@ -83,7 +84,6 @@ AR1	560R NF	Resistor 0805: 560R NF	Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm
 AR2	560R NF	Resistor 0805: 560R NF	Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
 R10	68R	Resistor 0805: 68R	Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
 R9	68R	Resistor 0805: 68R	Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
-AR3	NF 10k	Resistor 0805: NF 10k	Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
 ULA	ULA header	Set of pin headers to plug into an Acorn Electron ULA socket	modified-kicad:PLCC-68_THT-Socket-Electron-ULA
 FPGA	10M08SCU169	https://www.digikey.com/product-detail/en/10M08SCU169C8G/544-3270-ND	myelin-kicad:intel_ubga169
 DAC	WM8524CGEDT	https://www.digikey.com/product-detail/en/cirrus-logic-inc/WM8524CGEDT/598-2458-ND	Package_SO:TSSOP-16_4.4x5mm_P0.65mm
