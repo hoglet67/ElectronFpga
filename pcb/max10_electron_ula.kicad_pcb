@@ -5615,7 +5615,7 @@
   (gr_text "debug\nusb" (at 148.3 100.88) (layer F.SilkS)
     (effects (font (size 1 1) (thickness 0.2)) (justify left))
   )
-  (gr_text "\"Ultimate Electron Upgrade\"\nhttp://myelin.nz/elkula\nv1 - 2019-05-15" (at 150.9 73.08 90) (layer F.SilkS)
+  (gr_text "\"Ultimate Electron Upgrade\"\nhttp://myelin.nz/elkula\nv2 - 2019-??-??" (at 150.9 73.08 90) (layer F.SilkS)
     (effects (font (size 1 1) (thickness 0.2)))
   )
   (gr_text "l1 slow vref ->" (at 177.31 49.8 90) (layer Margin) (tstamp 5CD583D3)
