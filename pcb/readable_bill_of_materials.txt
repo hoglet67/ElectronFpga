@@ -1,285 +1,20 @@
 This is the human-readable bill of materials.
 See bill_of_materials.txt for a terser version suitable for spreadsheet import.
 
-ABUF
-- Value: 74LVTH162245ZRDR
-- Description: https://www.digikey.com/product-detail/en/texas-instruments/74LVTH162245ZRDR/296-16878-1-ND
-- KiCad package: myelin-kicad:ti_zrd_54_pbga
-
-AC1
-- Value: 1u
-- Description: 1u capacitor in 0805 package
-- KiCad package: Capacitor_SMD:C_0805_2012Metric_Pad1.15x1.40mm_HandSolder
-
-AC2
-- Value: 4.7u
-- Description: 4.7u capacitor in 0805 package
-- KiCad package: Capacitor_SMD:C_0805_2012Metric_Pad1.15x1.40mm_HandSolder
-
-AC3
-- Value: 4.7u
-- Description: 4.7u capacitor in 0805 package
-- KiCad package: Capacitor_SMD:C_0805_2012Metric_Pad1.15x1.40mm_HandSolder
-
-AC4
-- Value: 2.2u
-- Description: 2.2u capacitor in 0805 package
-- KiCad package: Capacitor_SMD:C_0805_2012Metric_Pad1.15x1.40mm_HandSolder
-
-AC5
-- Value: 1u
-- Description: 1u capacitor in 0805 package
-- KiCad package: Capacitor_SMD:C_0805_2012Metric_Pad1.15x1.40mm_HandSolder
-
-AC6
-- Value: 2.7n NF
-- Description: 2.7n NF capacitor in 0805 package
-- KiCad package: Capacitor_SMD:C_0805_2012Metric_Pad1.15x1.40mm_HandSolder
-
-AC7
-- Value: 2.7n NF
-- Description: 2.7n NF capacitor in 0805 package
-- KiCad package: Capacitor_SMD:C_0805_2012Metric_Pad1.15x1.40mm_HandSolder
-
-AC8
-- Value: 10u
-- Description: 10u capacitor in 0805 package
-- KiCad package: Capacitor_SMD:C_0805_2012Metric_Pad1.15x1.40mm_HandSolder
-
-AC9
-- Value: 10u
-- Description: 10u capacitor in 0805 package
-- KiCad package: Capacitor_SMD:C_0805_2012Metric_Pad1.15x1.40mm_HandSolder
-
-AR1
-- Value: 560R NF
-- Description: 560R NF resistor in 0805 package
-- KiCad package: Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
-
-AR2
-- Value: 560R NF
-- Description: 560R NF resistor in 0805 package
-- KiCad package: Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
-
-AR3
-- Value: NF 10k
-- Description: NF 10k resistor in 0805 package
-- KiCad package: Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
-
-AR4
-- Value: 10k
-- Description: 10k resistor in 0805 package
-- KiCad package: Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
-
-AR5
-- Value: 10k
-- Description: 10k resistor in 0805 package
-- KiCad package: Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
-
-AR6
-- Value: 10k
-- Description: 10k resistor in 0805 package
-- KiCad package: Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+SD
+- Value: Micro SD socket
+- Description: 
+- KiCad package: myelin-kicad:hirose_micro_sd_card_socket
 
 AUDIO_OUT
 - Value: audio out
 - Description: 
 - KiCad package: Connector_PinHeader_2.54mm:PinHeader_2x02_P2.54mm_Vertical
 
-C1
-- Value: 10u
-- Description: 10u capacitor in 0805 package
-- KiCad package: Capacitor_SMD:C_0805_2012Metric_Pad1.15x1.40mm_HandSolder
-
-C2
-- Value: 1u
-- Description: 1u capacitor in 0805 package
-- KiCad package: Capacitor_SMD:C_0805_2012Metric_Pad1.15x1.40mm_HandSolder
-
-C3
-- Value: 1u
-- Description: 1u capacitor in 0805 package
-- KiCad package: Capacitor_SMD:C_0805_2012Metric_Pad1.15x1.40mm_HandSolder
-
-C4
-- Value: 2.7n
-- Description: 2.7n capacitor in 0805 package
-- KiCad package: Capacitor_SMD:C_0805_2012Metric_Pad1.15x1.40mm_HandSolder
-
-C8
-- Value: 1u
-- Description: 1u capacitor in 0805 package
-- KiCad package: Capacitor_SMD:C_0805_2012Metric
-
-C9
-- Value: 1u
-- Description: 1u capacitor in 0805 package
-- KiCad package: Capacitor_SMD:C_0805_2012Metric
-
-CMP
-- Value: MIC7221YM5-TR
-- Description: https://www.digikey.com/product-detail/en/microchip-technology/MIC7221YM5-TR/576-2901-1-ND
-- KiCad package: Package_TO_SOT_SMD:SOT-23-5_HandSoldering
-
-D1
-- Value: BAT54
-- Description: BAT54 diode in SOD323 package
-- KiCad package: Diode_SMD:D_SOD-323_HandSoldering
-
-DAC
-- Value: WM8524CGEDT
-- Description: https://www.digikey.com/product-detail/en/cirrus-logic-inc/WM8524CGEDT/598-2458-ND
-- KiCad package: Package_SO:TSSOP-16_4.4x5mm_P0.65mm
-
-DBUF
-- Value: 74LVTH162245ZRDR
-- Description: https://www.digikey.com/product-detail/en/texas-instruments/74LVTH162245ZRDR/296-16878-1-ND
-- KiCad package: myelin-kicad:ti_zrd_54_pbga
-
-DC1
-- Value: 100n
-- Description: 100n capacitor in 0402 package
-- KiCad package: Capacitor_SMD:C_0402_1005Metric
-
-DC10
-- Value: 100n
-- Description: 100n capacitor in 0402 package
-- KiCad package: Capacitor_SMD:C_0402_1005Metric
-
-DC11
-- Value: 100n
-- Description: 100n capacitor in 0402 package
-- KiCad package: Capacitor_SMD:C_0402_1005Metric
-
-DC12
-- Value: 100n
-- Description: 100n capacitor in 0402 package
-- KiCad package: Capacitor_SMD:C_0402_1005Metric
-
-DC13
-- Value: 100n
-- Description: 100n capacitor in 0402 package
-- KiCad package: Capacitor_SMD:C_0402_1005Metric
-
-DC14
-- Value: 100n
-- Description: 100n capacitor in 0402 package
-- KiCad package: Capacitor_SMD:C_0402_1005Metric
-
-DC15
-- Value: 100n
-- Description: 100n capacitor in 0805 package
-- KiCad package: Capacitor_SMD:C_0805_2012Metric_Pad1.15x1.40mm_HandSolder
-
-DC16
-- Value: 100n
-- Description: 100n capacitor in 0402 package
-- KiCad package: Capacitor_SMD:C_0402_1005Metric
-
-DC17
-- Value: 100n
-- Description: 100n capacitor in 0402 package
-- KiCad package: Capacitor_SMD:C_0402_1005Metric
-
-DC18
-- Value: 100n
-- Description: 100n capacitor in 0402 package
-- KiCad package: Capacitor_SMD:C_0402_1005Metric
-
-DC19
-- Value: 100n
-- Description: 100n capacitor in 0402 package
-- KiCad package: Capacitor_SMD:C_0402_1005Metric
-
-DC2
-- Value: 100n
-- Description: 100n capacitor in 0402 package
-- KiCad package: Capacitor_SMD:C_0402_1005Metric
-
-DC20
-- Value: 100n
-- Description: 100n capacitor in 0402 package
-- KiCad package: Capacitor_SMD:C_0402_1005Metric
-
-DC21
-- Value: 100n
-- Description: 100n capacitor in 0402 package
-- KiCad package: Capacitor_SMD:C_0402_1005Metric
-
-DC22
-- Value: 100n
-- Description: 100n capacitor in 0402 package
-- KiCad package: Capacitor_SMD:C_0402_1005Metric
-
-DC23
-- Value: 100n
-- Description: 100n capacitor in 0402 package
-- KiCad package: Capacitor_SMD:C_0402_1005Metric
-
-DC24
-- Value: 100n
-- Description: 100n capacitor in 0805 package
-- KiCad package: Capacitor_SMD:C_0805_2012Metric_Pad1.15x1.40mm_HandSolder
-
-DC25
-- Value: 100n
-- Description: 100n capacitor in 0805 package
-- KiCad package: Capacitor_SMD:C_0805_2012Metric_Pad1.15x1.40mm_HandSolder
-
-DC26
-- Value: 100n
-- Description: 100n capacitor in 0805 package
-- KiCad package: Capacitor_SMD:C_0805_2012Metric_Pad1.15x1.40mm_HandSolder
-
-DC3
-- Value: 100n
-- Description: 100n capacitor in 0402 package
-- KiCad package: Capacitor_SMD:C_0402_1005Metric
-
-DC4
-- Value: 100n
-- Description: 100n capacitor in 0402 package
-- KiCad package: Capacitor_SMD:C_0402_1005Metric
-
-DC5
-- Value: 100n
-- Description: 100n capacitor in 0402 package
-- KiCad package: Capacitor_SMD:C_0402_1005Metric
-
-DC6
-- Value: 100n
-- Description: 100n capacitor in 0402 package
-- KiCad package: Capacitor_SMD:C_0402_1005Metric
-
-DC7
-- Value: 100n
-- Description: 100n capacitor in 0402 package
-- KiCad package: Capacitor_SMD:C_0402_1005Metric
-
-DC8
-- Value: 100n
-- Description: 100n capacitor in 0402 package
-- KiCad package: Capacitor_SMD:C_0402_1005Metric
-
-DC9
-- Value: 100n
-- Description: 100n capacitor in 0402 package
-- KiCad package: Capacitor_SMD:C_0402_1005Metric
-
-EXTPWR
-- Value: ext pwr
-- Description: 1x3 0.1 inch male header
+SERIAL
+- Value: fpga serial port
+- Description: 
 - KiCad package: Connector_PinHeader_2.54mm:PinHeader_1x03_P2.54mm_Vertical
-
-FLASH
-- Value: W25Q128JVSIM
-- Description: https://www.digikey.com/product-detail/en/winbond-electronics/W25Q128JVSIM/W25Q128JVSIM-ND/6819721
-- KiCad package: Package_SO:SOIJ-8_5.3x5.3mm_P1.27mm
-
-FPGA
-- Value: 10M08SCU169
-- Description: https://www.digikey.com/product-detail/en/10M08SCU169C8G/544-3270-ND
-- KiCad package: myelin-kicad:intel_ubga169
 
 JTAG
 - Value: jtag
@@ -291,31 +26,6 @@ JTAGTC
 - Description: 
 - KiCad package: Tag-Connect_TC2030-IDC-FP_2x03_P1.27mm_Vertical
 
-MC1
-- Value: 100n
-- Description: 100n capacitor in 0805 package
-- KiCad package: Capacitor_SMD:C_0805_2012Metric_Pad1.15x1.40mm_HandSolder
-
-MCU
-- Value: atsamd11c
-- Description: https://www.digikey.com/product-detail/en/microchip-technology/ATSAMD11C14A-SSUT/ATSAMD11C14A-SSUTCT-ND
-- KiCad package: Package_SO:SOIC-14_3.9x8.7mm_P1.27mm
-
-MISC
-- Value: 74HCT245PW
-- Description: https://www.digikey.com/product-detail/en/nexperia-usa-inc/74HCT245PW118/1727-6353-1-ND
-- KiCad package: Package_SO:SSOP-20_4.4x6.5mm_P0.65mm
-
-MR1
-- Value: 10k
-- Description: 10k resistor in 0805 package
-- KiCad package: Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
-
-MR2
-- Value: 1k
-- Description: 1k resistor in 0805 package
-- KiCad package: Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
-
 MSWD
 - Value: swd
 - Description: 
@@ -326,158 +36,448 @@ MSWD2
 - Description: 
 - KiCad package: Connector_PinHeader_2.54mm:PinHeader_2x06_P2.54mm_Vertical
 
-MUSB
-- Value: usb
-- Description: Molex 1050170001 (Digikey WM1399CT-ND) surface mount micro USB socket with mounting holes.
-- KiCad package: myelin-kicad:micro_usb_b_smd_molex
-
-OC
-- Value: 74HCT125PW
-- Description: https://www.digikey.com/product-detail/en/nexperia-usa-inc/74HCT125PW112/1727-6443-ND
-- KiCad package: Package_SO:TSSOP-14_4.4x5mm_P0.65mm
-
-OSC
-- Value: osc
-- Description: https://www.digikey.com/product-detail/en/microchip-technology/DSC1001CL1-016.0000/DSC1001CL1-016.0000-ND
-- KiCad package: Oscillator:Oscillator_SMD_Abracon_ASE-4Pin_3.2x2.5mm_HandSoldering
-
-PR1
-- Value: 10k
-- Description: 10k resistor in 0805 package
-- KiCad package: Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
-
-PR10
-- Value: 10k
-- Description: 10k resistor in 0805 package
-- KiCad package: Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
-
-PR11
-- Value: 10k NF
-- Description: 10k NF resistor in 0805 package
-- KiCad package: Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
-
-PR2
-- Value: 10k
-- Description: 10k resistor in 0805 package
-- KiCad package: Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
-
-PR3
-- Value: 10k
-- Description: 10k resistor in 0805 package
-- KiCad package: Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
-
-PR4
-- Value: 10k
-- Description: 10k resistor in 0805 package
-- KiCad package: Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
-
-PR5
-- Value: 10k
-- Description: 10k resistor in 0805 package
-- KiCad package: Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
-
-PR6
-- Value: 10k
-- Description: 10k resistor in 0805 package
-- KiCad package: Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
-
-PR7
-- Value: 10k
-- Description: 10k resistor in 0805 package
-- KiCad package: Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
-
-PR8
-- Value: 10k
-- Description: 10k resistor in 0805 package
-- KiCad package: Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
-
-PR9
-- Value: 10k
-- Description: 10k resistor in 0805 package
-- KiCad package: Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
-
-R1
-- Value: 10k
-- Description: 10k resistor in 0805 package
-- KiCad package: Resistor_SMD:R_0805_2012Metric
-
-R10
-- Value: 68R
-- Description: 68R resistor in 0805 package
-- KiCad package: Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
-
-R11
-- Value: 1k5
-- Description: 1k5 resistor in 0805 package
-- KiCad package: Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
-
-R2
-- Value: 10k
-- Description: 10k resistor in 0805 package
-- KiCad package: Resistor_SMD:R_0805_2012Metric
-
-R3
-- Value: 1-10k
-- Description: 1-10k resistor in 0805 package
-- KiCad package: Resistor_SMD:R_0805_2012Metric
-
-R4
-- Value: 10k
-- Description: 10k resistor in 0805 package
-- KiCad package: Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
-
-R5
-- Value: 100R
-- Description: 100R resistor in 0805 package
-- KiCad package: Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
-
-R6
-- Value: 1k
-- Description: 1k resistor in 0805 package
-- KiCad package: Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
-
-R7
-- Value: 1k
-- Description: 1k resistor in 0805 package
-- KiCad package: Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
-
-R8
-- Value: 1k
-- Description: 1k resistor in 0805 package
-- KiCad package: Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
-
-R9
-- Value: 68R
-- Description: 68R resistor in 0805 package
-- KiCad package: Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
-
-RAM
-- Value: MT48LC16M16A2
-- Description: MT48LC16M16A2F4-6A:GTR
-- KiCad package: myelin-kicad:sdram_54tfbga
+EXTPWR
+- Value: ext pwr
+- Description: 1x3 0.1 inch male header
+- KiCad package: Connector_PinHeader_2.54mm:PinHeader_1x03_P2.54mm_Vertical
 
 REG
 - Value: AP7365-33YG-XX
 - Description: 3.3V LDO regulator, e.g. Digikey AP7365-33YG-13DICT-ND.  Search for the exact part number because there are many variants.
 - KiCad package: Package_TO_SOT_SMD:SOT-89-3
 
-SD
-- Value: Micro SD socket
-- Description: 
-- KiCad package: myelin-kicad:hirose_micro_sd_card_socket
+DC1
+- Value: 100n
+- Description: Capacitor 0402: 100n
+- KiCad package: Capacitor_SMD:C_0402_1005Metric
 
-SERIAL
-- Value: fpga serial port
-- Description: 
-- KiCad package: Connector_PinHeader_2.54mm:PinHeader_1x03_P2.54mm_Vertical
+DC10
+- Value: 100n
+- Description: Capacitor 0402: 100n
+- KiCad package: Capacitor_SMD:C_0402_1005Metric
+
+DC11
+- Value: 100n
+- Description: Capacitor 0402: 100n
+- KiCad package: Capacitor_SMD:C_0402_1005Metric
+
+DC12
+- Value: 100n
+- Description: Capacitor 0402: 100n
+- KiCad package: Capacitor_SMD:C_0402_1005Metric
+
+DC13
+- Value: 100n
+- Description: Capacitor 0402: 100n
+- KiCad package: Capacitor_SMD:C_0402_1005Metric
+
+DC14
+- Value: 100n
+- Description: Capacitor 0402: 100n
+- KiCad package: Capacitor_SMD:C_0402_1005Metric
+
+DC16
+- Value: 100n
+- Description: Capacitor 0402: 100n
+- KiCad package: Capacitor_SMD:C_0402_1005Metric
+
+DC17
+- Value: 100n
+- Description: Capacitor 0402: 100n
+- KiCad package: Capacitor_SMD:C_0402_1005Metric
+
+DC18
+- Value: 100n
+- Description: Capacitor 0402: 100n
+- KiCad package: Capacitor_SMD:C_0402_1005Metric
+
+DC19
+- Value: 100n
+- Description: Capacitor 0402: 100n
+- KiCad package: Capacitor_SMD:C_0402_1005Metric
+
+DC2
+- Value: 100n
+- Description: Capacitor 0402: 100n
+- KiCad package: Capacitor_SMD:C_0402_1005Metric
+
+DC20
+- Value: 100n
+- Description: Capacitor 0402: 100n
+- KiCad package: Capacitor_SMD:C_0402_1005Metric
+
+DC21
+- Value: 100n
+- Description: Capacitor 0402: 100n
+- KiCad package: Capacitor_SMD:C_0402_1005Metric
+
+DC22
+- Value: 100n
+- Description: Capacitor 0402: 100n
+- KiCad package: Capacitor_SMD:C_0402_1005Metric
+
+DC23
+- Value: 100n
+- Description: Capacitor 0402: 100n
+- KiCad package: Capacitor_SMD:C_0402_1005Metric
+
+DC3
+- Value: 100n
+- Description: Capacitor 0402: 100n
+- KiCad package: Capacitor_SMD:C_0402_1005Metric
+
+DC4
+- Value: 100n
+- Description: Capacitor 0402: 100n
+- KiCad package: Capacitor_SMD:C_0402_1005Metric
+
+DC5
+- Value: 100n
+- Description: Capacitor 0402: 100n
+- KiCad package: Capacitor_SMD:C_0402_1005Metric
+
+DC6
+- Value: 100n
+- Description: Capacitor 0402: 100n
+- KiCad package: Capacitor_SMD:C_0402_1005Metric
+
+DC7
+- Value: 100n
+- Description: Capacitor 0402: 100n
+- KiCad package: Capacitor_SMD:C_0402_1005Metric
+
+DC8
+- Value: 100n
+- Description: Capacitor 0402: 100n
+- KiCad package: Capacitor_SMD:C_0402_1005Metric
+
+DC9
+- Value: 100n
+- Description: Capacitor 0402: 100n
+- KiCad package: Capacitor_SMD:C_0402_1005Metric
+
+DC15
+- Value: 100n
+- Description: Capacitor 0805: 100n
+- KiCad package: Capacitor_SMD:C_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+
+DC24
+- Value: 100n
+- Description: Capacitor 0805: 100n
+- KiCad package: Capacitor_SMD:C_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+
+DC25
+- Value: 100n
+- Description: Capacitor 0805: 100n
+- KiCad package: Capacitor_SMD:C_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+
+DC26
+- Value: 100n
+- Description: Capacitor 0805: 100n
+- KiCad package: Capacitor_SMD:C_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+
+MC1
+- Value: 100n
+- Description: Capacitor 0805: 100n
+- KiCad package: Capacitor_SMD:C_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+
+AC8
+- Value: 10u
+- Description: Capacitor 0805: 10u
+- KiCad package: Capacitor_SMD:C_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+
+AC9
+- Value: 10u
+- Description: Capacitor 0805: 10u
+- KiCad package: Capacitor_SMD:C_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+
+C1
+- Value: 10u
+- Description: Capacitor 0805: 10u
+- KiCad package: Capacitor_SMD:C_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+
+AC1
+- Value: 1u
+- Description: Capacitor 0805: 1u
+- KiCad package: Capacitor_SMD:C_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+
+AC5
+- Value: 1u
+- Description: Capacitor 0805: 1u
+- KiCad package: Capacitor_SMD:C_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+
+C2
+- Value: 1u
+- Description: Capacitor 0805: 1u
+- KiCad package: Capacitor_SMD:C_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+
+C3
+- Value: 1u
+- Description: Capacitor 0805: 1u
+- KiCad package: Capacitor_SMD:C_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+
+C8
+- Value: 1u
+- Description: Capacitor 0805: 1u
+- KiCad package: Capacitor_SMD:C_0805_2012Metric
+
+C9
+- Value: 1u
+- Description: Capacitor 0805: 1u
+- KiCad package: Capacitor_SMD:C_0805_2012Metric
+
+AC4
+- Value: 2.2u
+- Description: Capacitor 0805: 2.2u
+- KiCad package: Capacitor_SMD:C_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+
+C4
+- Value: 2.7n
+- Description: Capacitor 0805: 2.7n
+- KiCad package: Capacitor_SMD:C_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+
+AC6
+- Value: 2.7n NF
+- Description: Capacitor 0805: 2.7n NF
+- KiCad package: Capacitor_SMD:C_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+
+AC7
+- Value: 2.7n NF
+- Description: Capacitor 0805: 2.7n NF
+- KiCad package: Capacitor_SMD:C_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+
+AC2
+- Value: 4.7u
+- Description: Capacitor 0805: 4.7u
+- KiCad package: Capacitor_SMD:C_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+
+AC3
+- Value: 4.7u
+- Description: Capacitor 0805: 4.7u
+- KiCad package: Capacitor_SMD:C_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+
+D1
+- Value: BAT54
+- Description: Diode SOD323: BAT54
+- KiCad package: Diode_SMD:D_SOD-323_HandSoldering
+
+RAM
+- Value: MT48LC16M16A2
+- Description: MT48LC16M16A2F4-6A:GTR
+- KiCad package: myelin-kicad:sdram_54tfbga
+
+MUSB
+- Value: usb
+- Description: Molex 1050170001 (Digikey WM1399CT-ND) surface mount micro USB socket with mounting holes.
+- KiCad package: myelin-kicad:micro_usb_b_smd_molex
+
+USB
+- Value: usb
+- Description: Molex 1050170001 (Digikey WM1399CT-ND) surface mount micro USB socket with mounting holes.
+- KiCad package: myelin-kicad:micro_usb_b_smd_molex
+
+R3
+- Value: 1-10k
+- Description: Resistor 0805: 1-10k
+- KiCad package: Resistor_SMD:R_0805_2012Metric
+
+R5
+- Value: 100R
+- Description: Resistor 0805: 100R
+- KiCad package: Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+
+AR4
+- Value: 10k
+- Description: Resistor 0805: 10k
+- KiCad package: Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+
+AR5
+- Value: 10k
+- Description: Resistor 0805: 10k
+- KiCad package: Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+
+AR6
+- Value: 10k
+- Description: Resistor 0805: 10k
+- KiCad package: Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+
+MR1
+- Value: 10k
+- Description: Resistor 0805: 10k
+- KiCad package: Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+
+PR1
+- Value: 10k
+- Description: Resistor 0805: 10k
+- KiCad package: Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+
+PR10
+- Value: 10k
+- Description: Resistor 0805: 10k
+- KiCad package: Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+
+PR2
+- Value: 10k
+- Description: Resistor 0805: 10k
+- KiCad package: Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+
+PR3
+- Value: 10k
+- Description: Resistor 0805: 10k
+- KiCad package: Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+
+PR4
+- Value: 10k
+- Description: Resistor 0805: 10k
+- KiCad package: Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+
+PR5
+- Value: 10k
+- Description: Resistor 0805: 10k
+- KiCad package: Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+
+PR6
+- Value: 10k
+- Description: Resistor 0805: 10k
+- KiCad package: Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+
+PR7
+- Value: 10k
+- Description: Resistor 0805: 10k
+- KiCad package: Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+
+PR8
+- Value: 10k
+- Description: Resistor 0805: 10k
+- KiCad package: Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+
+PR9
+- Value: 10k
+- Description: Resistor 0805: 10k
+- KiCad package: Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+
+R1
+- Value: 10k
+- Description: Resistor 0805: 10k
+- KiCad package: Resistor_SMD:R_0805_2012Metric
+
+R2
+- Value: 10k
+- Description: Resistor 0805: 10k
+- KiCad package: Resistor_SMD:R_0805_2012Metric
+
+R4
+- Value: 10k
+- Description: Resistor 0805: 10k
+- KiCad package: Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+
+PR11
+- Value: 10k NF
+- Description: Resistor 0805: 10k NF
+- KiCad package: Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+
+MR2
+- Value: 1k
+- Description: Resistor 0805: 1k
+- KiCad package: Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+
+R6
+- Value: 1k
+- Description: Resistor 0805: 1k
+- KiCad package: Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+
+R7
+- Value: 1k
+- Description: Resistor 0805: 1k
+- KiCad package: Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+
+R8
+- Value: 1k
+- Description: Resistor 0805: 1k
+- KiCad package: Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+
+R11
+- Value: 1k5
+- Description: Resistor 0805: 1k5
+- KiCad package: Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+
+AR1
+- Value: 560R NF
+- Description: Resistor 0805: 560R NF
+- KiCad package: Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+
+AR2
+- Value: 560R NF
+- Description: Resistor 0805: 560R NF
+- KiCad package: Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+
+R10
+- Value: 68R
+- Description: Resistor 0805: 68R
+- KiCad package: Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+
+R9
+- Value: 68R
+- Description: Resistor 0805: 68R
+- KiCad package: Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+
+AR3
+- Value: NF 10k
+- Description: Resistor 0805: NF 10k
+- KiCad package: Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
 
 ULA
 - Value: ULA header
 - Description: Set of pin headers to plug into an Acorn Electron ULA socket
 - KiCad package: modified-kicad:PLCC-68_THT-Socket-Electron-ULA
 
-USB
-- Value: usb
-- Description: Molex 1050170001 (Digikey WM1399CT-ND) surface mount micro USB socket with mounting holes.
-- KiCad package: myelin-kicad:micro_usb_b_smd_molex
+FPGA
+- Value: 10M08SCU169
+- Description: https://www.digikey.com/product-detail/en/10M08SCU169C8G/544-3270-ND
+- KiCad package: myelin-kicad:intel_ubga169
+
+DAC
+- Value: WM8524CGEDT
+- Description: https://www.digikey.com/product-detail/en/cirrus-logic-inc/WM8524CGEDT/598-2458-ND
+- KiCad package: Package_SO:TSSOP-16_4.4x5mm_P0.65mm
+
+MCU
+- Value: atsamd11c
+- Description: https://www.digikey.com/product-detail/en/microchip-technology/ATSAMD11C14A-SSUT/ATSAMD11C14A-SSUTCT-ND
+- KiCad package: Package_SO:SOIC-14_3.9x8.7mm_P1.27mm
+
+OSC
+- Value: osc
+- Description: https://www.digikey.com/product-detail/en/microchip-technology/DSC1001CL1-016.0000/DSC1001CL1-016.0000-ND
+- KiCad package: Oscillator:Oscillator_SMD_Abracon_ASE-4Pin_3.2x2.5mm_HandSoldering
+
+CMP
+- Value: MIC7221YM5-TR
+- Description: https://www.digikey.com/product-detail/en/microchip-technology/MIC7221YM5-TR/576-2901-1-ND
+- KiCad package: Package_TO_SOT_SMD:SOT-23-5_HandSoldering
+
+OC
+- Value: 74HCT125PW
+- Description: https://www.digikey.com/product-detail/en/nexperia-usa-inc/74HCT125PW112/1727-6443-ND
+- KiCad package: Package_SO:TSSOP-14_4.4x5mm_P0.65mm
+
+MISC
+- Value: 74HCT245PW
+- Description: https://www.digikey.com/product-detail/en/nexperia-usa-inc/74HCT245PW118/1727-6353-1-ND
+- KiCad package: Package_SO:SSOP-20_4.4x6.5mm_P0.65mm
+
+ABUF
+- Value: 74LVTH162245ZRDR
+- Description: https://www.digikey.com/product-detail/en/texas-instruments/74LVTH162245ZRDR/296-16878-1-ND
+- KiCad package: myelin-kicad:ti_zrd_54_pbga
+
+DBUF
+- Value: 74LVTH162245ZRDR
+- Description: https://www.digikey.com/product-detail/en/texas-instruments/74LVTH162245ZRDR/296-16878-1-ND
+- KiCad package: myelin-kicad:ti_zrd_54_pbga
+
+FLASH
+- Value: W25Q128JVSIM
+- Description: https://www.digikey.com/product-detail/en/winbond-electronics/W25Q128JVSIM/W25Q128JVSIM-ND/6819721
+- KiCad package: Package_SO:SOIJ-8_5.3x5.3mm_P1.27mm
 
