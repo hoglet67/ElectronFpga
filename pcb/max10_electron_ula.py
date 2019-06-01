@@ -32,6 +32,9 @@ sys.path.insert(0, os.path.join(here, "myelin-kicad.pretty"))
 import myelin_kicad_pcb
 Pin = myelin_kicad_pcb.Pin
 
+# TODO(v2) rename all 10k resistors to PR*
+# TODO(v2) rename all 100n caps to DC*
+# TODO(v2) put resistor/capacitor values for R*/AR*/C*/AC* on silkscreen
 
 ### ULA
 
@@ -499,7 +502,7 @@ if True:
     ]
 
     conns_to_allocate = roll_array([
-        # USB
+        # USB, SD, flash
         "USB_PU",
         "sd_DAT2",
         "sd_DAT3_nCS",
@@ -1276,7 +1279,7 @@ audio_filters = [
     myelin_kicad_pcb.C0805("2.7n NF", "audio_out_right", "GND", ref="AC7"),
 ]
 ula_audio_output = [
-    # pulldown for dac_out_left to prevent startup pops (maybe unnecessary)
+    # pulldown for dac_out_right to prevent startup pops (maybe unnecessary)
     myelin_kicad_pcb.R0805("NF 10k", "dac_out_right", "GND", ref="AR3"),
     # coupling capacitor for dac output (center voltage 0V) to SOUND_OUT_5V (center 2.5V)
     myelin_kicad_pcb.C0805("10u", "dac_out_right", "SOUND_OUT_5V", ref="AC8"),
@@ -1311,7 +1314,7 @@ audio_out_header = myelin_kicad_pcb.Component(
 # directly to CAS_OUT_5V.
 
 # Reset level conversion using diode + pullup
-reset_3v3_pullup = myelin_kicad_pcb.R0805("10k", "3V3", "RST_n_in", ref="R?")
+reset_3v3_pullup = myelin_kicad_pcb.R0805("10k", "3V3", "RST_n_in", ref="R4")
 reset_3v3_diode = myelin_kicad_pcb.DSOD323("BAT54", "nRESET_5V", "RST_n_in", ref="D?")
 
 big_buffers = [
@@ -1543,8 +1546,8 @@ misc_buf = [
 
 # Low pass filter on PHI_OUT_5V to bring rise time down to ~25 ns
 phi_out_filter = [
-    myelin_kicad_pcb.R0805("100R", "PHI_OUT_5V_prefilter", "PHI_OUT_5V", ref="R?"),
-    myelin_kicad_pcb.C0805("2.7n", "PHI_OUT_5V", "GND", ref="C?"),
+    myelin_kicad_pcb.R0805("100R", "PHI_OUT_5V_prefilter", "PHI_OUT_5V", ref="R5"),
+    myelin_kicad_pcb.C0805("2.7n", "PHI_OUT_5V", "GND", ref="C4"),
 ]
 
 # MIC7221 comparator for CAS IN
@@ -1566,11 +1569,11 @@ comparator = [
 
 comparator_misc = [
     # MIC7221 pullup to 3V3
-    myelin_kicad_pcb.R0805("1k", "casIn", "3V3", ref="R?"),
+    myelin_kicad_pcb.R0805("1k", "casIn", "3V3", ref="R6"),
     # TODO(v2) calculate CAS_IN_divider values to make the center voltage for casIn.
     # Currently this gives 2.5V.
-    myelin_kicad_pcb.R0805("1k", "GND", "CAS_IN_divider", ref="R?"),
-    myelin_kicad_pcb.R0805("1k", "CAS_IN_divider", "5V", ref="R?"),
+    myelin_kicad_pcb.R0805("1k", "GND", "CAS_IN_divider", ref="R7"),
+    myelin_kicad_pcb.R0805("1k", "CAS_IN_divider", "5V", ref="R8"),
     # decoupling
     myelin_kicad_pcb.C0805("100n", "5V", "GND", ref="DC?"),
 ]
@@ -1597,10 +1600,10 @@ micro_usb = myelin_kicad_pcb.Component(
 )
 usb_misc = [
     # series resistors between USB and FPGA
-    myelin_kicad_pcb.R0805("68R", "USBDM", "USB_M", ref="R?"),
-    myelin_kicad_pcb.R0805("68R", "USBDP", "USB_P", ref="R?"),
+    myelin_kicad_pcb.R0805("68R", "USBDM", "USB_M", ref="R9"),
+    myelin_kicad_pcb.R0805("68R", "USBDP", "USB_P", ref="R10"),
     # configurable pullup on D+
-    myelin_kicad_pcb.R0805("1k5", "USBDP", "USB_PU", ref="R?"),
+    myelin_kicad_pcb.R0805("1k5", "USBDP", "USB_PU", ref="R11"),
 ]
 
 
@@ -1671,13 +1674,13 @@ mcu_header = myelin_kicad_pcb.Component(
         Pin( 3, "SWCLK/TCK", "mcu_SWCLK"),
         Pin( 4, "GND",       "GND"),
         Pin( 5, "nRESET",    "mcu_RESET"),
-        Pin( 6, "gpio",      "mcu_debug_RXD"),
-        Pin( 7, "TXD",       "mcu_MISO"),
-        Pin( 8, "RXD",       "mcu_debug_TXD"),
+        Pin( 6, "RXD",       "mcu_debug_RXD"),
+        Pin( 7, "SPI",       "mcu_MISO"),
+        Pin( 8, "TXD",       "mcu_debug_TXD"),
         Pin( 9, "SPI",       "mcu_SCK"),
         Pin(10, "SPI",       "mcu_SS"),
         Pin(11, "SPI",       "mcu_MOSI"),
-        Pin(12, "SPI",       "mcu_PA02"),
+        Pin(12, "gpio",      "mcu_PA02"),
     ],
 )
 
