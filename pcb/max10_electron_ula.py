@@ -32,7 +32,6 @@ sys.path.insert(0, os.path.join(here, "myelin-kicad.pretty"))
 import myelin_kicad_pcb
 Pin = myelin_kicad_pcb.Pin
 
-# TODO(v2) rename all 10k resistors to PR*
 # TODO(v2) rename all 100n caps to DC*
 # TODO(v2) put resistor/capacitor values for R*/AR*/C*/AC* on silkscreen
 
@@ -1720,7 +1719,7 @@ mcu = myelin_kicad_pcb.Component(
         Pin(14, "PA04",        "mcu_MOSI"),      # sercom0.2/0.0: 0.0 SPI
     ],
 )
-mcu_cap = myelin_kicad_pcb.C0805("100n", "GND", "3V3", ref="MC1")
+mcu_cap = myelin_kicad_pcb.C0805("100n", "GND", "3V3", ref="DC?")
 # SAM D11 has an internal pull-up, so this is optional
 mcu_reset_pullup = myelin_kicad_pcb.R0805("10k", "mcu_RESET", "3V3", ref="PR15")
 # The SAM D11 datasheet says a 1k pullup on SWCLK is critical for reliability

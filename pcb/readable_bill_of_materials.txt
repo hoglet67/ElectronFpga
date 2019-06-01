@@ -176,7 +176,7 @@ DC26
 - Description: Capacitor 0805: 100n
 - KiCad package: Capacitor_SMD:C_0805_2012Metric_Pad1.15x1.40mm_HandSolder
 
-MC1
+DC27
 - Value: 100n
 - Description: Capacitor 0805: 100n
 - KiCad package: Capacitor_SMD:C_0805_2012Metric_Pad1.15x1.40mm_HandSolder

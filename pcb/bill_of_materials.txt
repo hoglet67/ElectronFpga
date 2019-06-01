@@ -34,7 +34,7 @@ DC15	100n	Capacitor 0805: 100n	Capacitor_SMD:C_0805_2012Metric_Pad1.15x1.40mm_Ha
 DC24	100n	Capacitor 0805: 100n	Capacitor_SMD:C_0805_2012Metric_Pad1.15x1.40mm_HandSolder
 DC25	100n	Capacitor 0805: 100n	Capacitor_SMD:C_0805_2012Metric_Pad1.15x1.40mm_HandSolder
 DC26	100n	Capacitor 0805: 100n	Capacitor_SMD:C_0805_2012Metric_Pad1.15x1.40mm_HandSolder
-MC1	100n	Capacitor 0805: 100n	Capacitor_SMD:C_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+DC27	100n	Capacitor 0805: 100n	Capacitor_SMD:C_0805_2012Metric_Pad1.15x1.40mm_HandSolder
 AC8	10u	Capacitor 0805: 10u	Capacitor_SMD:C_0805_2012Metric_Pad1.15x1.40mm_HandSolder
 AC9	10u	Capacitor 0805: 10u	Capacitor_SMD:C_0805_2012Metric_Pad1.15x1.40mm_HandSolder
 C1	10u	Capacitor 0805: 10u	Capacitor_SMD:C_0805_2012Metric_Pad1.15x1.40mm_HandSolder
