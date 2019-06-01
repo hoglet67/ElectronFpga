@@ -1314,7 +1314,7 @@ audio_out_header = myelin_kicad_pcb.Component(
 # directly to CAS_OUT_5V.
 
 # Reset level conversion using diode + pullup
-reset_3v3_pullup = myelin_kicad_pcb.R0805("10k", "3V3", "RST_n_in", ref="R4")
+reset_3v3_pullup = myelin_kicad_pcb.R0805("10k", "3V3", "RST_n_in", ref="PR14")
 reset_3v3_diode = myelin_kicad_pcb.DSOD323("BAT54", "nRESET_5V", "RST_n_in", ref="D?")
 
 big_buffers = [
@@ -1722,7 +1722,7 @@ mcu = myelin_kicad_pcb.Component(
 )
 mcu_cap = myelin_kicad_pcb.C0805("100n", "GND", "3V3", ref="MC1")
 # SAM D11 has an internal pull-up, so this is optional
-mcu_reset_pullup = myelin_kicad_pcb.R0805("10k", "mcu_RESET", "3V3", ref="MR1")
+mcu_reset_pullup = myelin_kicad_pcb.R0805("10k", "mcu_RESET", "3V3", ref="PR15")
 # The SAM D11 datasheet says a 1k pullup on SWCLK is critical for reliability
 mcu_swclk_pullup = myelin_kicad_pcb.R0805("1k", "mcu_SWCLK", "3V3", ref="MR2")
 

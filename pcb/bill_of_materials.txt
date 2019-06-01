@@ -59,11 +59,12 @@ R5	100R	Resistor 0805: 100R	Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSo
 AR4	10k	Resistor 0805: 10k	Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
 AR5	10k	Resistor 0805: 10k	Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
 AR6	10k	Resistor 0805: 10k	Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
-MR1	10k	Resistor 0805: 10k	Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
 PR1	10k	Resistor 0805: 10k	Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
 PR10	10k	Resistor 0805: 10k	Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
 PR12	10k	Resistor 0805: 10k	Resistor_SMD:R_0805_2012Metric
 PR13	10k	Resistor 0805: 10k	Resistor_SMD:R_0805_2012Metric
+PR14	10k	Resistor 0805: 10k	Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+PR15	10k	Resistor 0805: 10k	Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
 PR2	10k	Resistor 0805: 10k	Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
 PR3	10k	Resistor 0805: 10k	Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
 PR4	10k	Resistor 0805: 10k	Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
@@ -72,7 +73,6 @@ PR6	10k	Resistor 0805: 10k	Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSol
 PR7	10k	Resistor 0805: 10k	Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
 PR8	10k	Resistor 0805: 10k	Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
 PR9	10k	Resistor 0805: 10k	Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
-R4	10k	Resistor 0805: 10k	Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
 AR3	10k NF	Resistor 0805: 10k NF	Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
 PR11	10k NF	Resistor 0805: 10k NF	Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
 MR2	1k	Resistor 0805: 1k	Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
