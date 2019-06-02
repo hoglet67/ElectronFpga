@@ -58,7 +58,7 @@ PROJECT_NAME = "rgb_to_vga"
 
 import sys, os
 here = os.path.dirname(sys.argv[0])
-sys.path.insert(0, os.path.join(here, "../../third_party/myelin-kicad.pretty"))
+sys.path.insert(0, os.path.join(here, "../pcb/myelin-kicad.pretty"))
 import myelin_kicad_pcb
 Pin = myelin_kicad_pcb.Pin
 
