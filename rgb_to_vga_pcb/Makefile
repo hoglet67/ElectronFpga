@@ -15,4 +15,4 @@
 NAME=rgb_to_vga
 ROOT=../pcb
 SKIP_SETUP_DEFAULTS=1
-include ../../common/Makefile.pcb
+include ${ROOT}/common/Makefile.pcb

@@ -1,15 +1,15 @@
 This is the human-readable bill of materials.
 See bill_of_materials.txt for a terser version suitable for spreadsheet import.
 
-BUF
-- Value: 74HCT245PW
-- Description: https://www.digikey.com/product-detail/en/nexperia-usa-inc/74HCT245PW118/1727-6353-1-ND
-- KiCad package: Package_SO:SSOP-20_4.4x6.5mm_P0.65mm
+R10
+- Value: 100R
+- Description: 100R resistor in 0805 package
+- KiCad package: Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
 
-C1
-- Value: 10u
-- Description: 10u capacitor in 0805 package
-- KiCad package: Capacitor_SMD:C_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+R11
+- Value: 100R
+- Description: 100R resistor in 0805 package
+- KiCad package: Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
 
 C2
 - Value: 100n
@@ -36,21 +36,6 @@ R1
 - Description: 10k NF resistor in 0805 package
 - KiCad package: Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
 
-R10
-- Value: 100R
-- Description: 100R resistor in 0805 package
-- KiCad package: Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
-
-R11
-- Value: 100R
-- Description: 100R resistor in 0805 package
-- KiCad package: Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
-
-R12
-- Value: 681k 1%
-- Description: 681k 1% resistor in 0805 package
-- KiCad package: Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
-
 R2
 - Value: 10k NF
 - Description: 10k NF resistor in 0805 package
@@ -66,10 +51,10 @@ R4
 - Description: 10k NF resistor in 0805 package
 - KiCad package: Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
 
-R5
-- Value: 4k TBD
-- Description: 4k TBD resistor in 0805 package
-- KiCad package: Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+C1
+- Value: 10u
+- Description: 10u capacitor in 0805 package
+- KiCad package: Capacitor_SMD:C_0805_2012Metric_Pad1.15x1.40mm_HandSolder
 
 R6
 - Value: 1k TBD
@@ -91,15 +76,30 @@ R9
 - Description: 480R resistor in 0805 package
 - KiCad package: Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
 
-RGB
-- Value: RGB
-- Description: 
-- KiCad package: Connector_PinHeader_2.54mm:PinHeader_1x06_P2.54mm_Vertical
+R5
+- Value: 4k TBD
+- Description: 4k TBD resistor in 0805 package
+- KiCad package: Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+
+R12
+- Value: 681k 1%
+- Description: 681k 1% resistor in 0805 package
+- KiCad package: Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
+
+BUF
+- Value: 74HCT245PW
+- Description: https://www.digikey.com/product-detail/en/nexperia-usa-inc/74HCT245PW118/1727-6353-1-ND
+- KiCad package: Package_SO:SSOP-20_4.4x6.5mm_P0.65mm
 
 SYNC
 - Value: EL1883
 - Description: 
 - KiCad package: Package_SO:SOIC-8_3.9x4.9mm_P1.27mm
+
+RGB
+- Value: RGB
+- Description: 
+- KiCad package: Connector_PinHeader_2.54mm:PinHeader_1x06_P2.54mm_Vertical
 
 VGA
 - Value: VGA
