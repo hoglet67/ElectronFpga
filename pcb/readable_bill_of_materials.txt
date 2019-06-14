@@ -1,51 +1,6 @@
 This is the human-readable bill of materials.
 See bill_of_materials.txt for a terser version suitable for spreadsheet import.
 
-SD
-- Value: Micro SD socket
-- Description: 
-- KiCad package: myelin-kicad:hirose_micro_sd_card_socket
-
-AUDIO_OUT
-- Value: audio out
-- Description: 
-- KiCad package: Connector_PinHeader_2.54mm:PinHeader_2x02_P2.54mm_Vertical
-
-SERIAL
-- Value: fpga serial port
-- Description: 
-- KiCad package: Connector_PinHeader_2.54mm:PinHeader_1x03_P2.54mm_Vertical
-
-JTAG
-- Value: jtag
-- Description: 
-- KiCad package: myelin-kicad:jtag_shrouded_2x5
-
-JTAGTC
-- Value: jtagtc
-- Description: 
-- KiCad package: Tag-Connect_TC2030-IDC-FP_2x03_P1.27mm_Vertical
-
-MSWD
-- Value: swd
-- Description: 
-- KiCad package: Tag-Connect_TC2030-IDC-FP_2x03_P1.27mm_Vertical
-
-MSWD2
-- Value: swd
-- Description: 
-- KiCad package: Connector_PinHeader_2.54mm:PinHeader_2x06_P2.54mm_Vertical
-
-EXTPWR
-- Value: ext pwr
-- Description: 1x3 0.1 inch male header
-- KiCad package: Connector_PinHeader_2.54mm:PinHeader_1x03_P2.54mm_Vertical
-
-REG
-- Value: AP7365-33YG-XX
-- Description: 3.3V LDO regulator, e.g. Digikey AP7365-33YG-13DICT-ND.  Search for the exact part number because there are many variants.
-- KiCad package: Package_TO_SOT_SMD:SOT-89-3
-
 DC1
 - Value: 100n
 - Description: Capacitor 0402: 100n
@@ -261,20 +216,95 @@ D1
 - Description: Diode SOD323: BAT54
 - KiCad package: Diode_SMD:D_SOD-323_HandSoldering
 
+FLASH
+- Value: W25Q128JVSIM
+- Description: IC 128Mbit QSPI flash; https://www.digikey.com/product-detail/en/winbond-electronics/W25Q128JVSIM/W25Q128JVSIM-ND/6819721
+- KiCad package: Package_SO:SOIJ-8_5.3x5.3mm_P1.27mm
+
+MCU
+- Value: atsamd11c
+- Description: IC ARM MCU; https://www.digikey.com/product-detail/en/microchip-technology/ATSAMD11C14A-SSUT/ATSAMD11C14A-SSUTCT-ND
+- KiCad package: Package_SO:SOIC-14_3.9x8.7mm_P1.27mm
+
+DAC
+- Value: WM8524CGEDT
+- Description: IC Audio DAC; https://www.digikey.com/product-detail/en/cirrus-logic-inc/WM8524CGEDT/598-2458-ND
+- KiCad package: Package_SO:TSSOP-16_4.4x5mm_P0.65mm
+
+CMP
+- Value: MIC7221YM5-TR
+- Description: IC Comparator; https://www.digikey.com/product-detail/en/microchip-technology/MIC7221YM5-TR/576-2901-1-ND
+- KiCad package: Package_TO_SOT_SMD:SOT-23-5_HandSoldering
+
+FPGA
+- Value: 10M08SCU169
+- Description: IC FPGA Intel Max 10; https://www.digikey.com/product-detail/en/10M08SCU169C8G/544-3270-ND
+- KiCad package: myelin-kicad:intel_ubga169
+
+REG
+- Value: AP7365-33YG-XX
+- Description: IC LDO 3.3V regulator; https://www.digikey.com/products/en?keywords=AP7365-33YG-13DICT-ND
+- KiCad package: Package_TO_SOT_SMD:SOT-89-3
+
 RAM
 - Value: MT48LC16M16A2
-- Description: MT48LC16M16A2F4-6A:GTR
+- Description: IC SDRAM 32MB; MT48LC16M16A2F4-6A:GTR
 - KiCad package: myelin-kicad:sdram_54tfbga
 
-MUSB
-- Value: usb
-- Description: Molex 1050170001 (Digikey WM1399CT-ND) surface mount micro USB socket with mounting holes.
-- KiCad package: myelin-kicad:micro_usb_b_smd_molex
+ABUF
+- Value: 74LVTH162245ZRDR
+- Description: IC buffer 16-bit; https://www.digikey.com/product-detail/en/texas-instruments/74LVTH162245ZRDR/296-16878-1-ND
+- KiCad package: myelin-kicad:ti_zrd_54_pbga
 
-USB
-- Value: usb
-- Description: Molex 1050170001 (Digikey WM1399CT-ND) surface mount micro USB socket with mounting holes.
-- KiCad package: myelin-kicad:micro_usb_b_smd_molex
+DBUF
+- Value: 74LVTH162245ZRDR
+- Description: IC buffer 16-bit; https://www.digikey.com/product-detail/en/texas-instruments/74LVTH162245ZRDR/296-16878-1-ND
+- KiCad package: myelin-kicad:ti_zrd_54_pbga
+
+OC
+- Value: 74HCT125PW
+- Description: IC buffer 4-bit OC; https://www.digikey.com/product-detail/en/nexperia-usa-inc/74HCT125PW112/1727-6443-ND
+- KiCad package: Package_SO:TSSOP-14_4.4x5mm_P0.65mm
+
+MISC
+- Value: 74HCT245PW
+- Description: IC buffer 8-bit; https://www.digikey.com/product-detail/en/nexperia-usa-inc/74HCT245PW118/1727-6353-1-ND
+- KiCad package: Package_SO:SSOP-20_4.4x6.5mm_P0.65mm
+
+OSC
+- Value: osc
+- Description: IC oscillator 16MHz; https://www.digikey.com/product-detail/en/microchip-technology/DSC1001CL1-016.0000/DSC1001CL1-016.0000-ND
+- KiCad package: Oscillator:Oscillator_SMD_Abracon_ASE-4Pin_3.2x2.5mm_HandSoldering
+
+AUDIO_OUT
+- Value: audio out
+- Description: Pin header
+- KiCad package: Connector_PinHeader_2.54mm:PinHeader_2x02_P2.54mm_Vertical
+
+SERIAL
+- Value: fpga serial port
+- Description: Pin header
+- KiCad package: Connector_PinHeader_2.54mm:PinHeader_1x03_P2.54mm_Vertical
+
+JTAG
+- Value: jtag
+- Description: Pin header
+- KiCad package: myelin-kicad:jtag_shrouded_2x5
+
+MSWD2
+- Value: swd
+- Description: Pin header
+- KiCad package: Connector_PinHeader_2.54mm:PinHeader_2x06_P2.54mm_Vertical
+
+EXTPWR
+- Value: ext pwr
+- Description: Pin header - 1x3 0.1 inch male
+- KiCad package: Connector_PinHeader_2.54mm:PinHeader_1x03_P2.54mm_Vertical
+
+ULA
+- Value: ULA header
+- Description: Pin header - round - to plug into an Acorn Electron ULA socket
+- KiCad package: modified-kicad:PLCC-68_THT-Socket-Electron-ULA
 
 R3
 - Value: 1-10k
@@ -426,58 +456,18 @@ R9
 - Description: Resistor 0805: 68R
 - KiCad package: Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
 
-ULA
-- Value: ULA header
-- Description: Set of pin headers to plug into an Acorn Electron ULA socket
-- KiCad package: modified-kicad:PLCC-68_THT-Socket-Electron-ULA
+MUSB
+- Value: usb
+- Description: Socket Micro USB, Molex 1050170001; https://www.digikey.com/products/en?keywords=WM1399CT-ND
+- KiCad package: myelin-kicad:micro_usb_b_smd_molex
 
-FPGA
-- Value: 10M08SCU169
-- Description: https://www.digikey.com/product-detail/en/10M08SCU169C8G/544-3270-ND
-- KiCad package: myelin-kicad:intel_ubga169
+USB
+- Value: usb
+- Description: Socket Micro USB, Molex 1050170001; https://www.digikey.com/products/en?keywords=WM1399CT-ND
+- KiCad package: myelin-kicad:micro_usb_b_smd_molex
 
-DAC
-- Value: WM8524CGEDT
-- Description: https://www.digikey.com/product-detail/en/cirrus-logic-inc/WM8524CGEDT/598-2458-ND
-- KiCad package: Package_SO:TSSOP-16_4.4x5mm_P0.65mm
-
-MCU
-- Value: atsamd11c
-- Description: https://www.digikey.com/product-detail/en/microchip-technology/ATSAMD11C14A-SSUT/ATSAMD11C14A-SSUTCT-ND
-- KiCad package: Package_SO:SOIC-14_3.9x8.7mm_P1.27mm
-
-OSC
-- Value: osc
-- Description: https://www.digikey.com/product-detail/en/microchip-technology/DSC1001CL1-016.0000/DSC1001CL1-016.0000-ND
-- KiCad package: Oscillator:Oscillator_SMD_Abracon_ASE-4Pin_3.2x2.5mm_HandSoldering
-
-CMP
-- Value: MIC7221YM5-TR
-- Description: https://www.digikey.com/product-detail/en/microchip-technology/MIC7221YM5-TR/576-2901-1-ND
-- KiCad package: Package_TO_SOT_SMD:SOT-23-5_HandSoldering
-
-OC
-- Value: 74HCT125PW
-- Description: https://www.digikey.com/product-detail/en/nexperia-usa-inc/74HCT125PW112/1727-6443-ND
-- KiCad package: Package_SO:TSSOP-14_4.4x5mm_P0.65mm
-
-MISC
-- Value: 74HCT245PW
-- Description: https://www.digikey.com/product-detail/en/nexperia-usa-inc/74HCT245PW118/1727-6353-1-ND
-- KiCad package: Package_SO:SSOP-20_4.4x6.5mm_P0.65mm
-
-ABUF
-- Value: 74LVTH162245ZRDR
-- Description: https://www.digikey.com/product-detail/en/texas-instruments/74LVTH162245ZRDR/296-16878-1-ND
-- KiCad package: myelin-kicad:ti_zrd_54_pbga
-
-DBUF
-- Value: 74LVTH162245ZRDR
-- Description: https://www.digikey.com/product-detail/en/texas-instruments/74LVTH162245ZRDR/296-16878-1-ND
-- KiCad package: myelin-kicad:ti_zrd_54_pbga
-
-FLASH
-- Value: W25Q128JVSIM
-- Description: https://www.digikey.com/product-detail/en/winbond-electronics/W25Q128JVSIM/W25Q128JVSIM-ND/6819721
-- KiCad package: Package_SO:SOIJ-8_5.3x5.3mm_P1.27mm
+SD
+- Value: Micro SD socket
+- Description: Socket micro SD; https://www.digikey.com/products/en?keywords=HR1941CT-ND
+- KiCad package: myelin-kicad:hirose_micro_sd_card_socket
 

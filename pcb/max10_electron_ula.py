@@ -34,6 +34,8 @@ Pin = myelin_kicad_pcb.Pin
 
 # TODO(v2) rename all 100n caps to DC*
 # TODO(v2) put resistor/capacitor values for R*/AR*/C*/AC* on silkscreen
+# TODO(v2) move MSWD down into the corner of the board so it doesn't clash with the AUDIO_OUT pins
+# TODO(v2) try out JTAGTC and see if it's possible to use around SERIAL pins; maybe move SERIAL out to the right of DC13/DC14?
 
 ### ULA
 
@@ -72,7 +74,7 @@ ula = myelin_kicad_pcb.Component(
     footprint="modified-kicad:PLCC-68_THT-Socket-Electron-ULA",  # done(v1) check + pinout
     identifier="ULA",
     value="ULA header",
-    desc="Set of pin headers to plug into an Acorn Electron ULA socket",
+    desc="Pin header - round - to plug into an Acorn Electron ULA socket",
     pins=[
         # Ordered counter-clockwise, as shown in Appendix F of the Electron AUG
 
@@ -827,7 +829,7 @@ fpga = myelin_kicad_pcb.Component(
     footprint="myelin-kicad:intel_ubga169",
     identifier="FPGA",
     value="10M08SCU169",
-    desc="https://www.digikey.com/product-detail/en/10M08SCU169C8G/544-3270-ND",
+    desc="IC FPGA Intel Max 10; https://www.digikey.com/product-detail/en/10M08SCU169C8G/544-3270-ND",
     buses=['addr', 'data', 'sdram_DQ', 'sdram_A', 'sdram_BA', 'kbd'],
     pins=fpga_pins)
 
@@ -895,6 +897,7 @@ jtag = myelin_kicad_pcb.Component(
     footprint="myelin-kicad:jtag_shrouded_2x5",  # TODO(v2) replace with bigger IDC footprint
     identifier="JTAG",
     value="jtag",
+    desc="Pin header",
     pins=[
         Pin( 1, "TCK", "fpga_TCK"), # top left
         Pin( 2, "GND", "GND"), # top right
@@ -914,6 +917,7 @@ tag_connect = myelin_kicad_pcb.Component(
     footprint="Tag-Connect_TC2030-IDC-FP_2x03_P1.27mm_Vertical",
     identifier="JTAGTC",
     value="jtagtc",
+    exclude_from_bom=True,
     pins=[
         # This pinout is for the Tag-Connect TC2030-ALT cable
         # (http://www.tag-connect.com/TC2030-ALT) when used with an Altera USB
@@ -938,6 +942,7 @@ serial_header = myelin_kicad_pcb.Component(
     footprint="Connector_PinHeader_2.54mm:PinHeader_1x03_P2.54mm_Vertical",
     identifier="SERIAL",
     value="fpga serial port",
+    desc="Pin header",
     pins=[
         Pin( 1, "", "GND"),
         Pin( 2, "", "serial_TXD"),
@@ -961,7 +966,7 @@ regulator = myelin_kicad_pcb.Component(
     footprint="Package_TO_SOT_SMD:SOT-89-3",
     identifier="REG",
     value="AP7365-33YG-XX",  # 600 mA, 0.3V dropout
-    desc="3.3V LDO regulator, e.g. Digikey AP7365-33YG-13DICT-ND.  Search for the exact part number because there are many variants.",
+    desc="IC LDO 3.3V regulator; https://www.digikey.com/products/en?keywords=AP7365-33YG-13DICT-ND",
     pins=[
         # AP7365-Y: VOUT GND VIN  AP7365-33YG-...
         Pin(1, "VOUT", ["3V3"]),
@@ -977,7 +982,7 @@ ext_power = myelin_kicad_pcb.Component(
     footprint="Connector_PinHeader_2.54mm:PinHeader_1x03_P2.54mm_Vertical",
     identifier="EXTPWR",
     value="ext pwr",
-    desc="1x3 0.1 inch male header",
+    desc="Pin header - 1x3 0.1 inch male",
     pins=[
         Pin(1, "A", ["GND"]),
         Pin(2, "B", ["3V3"]),
@@ -999,7 +1004,7 @@ osc = myelin_kicad_pcb.Component(
     # When ordering: double check it's the 3.2x2.5mm package
     # http://ww1.microchip.com/downloads/en/DeviceDoc/20005529B.pdf
     #    DSC100X-C-X-X-096.000-X
-    desc="https://www.digikey.com/product-detail/en/microchip-technology/DSC1001CL1-016.0000/DSC1001CL1-016.0000-ND",
+    desc="IC oscillator 16MHz; https://www.digikey.com/product-detail/en/microchip-technology/DSC1001CL1-016.0000/DSC1001CL1-016.0000-ND",
     pins=[
         Pin(1, "STANDBY#",  "3V3"),
         Pin(2, "GND",       "GND"),
@@ -1035,7 +1040,7 @@ flash = [
         footprint="Package_SO:SOIJ-8_5.3x5.3mm_P1.27mm",  # done(v1) check + pinout
         identifier="FLASH",
         value="W25Q128JVSIM",  # 133MHz max clock
-        desc="https://www.digikey.com/product-detail/en/winbond-electronics/W25Q128JVSIM/W25Q128JVSIM-ND/6819721",
+        desc="IC 128Mbit QSPI flash; https://www.digikey.com/product-detail/en/winbond-electronics/W25Q128JVSIM/W25Q128JVSIM-ND/6819721",
         # $1 2MB version: https://www.digikey.com/product-detail/en/issi-integrated-silicon-solution-inc/IS25LP016D-JBLE/706-1582-ND
         # $2.50 16MB version: https://www.digikey.com/product-detail/en/issi-integrated-silicon-solution-inc/IS25LP128-JBLE/706-1341-ND
         pins=[
@@ -1149,7 +1154,7 @@ ram = [
         footprint="myelin-kicad:sdram_54tfbga",
         identifier="RAM",
         value="MT48LC16M16A2",
-        desc="MT48LC16M16A2F4-6A:GTR",  # done(v1) check pinout
+        desc="IC SDRAM 32MB; MT48LC16M16A2F4-6A:GTR",  # done(v1) check pinout
         buses=[""],
         pins=[
             Pin("A1", "VSS", "GND"),
@@ -1239,7 +1244,7 @@ dac = [
         footprint="Package_SO:TSSOP-16_4.4x5mm_P0.65mm",  # done(v1) check + pinout
         identifier="DAC",
         value="WM8524CGEDT",
-        desc="https://www.digikey.com/product-detail/en/cirrus-logic-inc/WM8524CGEDT/598-2458-ND",
+        desc="IC Audio DAC; https://www.digikey.com/product-detail/en/cirrus-logic-inc/WM8524CGEDT/598-2458-ND",
         pins=[
             Pin( 1, "LINEVOUTL", "dac_out_left"),
             Pin( 2, "CPVOUTN",   "dac_power_cpvoutn"),
@@ -1295,6 +1300,7 @@ audio_out_header = myelin_kicad_pcb.Component(
     footprint="Connector_PinHeader_2.54mm:PinHeader_2x02_P2.54mm_Vertical",
     identifier="AUDIO_OUT",
     value="audio out",
+    desc="Pin header",
     pins=[
         Pin( 1, "", "GND"),
         Pin( 2, "", "audio_out_right"),
@@ -1322,7 +1328,7 @@ big_buffers = [
             footprint="myelin-kicad:ti_zrd_54_pbga",  # done(v1): check + pinout
             identifier=ident,
             value="74LVTH162245ZRDR",
-            desc="https://www.digikey.com/product-detail/en/texas-instruments/74LVTH162245ZRDR/296-16878-1-ND",
+            desc="IC buffer 16-bit; https://www.digikey.com/product-detail/en/texas-instruments/74LVTH162245ZRDR/296-16878-1-ND",
             pins=[
                 Pin("A3", "1DIR", DIR1),
                 Pin("A4", "1nOE", nOE1),
@@ -1454,7 +1460,7 @@ oc_buf = [
             footprint="Package_SO:TSSOP-14_4.4x5mm_P0.65mm",  # done(v1) check + pinout
             identifier=ident,
             value="74HCT125PW",
-            desc="https://www.digikey.com/product-detail/en/nexperia-usa-inc/74HCT125PW112/1727-6443-ND",
+            desc="IC buffer 4-bit OC; https://www.digikey.com/product-detail/en/nexperia-usa-inc/74HCT125PW112/1727-6443-ND",
             pins=[
                 Pin( 1, "1nOE", conn[0][0]),
                 Pin( 2, "1A",   conn[0][1]),
@@ -1496,7 +1502,7 @@ misc_buf = [
             footprint="Package_SO:SSOP-20_4.4x6.5mm_P0.65mm",  # done(v1) check + pinout
             identifier=ident,
             value="74HCT245PW",
-            desc="https://www.digikey.com/product-detail/en/nexperia-usa-inc/74HCT245PW118/1727-6353-1-ND",
+            desc="IC buffer 8-bit; https://www.digikey.com/product-detail/en/nexperia-usa-inc/74HCT245PW118/1727-6353-1-ND",
             pins=[
                 Pin( 1, "A->B", DIR),
                 Pin( 2, "A0",   conn[0][0]),
@@ -1555,7 +1561,7 @@ comparator = [
         footprint="Package_TO_SOT_SMD:SOT-23-5_HandSoldering",  # done(v1) check + pinout
         identifier="CMP",
         value="MIC7221YM5-TR",
-        desc="https://www.digikey.com/product-detail/en/microchip-technology/MIC7221YM5-TR/576-2901-1-ND",
+        desc="IC Comparator; https://www.digikey.com/product-detail/en/microchip-technology/MIC7221YM5-TR/576-2901-1-ND",
         pins=[
             Pin( 1, "OUT", "casIn"),  # open drain, pulled to 3V3
             Pin( 2, "V+",  "5V"),
@@ -1588,7 +1594,7 @@ micro_usb = myelin_kicad_pcb.Component(
     footprint="myelin-kicad:micro_usb_b_smd_molex",
     identifier="USB",
     value="usb",
-    desc="Molex 1050170001 (Digikey WM1399CT-ND) surface mount micro USB socket with mounting holes.",
+    desc="Socket Micro USB, Molex 1050170001; https://www.digikey.com/products/en?keywords=WM1399CT-ND",
     pins=[
         Pin(1, "V", "VUSB"),
         Pin(2, "-", "USBDM"),
@@ -1612,6 +1618,7 @@ sd_card = myelin_kicad_pcb.Component(
     footprint="myelin-kicad:hirose_micro_sd_card_socket",
     identifier="SD",
     value="Micro SD socket",
+    desc="Socket micro SD; https://www.digikey.com/products/en?keywords=HR1941CT-ND",
     pins=[
         Pin(    8, "DAT1",       "sd_DAT1"),
         Pin(    7, "DAT0_MISO",  "sd_DAT0_MISO"),
@@ -1636,7 +1643,7 @@ mcu_micro_usb = myelin_kicad_pcb.Component(
     footprint="myelin-kicad:micro_usb_b_smd_molex",
     identifier="MUSB",
     value="usb",
-    desc="Molex 1050170001 (Digikey WM1399CT-ND) surface mount micro USB socket with mounting holes.",
+    desc="Socket Micro USB, Molex 1050170001; https://www.digikey.com/products/en?keywords=WM1399CT-ND",
     pins=[
         Pin(1, "V", ["mcu_VUSB"]),
         Pin(2, "-", ["mcu_USBDM"]),
@@ -1651,6 +1658,7 @@ mcu_swd = myelin_kicad_pcb.Component(
     footprint="Tag-Connect_TC2030-IDC-FP_2x03_P1.27mm_Vertical",
     identifier="MSWD",
     value="swd",
+    exclude_from_bom=True,
     pins=[
         # Tag-Connect SWD layout: http://www.tag-connect.com/Materials/TC2030-CTX.pdf
         Pin(1, "VCC",       "3V3"),
@@ -1667,6 +1675,7 @@ mcu_header = myelin_kicad_pcb.Component(
     footprint="Connector_PinHeader_2.54mm:PinHeader_2x06_P2.54mm_Vertical",
     identifier="MSWD2",
     value="swd",
+    desc="Pin header",
     pins=[
         Pin( 1, "SWDIO/TMS", "mcu_SWDIO"),
         Pin( 2, "VCC",       "3V3"),
@@ -1688,7 +1697,7 @@ mcu = myelin_kicad_pcb.Component(
     footprint="Package_SO:SOIC-14_3.9x8.7mm_P1.27mm",  # done(v1) check + pinout
     identifier="MCU",
     value="atsamd11c",
-    desc="https://www.digikey.com/product-detail/en/microchip-technology/ATSAMD11C14A-SSUT/ATSAMD11C14A-SSUTCT-ND",
+    desc="IC ARM MCU; https://www.digikey.com/product-detail/en/microchip-technology/ATSAMD11C14A-SSUT/ATSAMD11C14A-SSUTCT-ND",
     pins=[
         # SERCOM notes:
 

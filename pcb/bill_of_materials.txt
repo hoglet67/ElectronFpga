@@ -1,13 +1,4 @@
 Identifier	Value	Description	KiCad package
-SD	Micro SD socket		myelin-kicad:hirose_micro_sd_card_socket
-AUDIO_OUT	audio out		Connector_PinHeader_2.54mm:PinHeader_2x02_P2.54mm_Vertical
-SERIAL	fpga serial port		Connector_PinHeader_2.54mm:PinHeader_1x03_P2.54mm_Vertical
-JTAG	jtag		myelin-kicad:jtag_shrouded_2x5
-JTAGTC	jtagtc		Tag-Connect_TC2030-IDC-FP_2x03_P1.27mm_Vertical
-MSWD	swd		Tag-Connect_TC2030-IDC-FP_2x03_P1.27mm_Vertical
-MSWD2	swd		Connector_PinHeader_2.54mm:PinHeader_2x06_P2.54mm_Vertical
-EXTPWR	ext pwr	1x3 0.1 inch male header	Connector_PinHeader_2.54mm:PinHeader_1x03_P2.54mm_Vertical
-REG	AP7365-33YG-XX	3.3V LDO regulator, e.g. Digikey AP7365-33YG-13DICT-ND.  Search for the exact part number because there are many variants.	Package_TO_SOT_SMD:SOT-89-3
 DC1	100n	Capacitor 0402: 100n	Capacitor_SMD:C_0402_1005Metric
 DC10	100n	Capacitor 0402: 100n	Capacitor_SMD:C_0402_1005Metric
 DC11	100n	Capacitor 0402: 100n	Capacitor_SMD:C_0402_1005Metric
@@ -51,9 +42,24 @@ AC7	2.7n NF	Capacitor 0805: 2.7n NF	Capacitor_SMD:C_0805_2012Metric_Pad1.15x1.40
 AC2	4.7u	Capacitor 0805: 4.7u	Capacitor_SMD:C_0805_2012Metric_Pad1.15x1.40mm_HandSolder
 AC3	4.7u	Capacitor 0805: 4.7u	Capacitor_SMD:C_0805_2012Metric_Pad1.15x1.40mm_HandSolder
 D1	BAT54	Diode SOD323: BAT54	Diode_SMD:D_SOD-323_HandSoldering
-RAM	MT48LC16M16A2	MT48LC16M16A2F4-6A:GTR	myelin-kicad:sdram_54tfbga
-MUSB	usb	Molex 1050170001 (Digikey WM1399CT-ND) surface mount micro USB socket with mounting holes.	myelin-kicad:micro_usb_b_smd_molex
-USB	usb	Molex 1050170001 (Digikey WM1399CT-ND) surface mount micro USB socket with mounting holes.	myelin-kicad:micro_usb_b_smd_molex
+FLASH	W25Q128JVSIM	IC 128Mbit QSPI flash; https://www.digikey.com/product-detail/en/winbond-electronics/W25Q128JVSIM/W25Q128JVSIM-ND/6819721	Package_SO:SOIJ-8_5.3x5.3mm_P1.27mm
+MCU	atsamd11c	IC ARM MCU; https://www.digikey.com/product-detail/en/microchip-technology/ATSAMD11C14A-SSUT/ATSAMD11C14A-SSUTCT-ND	Package_SO:SOIC-14_3.9x8.7mm_P1.27mm
+DAC	WM8524CGEDT	IC Audio DAC; https://www.digikey.com/product-detail/en/cirrus-logic-inc/WM8524CGEDT/598-2458-ND	Package_SO:TSSOP-16_4.4x5mm_P0.65mm
+CMP	MIC7221YM5-TR	IC Comparator; https://www.digikey.com/product-detail/en/microchip-technology/MIC7221YM5-TR/576-2901-1-ND	Package_TO_SOT_SMD:SOT-23-5_HandSoldering
+FPGA	10M08SCU169	IC FPGA Intel Max 10; https://www.digikey.com/product-detail/en/10M08SCU169C8G/544-3270-ND	myelin-kicad:intel_ubga169
+REG	AP7365-33YG-XX	IC LDO 3.3V regulator; https://www.digikey.com/products/en?keywords=AP7365-33YG-13DICT-ND	Package_TO_SOT_SMD:SOT-89-3
+RAM	MT48LC16M16A2	IC SDRAM 32MB; MT48LC16M16A2F4-6A:GTR	myelin-kicad:sdram_54tfbga
+ABUF	74LVTH162245ZRDR	IC buffer 16-bit; https://www.digikey.com/product-detail/en/texas-instruments/74LVTH162245ZRDR/296-16878-1-ND	myelin-kicad:ti_zrd_54_pbga
+DBUF	74LVTH162245ZRDR	IC buffer 16-bit; https://www.digikey.com/product-detail/en/texas-instruments/74LVTH162245ZRDR/296-16878-1-ND	myelin-kicad:ti_zrd_54_pbga
+OC	74HCT125PW	IC buffer 4-bit OC; https://www.digikey.com/product-detail/en/nexperia-usa-inc/74HCT125PW112/1727-6443-ND	Package_SO:TSSOP-14_4.4x5mm_P0.65mm
+MISC	74HCT245PW	IC buffer 8-bit; https://www.digikey.com/product-detail/en/nexperia-usa-inc/74HCT245PW118/1727-6353-1-ND	Package_SO:SSOP-20_4.4x6.5mm_P0.65mm
+OSC	osc	IC oscillator 16MHz; https://www.digikey.com/product-detail/en/microchip-technology/DSC1001CL1-016.0000/DSC1001CL1-016.0000-ND	Oscillator:Oscillator_SMD_Abracon_ASE-4Pin_3.2x2.5mm_HandSoldering
+AUDIO_OUT	audio out	Pin header	Connector_PinHeader_2.54mm:PinHeader_2x02_P2.54mm_Vertical
+SERIAL	fpga serial port	Pin header	Connector_PinHeader_2.54mm:PinHeader_1x03_P2.54mm_Vertical
+JTAG	jtag	Pin header	myelin-kicad:jtag_shrouded_2x5
+MSWD2	swd	Pin header	Connector_PinHeader_2.54mm:PinHeader_2x06_P2.54mm_Vertical
+EXTPWR	ext pwr	Pin header - 1x3 0.1 inch male	Connector_PinHeader_2.54mm:PinHeader_1x03_P2.54mm_Vertical
+ULA	ULA header	Pin header - round - to plug into an Acorn Electron ULA socket	modified-kicad:PLCC-68_THT-Socket-Electron-ULA
 R3	1-10k	Resistor 0805: 1-10k	Resistor_SMD:R_0805_2012Metric
 R5	100R	Resistor 0805: 100R	Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
 AR4	10k	Resistor 0805: 10k	Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
@@ -84,14 +90,6 @@ AR1	560R NF	Resistor 0805: 560R NF	Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm
 AR2	560R NF	Resistor 0805: 560R NF	Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
 R10	68R	Resistor 0805: 68R	Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
 R9	68R	Resistor 0805: 68R	Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder
-ULA	ULA header	Set of pin headers to plug into an Acorn Electron ULA socket	modified-kicad:PLCC-68_THT-Socket-Electron-ULA
-FPGA	10M08SCU169	https://www.digikey.com/product-detail/en/10M08SCU169C8G/544-3270-ND	myelin-kicad:intel_ubga169
-DAC	WM8524CGEDT	https://www.digikey.com/product-detail/en/cirrus-logic-inc/WM8524CGEDT/598-2458-ND	Package_SO:TSSOP-16_4.4x5mm_P0.65mm
-MCU	atsamd11c	https://www.digikey.com/product-detail/en/microchip-technology/ATSAMD11C14A-SSUT/ATSAMD11C14A-SSUTCT-ND	Package_SO:SOIC-14_3.9x8.7mm_P1.27mm
-OSC	osc	https://www.digikey.com/product-detail/en/microchip-technology/DSC1001CL1-016.0000/DSC1001CL1-016.0000-ND	Oscillator:Oscillator_SMD_Abracon_ASE-4Pin_3.2x2.5mm_HandSoldering
-CMP	MIC7221YM5-TR	https://www.digikey.com/product-detail/en/microchip-technology/MIC7221YM5-TR/576-2901-1-ND	Package_TO_SOT_SMD:SOT-23-5_HandSoldering
-OC	74HCT125PW	https://www.digikey.com/product-detail/en/nexperia-usa-inc/74HCT125PW112/1727-6443-ND	Package_SO:TSSOP-14_4.4x5mm_P0.65mm
-MISC	74HCT245PW	https://www.digikey.com/product-detail/en/nexperia-usa-inc/74HCT245PW118/1727-6353-1-ND	Package_SO:SSOP-20_4.4x6.5mm_P0.65mm
-ABUF	74LVTH162245ZRDR	https://www.digikey.com/product-detail/en/texas-instruments/74LVTH162245ZRDR/296-16878-1-ND	myelin-kicad:ti_zrd_54_pbga
-DBUF	74LVTH162245ZRDR	https://www.digikey.com/product-detail/en/texas-instruments/74LVTH162245ZRDR/296-16878-1-ND	myelin-kicad:ti_zrd_54_pbga
-FLASH	W25Q128JVSIM	https://www.digikey.com/product-detail/en/winbond-electronics/W25Q128JVSIM/W25Q128JVSIM-ND/6819721	Package_SO:SOIJ-8_5.3x5.3mm_P1.27mm
+MUSB	usb	Socket Micro USB, Molex 1050170001; https://www.digikey.com/products/en?keywords=WM1399CT-ND	myelin-kicad:micro_usb_b_smd_molex
+USB	usb	Socket Micro USB, Molex 1050170001; https://www.digikey.com/products/en?keywords=WM1399CT-ND	myelin-kicad:micro_usb_b_smd_molex
+SD	Micro SD socket	Socket micro SD; https://www.digikey.com/products/en?keywords=HR1941CT-ND	myelin-kicad:hirose_micro_sd_card_socket
