@@ -8,19 +8,16 @@ use ieee.std_logic_1164.all;
 use ieee.std_logic_unsigned.all;
 use ieee.numeric_std.all;
 
--- TODO:
--- HS_n  needs adding
-
 entity ElectronULA_max10 is
     port (
         -- 16 MHz clock from Electron
         clk_in        : in  std_logic;
-        -- 16 (32?) MHz clock from oscillator
+        -- 16 MHz clock from oscillator
         clk_osc       : in std_logic;
 
-        -- QSPI flash chpi
-        flash_nCE     : inout std_logic := '1';
-        flash_SCK     : inout std_logic := '1';
+        -- QSPI flash chip
+        flash_nCE     : out std_logic := '1';  -- pulled high on board
+        flash_SCK     : out std_logic := '1';
         flash_IO0     : inout std_logic := 'Z';
         flash_IO1     : inout std_logic := 'Z';
         flash_IO2     : inout std_logic := 'Z';
@@ -28,16 +25,16 @@ entity ElectronULA_max10 is
 
         -- SDRAM
         sdram_DQ      : inout std_logic_vector(15 downto 0) := (others => 'Z');
-        sdram_A       : inout std_logic_vector(12 downto 0) := (others => '1');
-        sdram_BA      : inout std_logic_vector(1 downto 0) := (others => '1');
-        sdram_nCS     : inout std_logic := '1';
-        sdram_nWE     : inout std_logic := '1';
-        sdram_nCAS    : inout std_logic := '1';
-        sdram_nRAS    : inout std_logic := '1';
-        sdram_CLK     : inout std_logic := '1';
-        sdram_CKE     : inout std_logic := '0';
-        sdram_UDQM    : inout std_logic := '1';
-        sdram_LDQM    : inout std_logic := '1';
+        sdram_A       : out std_logic_vector(12 downto 0) := (others => '1');
+        sdram_BA      : out std_logic_vector(1 downto 0) := (others => '1');
+        sdram_nCS     : out std_logic := '1';  -- pulled high on board
+        sdram_nWE     : out std_logic := '1';
+        sdram_nCAS    : out std_logic := '1';
+        sdram_nRAS    : out std_logic := '1';
+        sdram_CLK     : out std_logic := '1';
+        sdram_CKE     : out std_logic := '0';
+        sdram_UDQM    : out std_logic := '1';
+        sdram_LDQM    : out std_logic := '1';
 
         -- USB
         USB_M         : inout std_logic := 'Z';
@@ -45,25 +42,25 @@ entity ElectronULA_max10 is
         USB_PU        : out std_logic := 'Z';
 
         -- Enable input buffer for kbd[3:0], NMI_n_in, IRQ_n_in, RnW_in, clk_in
-        input_buf_nOE : out std_logic := '0';
+        input_buf_nOE : out std_logic := '0';  -- pulled high on board
 
         -- Enable output buffer for clk_out, nHS, red, green, blue, csync, casMO, casOut
-        misc_buf_nOE  : inout std_logic := '0';
+        misc_buf_nOE  : inout std_logic := '0';  -- pulled high on board
 
         -- CPU Interface
         clk_out       : out std_logic;
-        A_buf_nOE     : out std_logic := '0';  -- default on
+        A_buf_nOE     : out std_logic := '0';  -- default on; pulled high on board
         A_buf_DIR     : out std_logic := '1';  -- default to buffer from Elk to FPGA
         addr          : inout std_logic_vector(15 downto 0);
-        D_buf_nOE     : out std_logic := '1';  -- default off
+        D_buf_nOE     : out std_logic := '1';  -- default off; pulled high on board
         D_buf_DIR     : out std_logic := '1';  -- default to buffer from Elk to FPGA
         data          : inout std_logic_vector(7 downto 0);
         RnW_in        : in std_logic;
         RnW_out       : out std_logic := '1';
-        RnW_nOE       : out std_logic := '1';
-        RST_n_out     : inout std_logic := '1';
+        RnW_nOE       : out std_logic := '1';  -- pulled high on board
+        RST_n_out     : inout std_logic := '1';  -- pulled high on board
         RST_n_in      : inout std_logic;
-        IRQ_n_out     : inout std_logic := '1';
+        IRQ_n_out     : inout std_logic := '1';  -- pulled high on board
         IRQ_n_in      : inout std_logic;
         NMI_n_in      : inout std_logic;
 
@@ -99,7 +96,19 @@ entity ElectronULA_max10 is
         sd_DAT0_MISO  : inout std_logic;
         sd_DAT1       : inout std_logic := 'Z';
         sd_DAT2       : inout std_logic := 'Z';
-        sd_DAT3_nCS   : inout std_logic
+        sd_DAT3_nCS   : inout std_logic;  -- pulled high on board
+
+        -- serial port
+        serial_RXD    : in std_logic;
+        serial_TXD    : out std_logic := '1';
+
+        -- Debug MCU interface
+        mcu_debug_RXD : out std_logic := '1';
+        mcu_debug_TXD : in std_logic;
+        mcu_MOSI      : in std_logic;
+        mcu_MISO      : out std_logic := '1';
+        mcu_SCK       : in std_logic;
+        mcu_SS        : in std_logic
     );
 end;
 
@@ -110,11 +119,17 @@ signal clock_24          : std_logic;
 signal clock_32          : std_logic;
 signal clock_33          : std_logic;
 signal clock_40          : std_logic;
+signal clock_96          : std_logic := '1';
+signal clock_div_96_32   : std_logic_vector(1 downto 0) := (others => '0');
+
+-- Divide 96MHz / 833 = 115246 baud serial
+signal serial_tx_count   : std_logic_vector(9 downto 0) := (others => '0');
+signal serial_rx_count   : std_logic_vector(9 downto 0) := (others => '0');
 
 signal pll_reset         : std_logic;
-signal pll_reset_counter : std_logic_vector (1 downto 0) := "00";
+signal pll_reset_counter : std_logic_vector(1 downto 0) := (others => '0');
 signal pll1_locked       : std_logic;
-signal pll_locked_sync   : std_logic_vector(2 downto 0) := "000";
+signal pll_locked_sync   : std_logic_vector(2 downto 0) := (others => '0');
 
 signal led_counter       : std_logic_vector(23 downto 0);
 signal clk_counter       : std_logic_vector(2 downto 0);
@@ -143,6 +158,13 @@ signal turbo             : std_logic_vector(1 downto 0);
 
 signal caps_led          : std_logic;
 
+signal mcu_MOSI_sync     : std_logic_vector(2 downto 0) := "000";
+signal mcu_SS_sync       : std_logic_vector(2 downto 0) := "111";
+signal mcu_SCK_sync      : std_logic_vector(2 downto 0) := "000";
+
+-- debug boundary scan over SPI
+signal debug_boundary_vector : std_logic_vector(31 downto 0);
+
 begin
 
     -- According to the Max 10 datasheet (Table 27), 5MHz < fIN < 472.5 MHz, and
@@ -153,20 +175,70 @@ begin
 
     max10_pll1_inst : entity work.max10_pll1 PORT MAP (
         areset   => pll_reset,
-        -- PLL input clock
-        inclk0   => clk_in,
-        -- the main system clock, and also the video clock in sRGB mode
-        c0       => clock_16,
-        -- used as a 24.00MHz for the SAA5050 in Mode 7
-        c1       => clock_24,
-        -- used as a output clock MIST scan doubler for the SAA5050 in Mode 7
-        c2       => clock_32,
-        -- used as a video clock when the ULA is in 60Hz VGA Mode
-        c3       => clock_40,
-		  -- used as a video clock when the ULA is in 50Hz VGA Mode
-        c4       => clock_33,
+        -- inclk0   => clk_in,   -- PLL input: 16MHz from Elk - TODO test this
+        inclk0   => clk_osc,    -- PLL input: 16MHz from oscillator
+        c0       => clock_16,   -- main system clock / sRGB video clock
+        c1       => clock_24,   -- for the SAA5050 in Mode 7
+        c2       => clock_96,   -- SDRAM/flash, divided to 32 for scan doubler for the SAA5050 in Mode 7
+        c3       => clock_40,   -- video clock when in 60Hz VGA Mode
+        c4       => clock_33,   -- video clock when in 50Hz VGA Mode
         locked   => pll1_locked
     );
+
+    -- debug SPI interface with mcu; currently just a boundary scan that reads most of the inputs.
+    -- to read: bring SS high then low, then clock out 32 bits.
+    spi : process(clock_96)
+    begin
+        if rising_edge(clock_96) then
+            mcu_MOSI_sync <= mcu_MOSI_sync(1 downto 0) & mcu_MOSI;
+            mcu_SCK_sync <= mcu_SCK_sync(1 downto 0) & mcu_SCK;
+            mcu_SS_sync <= mcu_SS_sync(1 downto 0) & mcu_SCK;
+            if mcu_SS_sync(2) = '0' then
+                if mcu_SS_sync(1) = '1' then
+                    -- start of transaction
+                    debug_boundary_vector <= addr & data & RnW_in & RST_n_in & IRQ_n_in & NMI_n_in & kbd;
+                end if;
+                if mcu_SCK_sync(2) = '0' and mcu_SCK_sync(1) = '1' then
+                    -- falling SCK edge; shift debug_boundary_vector out mcu_MISO
+                    mcu_MISO <= debug_boundary_vector(0);
+                    debug_boundary_vector <= '0' & debug_boundary_vector(31 downto 1);
+                end if;
+            end if;
+        end if;
+    end process;
+
+    -- divide clock_96 to get clock_32 and clock_serial
+    divide_96mhz : process(clock_96)
+    begin
+        if rising_edge(clock_96) then
+            -- Divide 96/3 to get 32MHz
+            if clock_div_96_32 = "10" then
+                -- if clock_32 = '0' then
+                --     clock_16 <= not clock_16;
+                -- end if;
+                clock_32 <= not clock_32;
+                clock_div_96_32 <= "00";
+            else
+                clock_div_96_32 <= clock_div_96_32 + 1;
+            end if;
+
+            -- Divide 96/833 to get serial clock
+            if serial_tx_count = 833 then
+                serial_tx_count <= (others => '0');
+            else
+                serial_tx_count <= serial_tx_count + 1;
+            end if;
+            -- TODO also reset serial_rx_count when we get a start bit
+            if serial_rx_count = 833 then
+                serial_rx_count <= (others => '0');
+            else
+                serial_rx_count <= serial_rx_count + 1;
+            end if;
+        end if;
+    end process;
+
+    -- DEBUG output serial clock on serial_TXD
+    serial_TXD <= '1' when serial_tx_count < 417 else '0';
 
     -- clk_out is not correct as the low time is always 250ns
     clk_gen : process(clock_16)
@@ -188,7 +260,7 @@ begin
         IncludeMMC       => true,
         Include32KRAM    => true,
         IncludeVGA       => true,
-        IncludeJafaMode7 => true
+        IncludeJafaMode7 => false  -- TODO get character ROM working
     )
     port map (
         clk_16M00 => clock_16,
@@ -205,7 +277,7 @@ begin
         R_W_n     => RnW_in,
         RST_n     => RST_n_out,
         IRQ_n     => ula_irq_n,
-        NMI_n     => '1',  -- TODO connect to NMI_n_in
+        NMI_n     => NMI_n_in,
 
         -- Rom Enable
         ROM_n     => ROM_n,
@@ -271,20 +343,26 @@ begin
 -- Paged ROM
 --------------------------------------------------------
 
+    -- Provide ROMs 14 and 15
     rom_enable  <= '1' when addr(15 downto 14) = "10" and rom_latch(3 downto 1) = "111" else '0';
 
     rom_we <= '1' when rom_enable = '1' and cpu_clken = '1' else '0';
 
-    -- TODO(myelin) figure out why Quartus can't find expansion_rom.  Is it
-    -- having trouble compiling expansion_rom.v?
+    -- There isn't enough room in the 10M08SC to fit the expansion ROMs, so they live in a
+    -- separate QPI flash chip instead.
 
-    -- rom : entity work.expansion_rom port map(
-    --     clk      => clock_16,
-    --     we       => rom_we,
-    --     addr     => rom_latch(0) & addr(13 downto 0),
-    --     data_in  => data_in,
-    --     data_out => rom_data
-    -- );
+    -- Timing: The ULA produces PHI0, which the 6502 delays to produce PHI2;
+    -- reads are referenced to PHI2. I believe we have about 190 ns from the
+    -- rising edge of PHI0 to set up the data bus.  There's no single signal
+    -- that lets us know when the CPU hold time is over, but holding until
+    -- addr changes should work okay.
+
+    -- As such our ROM emulator should sample addr on the rising clk_out edge
+    -- and hold until rom_enable drops.
+
+    -- We clock the flash at 96MHz and use the QPI fast read function.
+
+
 
 --------------------------------------------------------
 -- Power Up Reset Generation
