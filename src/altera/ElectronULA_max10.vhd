@@ -104,7 +104,7 @@ entity ElectronULA_max10 is
 
         -- Debug MCU interface
         mcu_debug_RXD : out std_logic := '1';
-        mcu_debug_TXD : in std_logic;
+        mcu_debug_TXD : in std_logic;  -- currently used to switch SPI port between flash (0) and boundary scan (1)
         mcu_MOSI      : in std_logic;
         mcu_MISO      : out std_logic := '1';
         mcu_SCK       : in std_logic;
@@ -200,12 +200,17 @@ begin
                 end if;
                 if mcu_SCK_sync(2) = '0' and mcu_SCK_sync(1) = '1' then
                     -- falling SCK edge; shift debug_boundary_vector out mcu_MISO
-                    mcu_MISO <= debug_boundary_vector(0);
                     debug_boundary_vector <= '0' & debug_boundary_vector(31 downto 1);
                 end if;
             end if;
         end if;
     end process;
+
+    -- when mcu_debug_TXD is low, pass MCU SPI port through to flash
+    mcu_MISO <= flash_IO1 when mcu_debug_TXD = '0' else debug_boundary_vector(0);
+    flash_nCE <= mcu_SS when mcu_debug_TXD = '0' else '1';
+    flash_IO0 <= mcu_MOSI when mcu_debug_TXD = '0' else '1';
+    flash_SCK <= mcu_SCK when mcu_debug_TXD = '0' else '1';
 
     -- divide clock_96 to get clock_32 and clock_serial
     divide_96mhz : process(clock_96)

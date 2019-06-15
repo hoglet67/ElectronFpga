@@ -5,6 +5,7 @@ xilinx/working/
 altera/db/
 altera/incremental_db/
 altera/output_files/
+altera/greybox_tmp
 
 nohup.out
 *~
