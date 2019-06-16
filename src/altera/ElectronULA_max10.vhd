@@ -211,6 +211,7 @@ begin
     flash_nCE <= mcu_SS when mcu_debug_TXD = '0' else '1';
     flash_IO0 <= mcu_MOSI when mcu_debug_TXD = '0' else '1';
     flash_SCK <= mcu_SCK when mcu_debug_TXD = '0' else '1';
+    mcu_debug_RXD <= mcu_debug_TXD;  -- loopback serial for MCU debugging
 
     -- divide clock_96 to get clock_32 and clock_serial
     divide_96mhz : process(clock_96)
