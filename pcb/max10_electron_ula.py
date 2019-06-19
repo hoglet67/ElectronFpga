@@ -236,7 +236,7 @@ pullups = [
     myelin_kicad_pcb.R0805("10k", "A_buf_nOE", "3V3", ref="PR4"),
     myelin_kicad_pcb.R0805("10k", "D_buf_nOE", "3V3", ref="PR5"),
     myelin_kicad_pcb.R0805("10k", "input_buf_nOE", "3V3", ref="PR6"),
-    myelin_kicad_pcb.R0805("10k", "misc_buf_nOE", "5V", ref="PR7"),
+    myelin_kicad_pcb.R0805("10k", "misc_buf_nOE", "3V3", ref="PR7"),
     # open collector outputs
     myelin_kicad_pcb.R0805("10k", "RST_n_out", "3V3", ref="PR8"),
     myelin_kicad_pcb.R0805("10k", "IRQ_n_out", "3V3", ref="PR9"),
