@@ -11,7 +11,7 @@ use ieee.numeric_std.all;
 entity ElectronULA_max10 is
     port (
         -- 16 MHz clock from Electron
-        clk_in        : in  std_logic;
+        clk_in        : in std_logic;
         -- 16 MHz clock from oscillator
         clk_osc       : in std_logic;
 
@@ -45,7 +45,7 @@ entity ElectronULA_max10 is
         input_buf_nOE : out std_logic := '0';  -- pulled high on board
 
         -- Enable output buffer for clk_out, nHS, red, green, blue, csync, casMO, casOut
-        misc_buf_nOE  : inout std_logic := '0';  -- pulled high on board
+        misc_buf_nOE  : out std_logic := '0';  -- pulled high on board
 
         -- CPU Interface
         clk_out       : out std_logic;
@@ -114,6 +114,9 @@ end;
 
 architecture behavioral of ElectronULA_max10 is
 
+-- Maps to either clk_in or clk_osc depending which one we are using
+signal clock_input       : std_logic;
+-- Generated clocks:
 signal clock_16          : std_logic;
 signal clock_24          : std_logic;
 signal clock_32          : std_logic;
@@ -134,6 +137,7 @@ signal pll_locked_sync   : std_logic_vector(2 downto 0) := (others => '0');
 signal led_counter       : std_logic_vector(23 downto 0);
 signal clk_counter       : std_logic_vector(2 downto 0);
 signal cpu_clken         : std_logic;
+signal clk_out_int       : std_logic;
 
 signal data_in           : std_logic_vector(7 downto 0);
 
@@ -163,27 +167,18 @@ signal mcu_SS_sync       : std_logic_vector(2 downto 0) := "111";
 signal mcu_SCK_sync      : std_logic_vector(2 downto 0) := "000";
 
 -- debug boundary scan over SPI
-signal debug_boundary_vector : std_logic_vector(31 downto 0);
+signal boundary_scan     : std_logic := '0';
+signal debug_boundary_vector : std_logic_vector(47 downto 0);
+
+signal flash_data_out    : std_logic_vector(7 downto 0);
+signal flash_reset       : std_logic;
+signal flash_read        : std_logic;
 
 begin
 
-    -- According to the Max 10 datasheet (Table 27), 5MHz < fIN < 472.5 MHz, and
-    -- the VCO runs between 600-1300 MHz.  We might want a lower-jitter clock than
-    -- the 16MHz one from the Electron though.
-
-    -- TODO(myelin) test PLLs with both electron clock and discrete oscillator
-
-    max10_pll1_inst : entity work.max10_pll1 PORT MAP (
-        areset   => pll_reset,
-        -- inclk0   => clk_in,   -- PLL input: 16MHz from Elk - TODO test this
-        inclk0   => clk_osc,    -- PLL input: 16MHz from oscillator
-        c0       => clock_16,   -- main system clock / sRGB video clock
-        c1       => clock_24,   -- for the SAA5050 in Mode 7
-        c2       => clock_96,   -- SDRAM/flash, divided to 32 for scan doubler for the SAA5050 in Mode 7
-        c3       => clock_40,   -- video clock when in 60Hz VGA Mode
-        c4       => clock_33,   -- video clock when in 50Hz VGA Mode
-        locked   => pll1_locked
-    );
+--------------------------------------------------------
+-- Debugging
+--------------------------------------------------------
 
     -- debug SPI interface with mcu; currently just a boundary scan that reads most of the inputs.
     -- to read: bring SS high then low, then clock out 32 bits.
@@ -192,80 +187,54 @@ begin
         if rising_edge(clock_96) then
             mcu_MOSI_sync <= mcu_MOSI_sync(1 downto 0) & mcu_MOSI;
             mcu_SCK_sync <= mcu_SCK_sync(1 downto 0) & mcu_SCK;
-            mcu_SS_sync <= mcu_SS_sync(1 downto 0) & mcu_SCK;
+            mcu_SS_sync <= mcu_SS_sync(1 downto 0) & mcu_SS;
+
             if mcu_SS_sync(2) = '0' then
                 if mcu_SS_sync(1) = '1' then
                     -- start of transaction
-                    debug_boundary_vector <= addr & data & RnW_in & RST_n_in & IRQ_n_in & NMI_n_in & kbd;
+                    debug_boundary_vector <=
+                        "10101010" &  -- AA
+                        addr &        -- FF FF
+                        data &        -- FF
+                        RnW_in & '0' & powerup_reset_n & RST_n_in & RST_n_out & IRQ_n_in & IRQ_n_out & NMI_n_in &  -- BF
+                        kbd & '1' & '1' & '1' & '1'; -- FF
+                end if;
+                if mcu_SCK_sync(2) = '1' and mcu_SCK_sync(1) = '0' then
+                    -- rising SCK edge; mcu_MOSI_sync(2) contains the input bit
                 end if;
                 if mcu_SCK_sync(2) = '0' and mcu_SCK_sync(1) = '1' then
-                    -- falling SCK edge; shift debug_boundary_vector out mcu_MISO
-                    debug_boundary_vector <= '0' & debug_boundary_vector(31 downto 1);
+                    -- falling SCK edge; shift debug_boundary_vector out mcu_MISO, MSB first
+                    debug_boundary_vector <= debug_boundary_vector(debug_boundary_vector'high-1 downto 0) & '0';
                 end if;
             end if;
         end if;
     end process;
 
     -- when mcu_debug_TXD is low, pass MCU SPI port through to flash
-    mcu_MISO <= flash_IO1 when mcu_debug_TXD = '0' else debug_boundary_vector(0);
+    boundary_scan <= '0';  -- Boundary scan off (needed to operate as ULA)
+    --boundary_scan <= mcu_debug_TXD;  -- Turn on boundary scan when SPI is connected to debug SPI
+    mcu_MISO <= flash_IO1 when mcu_debug_TXD = '0' else debug_boundary_vector(debug_boundary_vector'high);
     flash_nCE <= mcu_SS when mcu_debug_TXD = '0' else '1';
     flash_IO0 <= mcu_MOSI when mcu_debug_TXD = '0' else '1';
     flash_SCK <= mcu_SCK when mcu_debug_TXD = '0' else '1';
     mcu_debug_RXD <= mcu_debug_TXD;  -- loopback serial for MCU debugging
 
-    -- divide clock_96 to get clock_32 and clock_serial
-    divide_96mhz : process(clock_96)
-    begin
-        if rising_edge(clock_96) then
-            -- Divide 96/3 to get 32MHz
-            if clock_div_96_32 = "10" then
-                -- if clock_32 = '0' then
-                --     clock_16 <= not clock_16;
-                -- end if;
-                clock_32 <= not clock_32;
-                clock_div_96_32 <= "00";
-            else
-                clock_div_96_32 <= clock_div_96_32 + 1;
-            end if;
+    -- DEBUG output serial clock on serial_TXD; appears to work nicely.
+    --serial_TXD <= '1' when serial_tx_count < 417 else '0';
+    --serial_TXD <= clock_16; -- verified on scope
+    --serial_TXD <= cpu_clken; -- verified on scope
+    serial_TXD <= clk_out_int;
 
-            -- Divide 96/833 to get serial clock
-            if serial_tx_count = 833 then
-                serial_tx_count <= (others => '0');
-            else
-                serial_tx_count <= serial_tx_count + 1;
-            end if;
-            -- TODO also reset serial_rx_count when we get a start bit
-            if serial_rx_count = 833 then
-                serial_rx_count <= (others => '0');
-            else
-                serial_rx_count <= serial_rx_count + 1;
-            end if;
-        end if;
-    end process;
 
-    -- DEBUG output serial clock on serial_TXD
-    serial_TXD <= '1' when serial_tx_count < 417 else '0';
-
-    -- clk_out is not correct as the low time is always 250ns
-    clk_gen : process(clock_16)
-    begin
-        if rising_edge(clock_16) then
-            if cpu_clken = '1' then
-                clk_counter <= (others => '0');
-                clk_out <= '0';
-            elsif clk_counter(2) = '0' then
-                clk_counter <= clk_counter + 1;
-            else
-                clk_out <= '1';
-            end if;
-        end if;
-    end process;
+--------------------------------------------------------
+-- ULA
+--------------------------------------------------------
 
     ula : entity work.ElectronULA
     generic map (
-        IncludeMMC       => true,
+        IncludeMMC       => false,
         Include32KRAM    => true,
-        IncludeVGA       => true,
+        IncludeVGA       => false, -- TODO disabled to simplify clocks
         IncludeJafaMode7 => false  -- TODO get character ROM working
     )
     port map (
@@ -335,15 +304,17 @@ begin
     IRQ_n_out <= '0' when ula_irq_n = '0' else 'Z';
 
     -- Enable data bus transceiver when ULA or ROM selected
-    D_buf_nOE <= '0' when ula_enable = '1' or rom_enable = '1' else '1';
+    D_buf_nOE <= '0' when ula_enable = '1' or rom_enable = '1' or boundary_scan = '1' else '1';
     -- DIR=1 buffers from Elk to FPGA, DIR=0 buffers from FPGA to Elk
-    D_buf_DIR <= '1' when RnW_in = '0' else '0';
+    D_buf_DIR <= '1' when RnW_in = '0' or boundary_scan = '1' else '0';
 
     data_in <= data;
 
-    data <= rom_data      when RnW_in = '1' and rom_enable = '1' else
+    data <= "ZZZZZZZZ"    when boundary_scan = '1' else
+            rom_data      when RnW_in = '1' and rom_enable = '1' else
             ula_data      when RnW_in = '1' and ula_enable = '1' else
             "ZZZZZZZZ";
+
 
 --------------------------------------------------------
 -- Paged ROM
@@ -368,15 +339,33 @@ begin
 
     -- We clock the flash at 96MHz and use the QPI fast read function.
 
+    --flash : entity work.qpi_flash
+    --port map (
+    --    flash_nCE => flash_nCE,
+    --    flash_SCK => flash_SCK,
+    --    flash_IO0 => flash_IO0,
+    --    flash_IO1 => flash_IO1,
+    --    flash_IO2 => flash_IO2,
+    --    flash_IO3 => flash_IO3,
+    --
+    --    clk => clock_96,
+    --
+    --    addr => addr,        -- from external data bus
+    --    data_in => data_in,  -- from external data bus
+    --    data_out => flash_data_out,
+    --
+    --    reset => flash_reset,
+    --    read => flash_read
+    --);
 
 
 --------------------------------------------------------
 -- Power Up Reset Generation
 --------------------------------------------------------
 
-    reset_gen : process(clock_16)
+    reset_gen : process(clock_input)
     begin
-        if rising_edge(clock_16) then
+        if rising_edge(clock_input) then
 
             -- pll_reset_counter is a 2 bit counter, which holds the PLL in
             -- reset for two clocks.
@@ -402,7 +391,79 @@ begin
         end if;
     end process;
 
-    -- Reset is open collector to avoid contention when BREAK pressed
-    RST_n_out <= '0' when powerup_reset_n = '0' else 'Z';
+    -- Reset drives the enable on an open collector buffer which pulls the 5V RESET line down
+    RST_n_out <= '0' when powerup_reset_n = '0' else 'Z';  -- Pulled up externally
+    -- TODO it looks like there might be a short to ground from RST_n_out on board #1
+
+
+--------------------------------------------------------
+-- Clock generation
+--------------------------------------------------------
+
+    clock_input <= clk_osc;  -- Use 16MHz oscillator
+    -- clock_input <= clk_in;  -- Use 16MHz clock from ULA pin
+
+    -- According to the Max 10 datasheet (Table 27), 5MHz < fIN < 472.5 MHz, and
+    -- the VCO runs between 600-1300 MHz.  We might want a lower-jitter clock than
+    -- the 16MHz one from the Electron though.
+
+    -- TODO(myelin) test PLLs with both electron clock and discrete oscillator
+
+    max10_pll1_inst : entity work.max10_pll1 PORT MAP (
+        areset   => pll_reset,
+        inclk0   => clock_input, -- PLL input: 16MHz from oscillator or ULA pin
+        c0       => clock_16,    -- main system clock / sRGB video clock
+        c1       => clock_24,    -- for the SAA5050 in Mode 7
+        c2       => clock_96,    -- SDRAM/flash, divided to 32 for scan doubler for the SAA5050 in Mode 7
+        c3       => clock_40,    -- video clock when in 60Hz VGA Mode
+        c4       => clock_33,    -- video clock when in 50Hz VGA Mode
+        locked   => pll1_locked
+    );
+
+    -- Generate a 250 ns low pulse on PHI OUT for four 16 MHz cycles after cpu_clken == 1
+    clk_gen : process(clock_16)
+    begin
+        if rising_edge(clock_16) then
+            if cpu_clken = '1' then
+                clk_counter <= "001";
+                clk_out_int <= '0';
+            elsif clk_counter(2) = '0' then
+                clk_counter <= clk_counter + 1;
+            else
+                clk_out_int <= '1';
+            end if;
+        end if;
+    end process;
+    clk_out <= clk_out_int;
+
+    -- divide clock_96 to get clock_32 and clock_serial
+    divide_96mhz : process(clock_96)
+    begin
+        if rising_edge(clock_96) then
+            -- Divide 96/3 to get 32MHz
+            if clock_div_96_32 = "10" then
+                -- if clock_32 = '0' then
+                --     clock_16 <= not clock_16;
+                -- end if;
+                clock_32 <= not clock_32;
+                clock_div_96_32 <= "00";
+            else
+                clock_div_96_32 <= clock_div_96_32 + 1;
+            end if;
+
+            -- Divide 96/833 to get serial clock
+            if serial_tx_count = 833 then
+                serial_tx_count <= (others => '0');
+            else
+                serial_tx_count <= serial_tx_count + 1;
+            end if;
+            -- TODO also reset serial_rx_count when we get a start bit
+            if serial_rx_count = 833 then
+                serial_rx_count <= (others => '0');
+            else
+                serial_rx_count <= serial_rx_count + 1;
+            end if;
+        end if;
+    end process;
 
 end behavioral;

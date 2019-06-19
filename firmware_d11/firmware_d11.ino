@@ -116,6 +116,18 @@ void loop() {
     Serial.print(" ");
     Serial.print(fpga_spi.transfer(0), HEX);
     Serial.print(" ");
+    Serial.print(fpga_spi.transfer(0), HEX);
+    Serial.print(" ");
+    Serial.print(fpga_spi.transfer(0), HEX);
+    Serial.print(" ");
+    Serial.print(fpga_spi.transfer(0), HEX);
+    Serial.print(" ");
+    Serial.print(fpga_spi.transfer(0), HEX);
+    Serial.print(" ");
+    Serial.print(fpga_spi.transfer(0), HEX);
+    Serial.print(" ");
+    Serial.print(fpga_spi.transfer(0), HEX);
+    Serial.print(" ");
     Serial.println(fpga_spi.transfer(0), HEX);
     digitalWrite(FPGA_SS_PIN, HIGH);
 

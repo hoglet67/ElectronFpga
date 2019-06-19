@@ -9,6 +9,7 @@
 
 # External clock inputs
 create_clock -period "16 MHz" -name clk_in [get_ports clk_in]
+create_clock -period "16 MHz" -name clk_osc [get_ports clk_osc]
 
 #ElectronFpga_core:electron_core|ElectronULA:ula|clk_video
 
@@ -33,7 +34,7 @@ create_clock -period "16 MHz" -name clk_16M00_c [get_ports clk_16M00_c]
 # Create Generated Clock
 #**************************************************************
 
-# Doing this manually above so we can name the clock
+# Alternatively use a create_generated_clock line for each clock
 derive_pll_clocks
 
 
