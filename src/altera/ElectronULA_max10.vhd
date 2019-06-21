@@ -32,8 +32,8 @@ entity ElectronULA_max10 is
         sdram_nCAS    : out std_logic := '1';
         sdram_nRAS    : out std_logic := '1';
         sdram_CLK     : out std_logic := '1';
-        sdram_CKE     : out std_logic := '0';
-        sdram_UDQM    : out std_logic := '1';
+        sdram_CKE     : out std_logic := '0';  -- active high
+        sdram_UDQM    : out std_logic := '1';  -- active low
         sdram_LDQM    : out std_logic := '1';
 
         -- USB
@@ -58,11 +58,11 @@ entity ElectronULA_max10 is
         RnW_in        : in std_logic;
         RnW_out       : out std_logic := '1';
         RnW_nOE       : out std_logic := '1';  -- pulled high on board
-        RST_n_out     : inout std_logic := '1';  -- pulled high on board
-        RST_n_in      : inout std_logic;
-        IRQ_n_out     : inout std_logic := '1';  -- pulled high on board
-        IRQ_n_in      : inout std_logic;
-        NMI_n_in      : inout std_logic;
+        RST_n_out     : out std_logic := '1';  -- pulled high on board
+        RST_n_in      : in std_logic;
+        IRQ_n_out     : out std_logic := '1';  -- pulled high on board
+        IRQ_n_in      : in std_logic;
+        NMI_n_in      : in std_logic;
 
         -- Rom Enable
         ROM_n         : out std_logic;
@@ -75,11 +75,11 @@ entity ElectronULA_max10 is
         HS_n          : out std_logic := '1';  -- TODO is this unused?
 
         -- Audio DAC
-        dac_dacdat    : inout std_logic;
-        dac_lrclk     : inout std_logic;
-        dac_bclk      : inout std_logic;
-        dac_mclk      : inout std_logic;
-        dac_nmute     : inout std_logic;
+        dac_dacdat    : out std_logic := '0';  -- DAC data
+        dac_lrclk     : out std_logic := '0';  -- Left/right clock
+        dac_bclk      : out std_logic := '0';  -- Bit clock
+        dac_mclk      : out std_logic := '0';  -- Master clock
+        dac_nmute     : out std_logic := '0';
 
         -- Keyboard
         kbd           : in  std_logic_vector(3 downto 0);
@@ -93,13 +93,13 @@ entity ElectronULA_max10 is
         -- SD card
         sd_CLK_SCK    : out std_logic;
         sd_CMD_MOSI   : out std_logic;
-        sd_DAT0_MISO  : inout std_logic;
+        sd_DAT0_MISO  : in std_logic;
         sd_DAT1       : inout std_logic := 'Z';
         sd_DAT2       : inout std_logic := 'Z';
-        sd_DAT3_nCS   : inout std_logic;  -- pulled high on board
+        sd_DAT3_nCS   : out std_logic;  -- pulled high on board
 
         -- serial port
-        serial_RXD    : in std_logic;
+        serial_RXD    : out std_logic := '1';  --DEBUG in std_logic;
         serial_TXD    : out std_logic := '1';
 
         -- Debug MCU interface
@@ -125,23 +125,36 @@ signal clock_40          : std_logic;
 signal clock_96          : std_logic := '1';
 signal clock_div_96_32   : std_logic_vector(1 downto 0) := (others => '0');
 
+-- Divide clock_16 down to ~1 Hz to blink the caps LED
+signal blinky_div        : std_logic_vector(24 downto 0) := (others => '0');
+
 -- Divide 96MHz / 833 = 115246 baud serial
 signal serial_tx_count   : std_logic_vector(9 downto 0) := (others => '0');
 signal serial_rx_count   : std_logic_vector(9 downto 0) := (others => '0');
 
-signal pll_reset         : std_logic;
+signal pll_reset         : std_logic := '1';
 signal pll_reset_counter : std_logic_vector(1 downto 0) := (others => '0');
 signal pll1_locked       : std_logic;
 signal pll_locked_sync   : std_logic_vector(2 downto 0) := (others => '0');
+signal pll_locked_sync_96 : std_logic_vector(2 downto 0) := (others => '0');
 
 signal led_counter       : std_logic_vector(23 downto 0);
 signal clk_counter       : std_logic_vector(2 downto 0);
 signal cpu_clken         : std_logic;
 signal clk_out_int       : std_logic;
+signal cpu_clken_16_sync : std_logic;
+signal cpu_clken_96_sync : std_logic_vector(2 downto 0);
+-- will go high for one clock_96 cycle when A/D are valid for a write
+signal start_write_96    : std_logic;
+-- will go high for one clock_96 cycle when A is valid for a read
+signal start_read_96     : std_logic;
+-- one shot timer to generate start_read_96
+signal wait_for_ads_counter : std_logic_vector(4 downto 0) := (others => '1');
 
 signal data_in           : std_logic_vector(7 downto 0);
 
 signal ula_enable        : std_logic;
+signal ula_addr          : std_logic_vector(15 downto 0);
 signal ula_data          : std_logic_vector(7 downto 0);
 signal ula_irq_n         : std_logic;
 signal video_red         : std_logic_vector(3 downto 0);
@@ -151,12 +164,14 @@ signal video_hsync       : std_logic;
 signal video_vsync       : std_logic;
 signal rom_latch         : std_logic_vector(3 downto 0);
 
-signal powerup_reset_n   : std_logic;
+signal powerup_reset_n   : std_logic := '0';
 signal reset_counter     : std_logic_vector (15 downto 0);
+signal RST_n_sync_16     : std_logic_vector(1 downto 0);
+signal NMI_n_sync_16     : std_logic_vector(1 downto 0);
 
-signal rom_enable        : std_logic;
-signal rom_data          : std_logic_vector(7 downto 0);
-signal rom_we            : std_logic;
+-- Active high reset for flash and SDRAM; will be high until ~1us after the PLL locks
+signal memory_reset_96   : std_logic := '1';
+signal reset_counter_96  : std_logic_vector(8 downto 0);
 
 signal turbo             : std_logic_vector(1 downto 0);
 
@@ -170,9 +185,18 @@ signal mcu_SCK_sync      : std_logic_vector(2 downto 0) := "000";
 signal boundary_scan     : std_logic := '0';
 signal debug_boundary_vector : std_logic_vector(47 downto 0);
 
-signal flash_data_out    : std_logic_vector(7 downto 0);
+signal flash_enable      : std_logic;
+signal flash_data_out    : std_logic_vector(7 downto 0) := x"FF";
 signal flash_reset       : std_logic;
 signal flash_read        : std_logic;
+
+signal sdram_enable      : std_logic;
+signal sdram_data_out    : std_logic_vector(7 downto 0) := x"42";
+signal sdram_init        : std_logic := '1';  -- Power on reset for sdram
+signal sdram_reading     : std_logic;
+signal sdram_writing     : std_logic;
+signal sdram_refreshing  : std_logic;
+signal sdram_check_refresh : std_logic;
 
 begin
 
@@ -181,7 +205,7 @@ begin
 --------------------------------------------------------
 
     -- debug SPI interface with mcu; currently just a boundary scan that reads most of the inputs.
-    -- to read: bring SS high then low, then clock out 32 bits.
+    -- to read: bring SS high then low, then clock out 48 bits.
     spi : process(clock_96)
     begin
         if rising_edge(clock_96) then
@@ -196,7 +220,7 @@ begin
                         "10101010" &  -- AA
                         addr &        -- FF FF
                         data &        -- FF
-                        RnW_in & '0' & powerup_reset_n & RST_n_in & RST_n_out & IRQ_n_in & IRQ_n_out & NMI_n_in &  -- BF
+                        RnW_in & '0' & powerup_reset_n & RST_n_in & powerup_reset_n & IRQ_n_in & ula_irq_n & NMI_n_in &  -- BF
                         kbd & '1' & '1' & '1' & '1'; -- FF
                 end if;
                 if mcu_SCK_sync(2) = '1' and mcu_SCK_sync(1) = '0' then
@@ -219,11 +243,11 @@ begin
     flash_SCK <= mcu_SCK when mcu_debug_TXD = '0' else '1';
     mcu_debug_RXD <= mcu_debug_TXD;  -- loopback serial for MCU debugging
 
-    -- DEBUG output serial clock on serial_TXD; appears to work nicely.
-    --serial_TXD <= '1' when serial_tx_count < 417 else '0';
+    --serial_TXD <= '1' when serial_tx_count < 417 else '0'; -- verified on scope
     --serial_TXD <= clock_16; -- verified on scope
     --serial_TXD <= cpu_clken; -- verified on scope
-    serial_TXD <= clk_out_int;
+    serial_TXD <= clk_out_int; -- verified on scope
+    serial_RXD <= ula_irq_n; -- checking to see if IRQ output pin or logic or buffer is broken
 
 
 --------------------------------------------------------
@@ -245,14 +269,14 @@ begin
         clk_40M00 => clock_40,
 
         -- CPU Interface
-        addr      => addr,
+        addr      => ula_addr,  -- Updated on rising clk_out edge
         data_in   => data_in,
         data_out  => ula_data,
         data_en   => ula_enable,
         R_W_n     => RnW_in,
-        RST_n     => RST_n_out,
-        IRQ_n     => ula_irq_n,
-        NMI_n     => NMI_n_in,
+        RST_n     => RST_n_sync_16(1),
+        IRQ_n     => ula_irq_n,  -- IRQ output from ULA
+        NMI_n     => NMI_n_sync_16(1),
 
         -- Rom Enable
         ROM_n     => ROM_n,
@@ -298,64 +322,172 @@ begin
     green <= video_green(3);
     blue  <= video_blue(3);
     csync <= video_hsync;
-    caps  <= not caps_led;
+    --caps  <= not caps_led;
+    blink_caps : process(clock_16)
+    begin
+        if rising_edge(clock_16) then
+            blinky_div <= blinky_div + 1;
+        end if;
+    end process;
+    --caps <= blinky_div(blinky_div'high);
+    caps <= RST_n_sync_16(1);
     
-    -- IRQ is open collector to avoid contention with the expansion bus
-    IRQ_n_out <= '0' when ula_irq_n = '0' else 'Z';
+    -- IRQ_n_out drives the enable on an open collector buffer which pulls the external IRQ line down
+    IRQ_n_out <= ula_irq_n;
 
-    -- Enable data bus transceiver when ULA or ROM selected
-    D_buf_nOE <= '0' when ula_enable = '1' or rom_enable = '1' or boundary_scan = '1' else '1';
+    -- Enable data bus transceiver when ULA/flash/RAM selected or we want to snoop on the data bus
+    D_buf_nOE <= '0' when (
+        boundary_scan = '1'
+        or flash_enable = '1'
+        or sdram_enable = '1'
+        or ula_enable = '1'
+    ) else '1';
+
     -- DIR=1 buffers from Elk to FPGA, DIR=0 buffers from FPGA to Elk
     D_buf_DIR <= '1' when RnW_in = '0' or boundary_scan = '1' else '0';
 
     data_in <= data;
 
-    data <= "ZZZZZZZZ"    when boundary_scan = '1' else
-            rom_data      when RnW_in = '1' and rom_enable = '1' else
-            ula_data      when RnW_in = '1' and ula_enable = '1' else
+    data <= "ZZZZZZZZ"     when RnW_in = '0' or boundary_scan = '1' else
+            ula_data       when ula_enable = '1' else
+            flash_data_out when flash_enable = '1' else
+            sdram_data_out when sdram_enable = '1' else
             "ZZZZZZZZ";
 
+
+--------------------------------------------------------
+-- Audio DAC
+--------------------------------------------------------
+
+    -- Standby mode
+    dac_bclk <= clock_16;
+    dac_mclk <= clock_16;
+    dac_nmute <= '0';
+
+    -- Master clock runs at 16 MHz
+    -- Divide by 128 to get fs = 125 kHz sample rate
+    -- We need 17 BCLK times per sample because I2S requires a dummy BCLK cycle after a LRCLK transition
+    -- So BCLK >= fs * 17 * 2 = 6.375 MHz; probably just use 8MHz.
+
+--------------------------------------------------------
+-- SDRAM
+--------------------------------------------------------
+
+    -- Sideways RAM
+    sdram_enable <= '0';  -- '1' when addr(15 downto 14) = "10" and (rom_latch = 6 or rom_latch = 7) else '0';
+
+    -- Disable SDRAM for now
+    sdram_CLK <= clock_96;
+    sdram_nCS <= '1';
+    sdram_nWE <= '1';
+    sdram_nCAS <= '1';
+    sdram_nRAS <= '1';
+    sdram_UDQM <= '1';
+    sdram_LDQM <= '1';
+
+    -- TODO move all of this into ula_sdram.v
+    -- TODO start sdram read when start_read_96 = '1' and ram is selected
+    -- TODO start sdram write when start_write_96 = '1' and ram is selected
+
+    -- We clock the SDRAM at 96MHz, i.e. there are 24 cycles in 250 ns and 48 in 500 ns.
+
+    -- Two possibilities in a clock cycle:
+    -- start_write_96 asserted at start of PHI1 period; write takes the next 62.5 ns
+    -- start_read_96 asserted at PHI1+tADS; read takes the next 62.5 ns
+
+    -- In all cases, if it's time for a refresh (about every 7 us), we have
+    -- time for that after a read or write.
+
+    -- In 4MHz operation (250 ns clock), start_read_96 = PHI1+70ns, so we're done after 132.5 ns.
+    -- In 2MHz operation (500 ns clock), start_read_96 = PHI1+177ns, so we're done after 240 ns.
+
+    -- 0: ACTIVE -- nCS=0 RAS=0 CAS=1 WE=1 addr=row BA=bank
+    -- 1: NOP    -- nCS=0 RAS=1 CAS=1 WE=1
+    -- 2: READ   -- nCS=0 RAS=1 CAS=0 WE=1 addr=col BA1:0=bank A10=1 (enable auto precharge)
+    -- 3: NOP    -- nCS=0 RAS=1 CAS=1 WE=1
+    -- 4: NOP    -- register output data here
+    -- 5: NOP
+    -- 6: NOP
+    -- 7: NOP    -- Now switch to refresh mode
+    -- 8: AUTO REFRESH -- 
+    -- 9: nCS=1
+
+    sdram_loop : process(clock_96)
+    begin
+        if rising_edge(clock_96) then
+            sdram_check_refresh <= '0';
+
+            if sdram_init = '1' then
+                if memory_reset_96 = '0' then
+                    -- We're out of reset; start the SDRAM init process
+                    sdram_CKE <= '1';
+                end if;
+            elsif sdram_reading = '1' then
+            elsif sdram_writing = '1' then
+            elsif sdram_refreshing = '1' then
+            end if;
+
+            if start_write_96 = '1' then
+                if sdram_enable = '1' then
+                    sdram_writing <= '1';
+                else
+                    sdram_check_refresh <= '1';
+                end if;
+            elsif start_read_96 = '1' then
+                if sdram_enable = '1' then
+                    sdram_reading <= '1';
+                else
+                    sdram_check_refresh <= '1';
+                end if;
+            end if;
+
+            if sdram_check_refresh = '1' then
+                -- TODO check sdram refresh timer and kick off a refresh if so
+            end if;
+
+            -- reset everything if we're just powering up
+            if memory_reset_96 = '1' then
+                sdram_CKE <= '0';
+                sdram_init <= '1';
+                sdram_reading <= '0';
+                sdram_writing <= '0';
+                sdram_refreshing <= '0';
+                sdram_check_refresh <= '0';
+            end if;
+        end if;
+    end process;
 
 --------------------------------------------------------
 -- Paged ROM
 --------------------------------------------------------
 
-    -- Provide ROMs 14 and 15
-    rom_enable  <= '1' when addr(15 downto 14) = "10" and rom_latch(3 downto 1) = "111" else '0';
-
-    rom_we <= '1' when rom_enable = '1' and cpu_clken = '1' else '0';
-
-    -- There isn't enough room in the 10M08SC to fit the expansion ROMs, so they live in a
-    -- separate QPI flash chip instead.
-
-    -- Timing: The ULA produces PHI0, which the 6502 delays to produce PHI2;
-    -- reads are referenced to PHI2. I believe we have about 190 ns from the
-    -- rising edge of PHI0 to set up the data bus.  There's no single signal
-    -- that lets us know when the CPU hold time is over, but holding until
-    -- addr changes should work okay.
-
-    -- As such our ROM emulator should sample addr on the rising clk_out edge
-    -- and hold until rom_enable drops.
+    -- Provide ROMs 14 and 15 using the QPI flash chip
+    flash_enable <= '1' when addr(15 downto 14) = "10" and (rom_latch = 12 or rom_latch = 13 or rom_latch = 14 or rom_latch = 15) else '0';
 
     -- We clock the flash at 96MHz and use the QPI fast read function.
+    -- 1: drop /CE
+    -- 2-3: cmd
+    -- 4-9: addr
+    -- 10-15: dummy
+    -- 16-17: read byte
+    -- 18: raise /CE
+    -- so flash_data_out will be valid 18 clocks (187.5ns) after start_read_96.
 
     --flash : entity work.qpi_flash
     --port map (
+    --    clk => clock_96,
+    --    en => flash_enable,  -- Asynchronous but safe to sample when read = '1'
+    --    reset => memory_reset_96,
+    --    read => start_read_96,  -- Read cycle trigger
+    --    addr => flash_bank & addr,
+    --    data_out => flash_data_out,
+    --    -- External pins
     --    flash_nCE => flash_nCE,
     --    flash_SCK => flash_SCK,
     --    flash_IO0 => flash_IO0,
     --    flash_IO1 => flash_IO1,
     --    flash_IO2 => flash_IO2,
-    --    flash_IO3 => flash_IO3,
-    --
-    --    clk => clock_96,
-    --
-    --    addr => addr,        -- from external data bus
-    --    data_in => data_in,  -- from external data bus
-    --    data_out => flash_data_out,
-    --
-    --    reset => flash_reset,
-    --    read => flash_read
+    --    flash_IO3 => flash_IO3
     --);
 
 
@@ -392,20 +524,26 @@ begin
     end process;
 
     -- Reset drives the enable on an open collector buffer which pulls the 5V RESET line down
-    RST_n_out <= '0' when powerup_reset_n = '0' else 'Z';  -- Pulled up externally
-    -- TODO it looks like there might be a short to ground from RST_n_out on board #1
+    RST_n_out <= powerup_reset_n;
 
+    reset_gen_96 : process(clock_96)
+    begin
+        if rising_edge(clock_96) then
+            -- synchronize pll1_locked with clock_96, then release reset 128 clocks later
+            pll_locked_sync_96 <= pll_locked_sync_96(1 downto 0) & pll1_locked;
+            if pll_locked_sync_96(2) = '1' and reset_counter_96(reset_counter_96'high) = '0' then
+                reset_counter_96 <= reset_counter_96 + 1;
+            end if;
+            memory_reset_96 <= not reset_counter_96(reset_counter_96'high);
+        end if;
+    end process;
 
 --------------------------------------------------------
 -- Clock generation
 --------------------------------------------------------
 
-    clock_input <= clk_osc;  -- Use 16MHz oscillator
-    -- clock_input <= clk_in;  -- Use 16MHz clock from ULA pin
-
-    -- According to the Max 10 datasheet (Table 27), 5MHz < fIN < 472.5 MHz, and
-    -- the VCO runs between 600-1300 MHz.  We might want a lower-jitter clock than
-    -- the 16MHz one from the Electron though.
+    --clock_input <= clk_osc;  -- Use 16MHz oscillator (works nicely)
+    clock_input <= clk_in;  -- Use 16MHz clock from ULA pin
 
     -- TODO(myelin) test PLLs with both electron clock and discrete oscillator
 
@@ -420,21 +558,73 @@ begin
         locked   => pll1_locked
     );
 
-    -- Generate a 250 ns low pulse on PHI OUT for four 16 MHz cycles after cpu_clken == 1
+    -- Generate a 250 ns low pulse on PHI OUT for four 16 MHz cycles after
+    -- cpu_clken == 1 (i.e. cpu_clken = '1' for the last 62.5ns of a PHI0
+    -- cycle) in 1MHz/2MHz mode, or a 125 ns low pulse in 4MHz mode.
     clk_gen : process(clock_16)
     begin
         if rising_edge(clock_16) then
-            if cpu_clken = '1' then
-                clk_counter <= "001";
+            -- Synchronize reset and NMI for ULA
+            RST_n_sync_16 <= RST_n_sync_16(0) & RST_n_in;
+            NMI_n_sync_16 <= NMI_n_sync_16(0) & NMI_n_in;
+            -- Generate a signal that's synced to the rising edge, for cpu_clken_96_sync later
+            cpu_clken_16_sync <= cpu_clken;
+            -- Generate clk_out (but hold clock when in reset)
+            if cpu_clken = '1' then -- and RST_n_sync_16(1) = '1' then
+                if turbo = "11" then
+                    -- 4MHz clock; produce a 125 ns low pulse
+                    clk_counter <= "011";
+                    -- TODO 4MHz will not work with QPI flash at 96MHz
+                else
+                    -- 1MHz or 2MHz clock; produce a 250 ns low pulse
+                    clk_counter <= "001";
+                end if;
                 clk_out_int <= '0';
             elsif clk_counter(2) = '0' then
                 clk_counter <= clk_counter + 1;
             else
+                -- Update addr from 6502 on rising clk_out edge
+                if clk_out_int = '0' then
+                    ula_addr <= addr;
+                end if;
                 clk_out_int <= '1';
             end if;
         end if;
     end process;
     clk_out <= clk_out_int;
+
+    generate_start_read_write_signals : process(clock_96)
+    begin
+        if rising_edge(clock_96) then
+            -- Probably don't need a synchronizer here, but just in case...
+            -- cpu_clken_16_sync will go high shortly after clock_16.
+            -- cpu_clken_96_sync(2): 3/96 (0.5/16) us after clock_16, i.e 0.5/16 us before clk_out low
+            cpu_clken_96_sync <= cpu_clken_96_sync(1 downto 0) & cpu_clken_16_sync;
+
+            -- start_write_96: high for 1/96 us, .33/16 us before clk_out low when RnW = '0'
+            -- start_read_96: high for 1/96 us when it's safe to sample addr for a read from sdram or flash
+            start_write_96 <= '0';
+            start_read_96 <= '0';
+            if cpu_clken_96_sync(2) = '1' and cpu_clken_96_sync(1) = '0' then
+                if RnW_in = '0' then
+                    start_write_96 <= '1';
+                end if;
+                wait_for_ads_counter <= "00000";
+            elsif wait_for_ads_counter /= 18 then
+                -- A/RnW/D are valid for write at the start of the PHI0 low cycle (from the previous cpu cycle)
+                -- A/RnW are valid for read at the end of the PHI0 low cycle (for the current cycle).
+                -- For 2MHz parts -- R6502A: tRWS = tADS = 140 ns; UM6502B/BE: tRWS = tADS = 100ns
+                -- For 4MHz parts -- UM6502CE: tRWS = 60ns, tADS = 70 ns
+                -- For 14MHz parts -- W65C02S6TPG-14: tADS = 30 ns
+                -- These are referenced to PHI2, which can be delayed up to 30ns from PHI0.
+                -- So we really want a delay of about 170 ns (~17 * clock_96) from clk_out low to start_read_96 high.
+                if wait_for_ads_counter = 17 and RnW_in = '1' then
+                    start_read_96 <= '1';
+                end if;
+                wait_for_ads_counter <= wait_for_ads_counter + 1;
+            end if;
+        end if;
+    end process;
 
     -- divide clock_96 to get clock_32 and clock_serial
     divide_96mhz : process(clock_96)

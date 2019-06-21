@@ -38,7 +38,7 @@ entity ElectronULA is
 
         -- CPU Interface
         addr      : in  std_logic_vector(15 downto 0);
-        data_in   : in  std_logic_vector(7 downto 0);
+        data_in   : in  std_logic_vector(7 downto 0);  -- Async, but stable on rising edge of cpu_clken
         data_out  : out std_logic_vector(7 downto 0);
         data_en   : out std_logic;
         R_W_n     : in  std_logic;
@@ -60,7 +60,7 @@ entity ElectronULA is
         sound     : out std_logic;
 
         -- Keyboard
-        kbd       : in  std_logic_vector(3 downto 0);
+        kbd       : in  std_logic_vector(3 downto 0);  -- Async
 
         -- SD Card
         SDMISO    : in  std_logic;
@@ -105,6 +105,8 @@ architecture behavioral of ElectronULA is
   signal general_counter: std_logic_vector(15 downto 0);
   signal sound_bit      : std_logic;
   signal isr_data       : std_logic_vector(7 downto 0);
+
+  signal ram_data_in_sync : std_logic_vector(7 downto 0);
 
   -- ULA Registers
   signal isr            : std_logic_vector(6 downto 2);
@@ -433,7 +435,7 @@ begin
             clka  => clk_16M00,
             wea   => ram_we,
             addra => addr(14 downto 0),
-            dina  => data_in,
+            dina  => ram_data_in_sync,
             douta => ram_data,
             -- Port B is the VGA Port
             clkb  => clk_video,
@@ -442,7 +444,17 @@ begin
             dinb  => x"00",
             doutb => screen_data
             );
-        ram_we <= '1' when addr(15) = '0' and R_W_n = '0' and cpu_clken = '1' else '0';
+        -- Synchronize wea and dina
+        synchronize_wea_and_dina : process(clk_16M00)
+        begin
+          if rising_edge(clk_16M00) then
+            ram_we <= '0';
+            if addr(15) = '0' and R_W_n = '0' and cpu_clken = '1' then
+              ram_we <= '1';
+              ram_data_in_sync <= data_in;
+            end if;
+          end if;
+        end process;
     end generate;
 
     -- Just screen memory (0x3000-0x7fff) is dual port RAM in the ULA
@@ -718,46 +730,46 @@ begin
                     if delayed_clear_reset = '1' then
                         power_on_reset <= '0';
                     end if;
-                    -- Detect control+caps 1...4 and change video format
-                    if (addr = x"9fff" and page_enable = '1' and page(2 downto 1) = "00") then
-                        if (kbd(2 downto 1) = "00") then
-                            ctrl_caps <= '1';
-                        else
-                            ctrl_caps <= '0';
-                        end if;
-                    end if;
-                    -- Detect "1" being pressed
-                    if (addr = x"afff" and page_enable = '1' and page(2 downto 1) = "00" and ctrl_caps = '1' and kbd(0) = '0') then
-                        mode <= "00";
-                    end if;
-                    -- Detect "2" being pressed
-                    if (addr = x"b7ff" and page_enable = '1' and page(2 downto 1) = "00" and ctrl_caps = '1' and kbd(0) = '0') then
-                        mode <= "01";
-                    end if;
-                    -- Detect "3" being pressed
-                    if (addr = x"bbff" and page_enable = '1' and page(2 downto 1) = "00" and ctrl_caps = '1' and kbd(0) = '0' and IncludeVGA) then
-                        mode <= "10";
-                    end if;
-                    -- Detect "4" being pressed
-                    if (addr = x"bdff" and page_enable = '1' and page(2 downto 1) = "00" and ctrl_caps = '1' and kbd(0) = '0' and IncludeVGA) then
-                        mode <= "11";
-                    end if;
-                    -- Detect "5" being pressed
-                    if (addr = x"beff" and page_enable = '1' and page(2 downto 1) = "00" and ctrl_caps = '1' and kbd(0) = '0') then
-                        turbo_out <= "00";
-                    end if;
-                    -- Detect "6" being pressed
-                    if (addr = x"bf7f" and page_enable = '1' and page(2 downto 1) = "00" and ctrl_caps = '1' and kbd(0) = '0') then
-                        turbo_out <= "01";
-                    end if;
-                    -- Detect "7" being pressed
-                    if (addr = x"bfbf" and page_enable = '1' and page(2 downto 1) = "00" and ctrl_caps = '1' and kbd(0) = '0') then
-                        turbo_out <= "10";
-                    end if;
-                    -- Detect "8" being pressed
-                    if (addr = x"bfdf" and page_enable = '1' and page(2 downto 1) = "00" and ctrl_caps = '1' and kbd(0) = '0') then
-                        turbo_out <= "11";
-                    end if;
+                    ---- Detect control+caps 1...4 and change video format
+                    --if (addr = x"9fff" and page_enable = '1' and page(2 downto 1) = "00") then
+                    --    if (kbd(2 downto 1) = "00") then
+                    --        ctrl_caps <= '1';
+                    --    else
+                    --        ctrl_caps <= '0';
+                    --    end if;
+                    --end if;
+                    ---- Detect "1" being pressed
+                    --if (addr = x"afff" and page_enable = '1' and page(2 downto 1) = "00" and ctrl_caps = '1' and kbd(0) = '0') then
+                    --    mode <= "00";
+                    --end if;
+                    ---- Detect "2" being pressed
+                    --if (addr = x"b7ff" and page_enable = '1' and page(2 downto 1) = "00" and ctrl_caps = '1' and kbd(0) = '0') then
+                    --    mode <= "01";
+                    --end if;
+                    ---- Detect "3" being pressed
+                    --if (addr = x"bbff" and page_enable = '1' and page(2 downto 1) = "00" and ctrl_caps = '1' and kbd(0) = '0' and --IncludeVGA) then
+                    --    mode <= "10";
+                    --end if;
+                    ---- Detect "4" being pressed
+                    --if (addr = x"bdff" and page_enable = '1' and page(2 downto 1) = "00" and ctrl_caps = '1' and kbd(0) = '0' and --IncludeVGA) then
+                    --    mode <= "11";
+                    --end if;
+                    ---- Detect "5" being pressed
+                    --if (addr = x"beff" and page_enable = '1' and page(2 downto 1) = "00" and ctrl_caps = '1' and kbd(0) = '0') then
+                    --    turbo_out <= "00";
+                    --end if;
+                    ---- Detect "6" being pressed
+                    --if (addr = x"bf7f" and page_enable = '1' and page(2 downto 1) = "00" and ctrl_caps = '1' and kbd(0) = '0') then
+                    --    turbo_out <= "01";
+                    --end if;
+                    ---- Detect "7" being pressed
+                    --if (addr = x"bfbf" and page_enable = '1' and page(2 downto 1) = "00" and ctrl_caps = '1' and kbd(0) = '0') then
+                    --    turbo_out <= "10";
+                    --end if;
+                    ---- Detect "8" being pressed
+                    --if (addr = x"bfdf" and page_enable = '1' and page(2 downto 1) = "00" and ctrl_caps = '1' and kbd(0) = '0') then
+                    --    turbo_out <= "11";
+                    --end if;
                     if (addr(15 downto 8) = x"FE") then
                         if (R_W_n = '1') then
                             -- Clear the power on reset flag on the first read of the ISR (FEx0)
@@ -1037,6 +1049,7 @@ begin
                     blue_int  <= (others => palette(4)(7));
                 when others =>
                 end case;
+                green_int <= (not ctrl_caps) & "111"; -- DEBUG make screen green
             end if;
             -- Vertical Sync
             if (field = '0') then
@@ -1117,7 +1130,7 @@ begin
 
     -- ROM accesses always happen at 2Mhz
     rom_access <= not ROM_n_int;
-    -- RAM accesses always happen at 1Mhz and subber contention
+    -- RAM accesses always happen at 1Mhz and suffer contention
     ram_access <= not addr(15);
     -- IO accesses always happen at 1MHz and don't suffer contention
 

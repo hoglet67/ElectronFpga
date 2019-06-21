@@ -32,10 +32,13 @@ sys.path.insert(0, os.path.join(here, "myelin-kicad.pretty"))
 import myelin_kicad_pcb
 Pin = myelin_kicad_pcb.Pin
 
+# TODO(v2) CRITICAL add 10k pullups for nNMI_5V and nIRQ_5V
 # TODO(v2) rename all 100n caps to DC*
 # TODO(v2) put resistor/capacitor values for R*/AR*/C*/AC* on silkscreen
 # TODO(v2) move MSWD down into the corner of the board so it doesn't clash with the AUDIO_OUT pins
 # TODO(v2) try out JTAGTC and see if it's possible to use around SERIAL pins; maybe move SERIAL out to the right of DC13/DC14?
+
+# TODO(v2+) Add an ESP32-PICO-D4 for wifi
 
 ### ULA
 
