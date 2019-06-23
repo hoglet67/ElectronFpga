@@ -151,6 +151,11 @@ signal start_read_96     : std_logic;
 -- one shot timer to generate start_read_96
 signal wait_for_ads_counter : std_logic_vector(4 downto 0) := (others => '1');
 
+signal kbd_access        : std_logic;
+signal kbd_delay         : std_logic := '1';
+-- to skip 127 clocks when we're accessing the keyboard, make this 8-bit
+signal kbd_delay_counter : std_logic_vector(1 downto 0);
+
 signal data_in           : std_logic_vector(7 downto 0);
 
 signal ula_enable        : std_logic;
@@ -247,7 +252,8 @@ begin
     --serial_TXD <= clock_16; -- verified on scope
     --serial_TXD <= cpu_clken; -- verified on scope
     serial_TXD <= clk_out_int; -- verified on scope
-    serial_RXD <= ula_irq_n; -- checking to see if IRQ output pin or logic or buffer is broken
+    --serial_RXD <= kbd(3);
+    serial_RXD <= kbd_access;
 
 
 --------------------------------------------------------
@@ -570,7 +576,12 @@ begin
             -- Generate a signal that's synced to the rising edge, for cpu_clken_96_sync later
             cpu_clken_16_sync <= cpu_clken;
             -- Generate clk_out (but hold clock when in reset)
-            if cpu_clken = '1' then -- and RST_n_sync_16(1) = '1' then
+            if cpu_clken = '1' and kbd_access = '1' and kbd_delay = '1' and kbd_delay_counter(kbd_delay_counter'high) = '0' then
+                -- it's a keyboard access cycle and we want to delay those.
+                -- skip however many cpu clock cycles kbd_delay_counter can handle.
+                kbd_delay_counter <= kbd_delay_counter + 1;
+            elsif cpu_clken = '1' then -- and RST_n_sync_16(1) = '1' then
+                kbd_delay_counter <= "01"; -- reset for next time
                 if turbo = "11" then
                     -- 4MHz clock; produce a 125 ns low pulse
                     clk_counter <= "011";
@@ -592,6 +603,7 @@ begin
         end if;
     end process;
     clk_out <= clk_out_int;
+    kbd_access <= '1' when addr(15 downto 14) = "10" and rom_latch = 8 else '0';
 
     generate_start_read_write_signals : process(clock_96)
     begin

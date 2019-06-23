@@ -33,11 +33,14 @@ import myelin_kicad_pcb
 Pin = myelin_kicad_pcb.Pin
 
 # TODO(v2) CRITICAL add 10k pullups for nNMI_5V and nIRQ_5V
+# TODO(v2) CRITICAL swap DBUF for two 74LVC245 chips and move regulator outside ULA footprint
+# TODO(v2) CRITICAL add 10k pullups for KBD* to 5V (and use LVC rather than LVTH buffer)
+# TODO(v2) CRITICAL pull CAS_IN_5V to CAS_IN_divider with 10k, and add 10u decoupling cap from CAS_IN_divider to GND
+
 # TODO(v2) rename all 100n caps to DC*
 # TODO(v2) put resistor/capacitor values for R*/AR*/C*/AC* on silkscreen
 # TODO(v2) move MSWD down into the corner of the board so it doesn't clash with the AUDIO_OUT pins
 # TODO(v2) try out JTAGTC and see if it's possible to use around SERIAL pins; maybe move SERIAL out to the right of DC13/DC14?
-
 # TODO(v2+) Add an ESP32-PICO-D4 for wifi
 
 ### ULA
@@ -1568,7 +1571,7 @@ comparator = [
         pins=[
             Pin( 1, "OUT", "casIn"),  # open drain, pulled to 3V3
             Pin( 2, "V+",  "5V"),
-            Pin( 3, "IN+", "CAS_IN_5V"),
+            Pin( 3, "IN+", "CAS_IN_5V"),  # -0.37V - 0.73V, probably needs to be pulled to divider
             Pin( 4, "IN-", "CAS_IN_divider"),
             Pin( 5, "V-",  "GND"),
         ],

@@ -267,6 +267,15 @@ architecture behavioral of ElectronULA is
   signal rom_access     : std_logic; -- always at 2mhz, no contention
   signal ram_access     : std_logic; -- 1MHz/2Mhz/Stopped
 
+  -- stretch clock high cycle when reading keyboard, to give pullups a chance to
+  -- overpower the 74lvth162245 bus hold.
+  signal kbd_access     : std_logic;
+  signal kbd_delay      : std_logic := '0';  -- set to 0 to not delay on keyboard accesses
+  -- counts 2**len-1 clocks, holding the clock high, on a keyboard access cycle
+  -- i.e. 4 downto 0 = 16 clocks = 1 us
+  -- 16 downto 0 = 2**15 = 32768 clocks = 2.048 ms, which lets me scope up kbd* and see how long the pullups are taking
+  signal kbd_delay_counter : std_logic_vector(16 downto 0);
+
   signal clk_state      : std_logic_vector(2 downto 0);
   signal cpu_clken      : std_logic;
   signal cpu_clken_1    : std_logic;
@@ -490,7 +499,7 @@ begin
 
     -- ULA Reads + RAM Reads + KBD Reads
     data_out <= ram_data                  when addr(15) = '0' else
-                "0000" & (kbd xor "1111") when addr(15 downto 14) = "10" and page_enable = '1' and page(2 downto 1) = "00" else
+                "0000" & (kbd xor "1111") when kbd_access = '1' else
                 isr_data                  when addr(15 downto 8) = x"FE" and addr(3 downto 0) = x"0" else
                 data_shift                when addr(15 downto 8) = x"FE" and addr(3 downto 0) = x"4" else
                 crtc_do                   when crtc_enable = '1' and IncludeJafaMode7 else
@@ -499,7 +508,7 @@ begin
                 x"F1"; -- todo FIXEME
 
     data_en  <= '1'                       when addr(15) = '0' else
-                '1'                       when addr(15 downto 14) = "10" and page_enable = '1' and page(2 downto 1) = "00" else
+                '1'                       when kbd_access = '1' else
                 '1'                       when addr(15 downto 8) = x"FE" else
                 '1'                       when crtc_enable = '1' and IncludeJafaMode7 else
                 '1'                       when status_enable = '1' and IncludeJafaMode7 else
@@ -1049,7 +1058,7 @@ begin
                     blue_int  <= (others => palette(4)(7));
                 when others =>
                 end case;
-                green_int <= (not ctrl_caps) & "111"; -- DEBUG make screen green
+                --green_int <= (not ctrl_caps) & "111"; -- DEBUG make screen green
             end if;
             -- Vertical Sync
             if (field = '0') then
@@ -1133,11 +1142,13 @@ begin
     -- RAM accesses always happen at 1Mhz and suffer contention
     ram_access <= not addr(15);
     -- IO accesses always happen at 1MHz and don't suffer contention
+    -- Keyboard accesses are delayed to debug the UEU
+    kbd_access <= '1' when addr(15 downto 14) = "10" and page_enable = '1' and page(2 downto 1) = "00" else '0';
 
     clk_gen1 : process(clk_16M00, RST_n)
     begin
         if rising_edge(clk_16M00) then
-            -- clock state machine
+            -- clock state machine, used to 
             if clken_counter(0) = '1' and clken_counter(1) = '1' then
                 case clk_state is
                 when "000" =>
@@ -1146,9 +1157,14 @@ begin
                         clk_state <= "001";
                     else
                         -- 1MHz, possible contention
-                        clk_state <= "101";
+                        if kbd_delay = '1' and kbd_access = '1' and kbd_delay_counter(kbd_delay_counter'high) = '0' then
+                          kbd_delay_counter <= kbd_delay_counter + 1;
+                        else
+                          clk_state <= "101";
+                        end if;
                     end if;
                 when "001" =>
+                    kbd_delay_counter <= (others => '0');
                     -- CPU is clocked in this state
                     clk_state <= "010";
                 when "010" =>
@@ -1157,9 +1173,14 @@ begin
                         clk_state <= "011";
                     else
                         -- 1MHz, possible contention
-                        clk_state <= "111";
+                        if kbd_delay = '1' and kbd_access = '1' and kbd_delay_counter(kbd_delay_counter'high) = '0' then
+                          kbd_delay_counter <= kbd_delay_counter + 1;
+                        else
+                          clk_state <= "111";
+                        end if;
                     end if;
                 when "011" =>
+                    kbd_delay_counter <= (others => '0');
                     -- CPU is clocked in this state
                     clk_state <= "000";
                 when "100" =>
