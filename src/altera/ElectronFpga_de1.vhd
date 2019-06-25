@@ -7,22 +7,18 @@
 -- Redistribution and use in source and synthezised forms, with or without
 -- modification, are permitted provided that the following conditions are met:
 --
--- * Redistributions of source code must retain the above copyright notice,
---   this list of conditions and the following disclaimer.
+-- Redistributions of source code must retain the above copyright notice,
+-- this list of conditions and the following disclaimer.
 --
--- * Redistributions in synthesized form must reproduce the above copyright
---   notice, this list of conditions and the following disclaimer in the
---   documentation and/or other materials provided with the distribution.
+-- Redistributions in synthesized form must reproduce the above copyright
+-- notice, this list of conditions and the following disclaimer in the
+-- documentation and/or other materials provided with the distribution.
 --
--- * Neither the name of the author nor the names of other contributors may
---   be used to endorse or promote products derived from this software without
---   specific prior written agreement from the author.
+-- Neither the name of the author nor the names of other contributors may
+-- be used to endorse or promote products derived from this software without
+-- specific prior written permission.
 --
--- * License is granted for non-commercial use only.  A fee may not be charged
---   for redistributions as source code or in synthesized/hardware form without
---   specific prior written agreement from the author.
---
--- THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+-- THIS CODE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
 -- AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
 -- THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
 -- PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE
@@ -34,9 +30,7 @@
 -- ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 -- POSSIBILITY OF SUCH DAMAGE.
 --
--- Altera/Terasic DE1 top-level
---
--- (c) 2015 David Banks
+-- You are responsible for any legal issues arising from your use of this code.
 
 library ieee;
 use ieee.std_logic_1164.all;
@@ -303,10 +297,10 @@ begin
 
     -- implement tape monitoring controlled by the motor and SW1
 	 cas_monitor <= motor_led and SW(0);
-	 
+
     pcm_outl <= "0" & audio_l & "00000000000000" when cas_monitor <= '0' else pcm_inl;
     pcm_outr <= "0" & audio_r & "00000000000000" when cas_monitor <= '0' else pcm_inr;
-                
+
     i2s : entity work.i2s_intf
     port map (
         CLK         => clock_32,
@@ -336,7 +330,7 @@ begin
         IS_DONE     => is_done,
         IS_ERROR    => is_error
     );
-    
+
 --------------------------------------------------------
 -- Casette Input (from Line In)
 --------------------------------------------------------
