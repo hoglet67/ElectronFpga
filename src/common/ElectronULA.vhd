@@ -267,14 +267,10 @@ architecture behavioral of ElectronULA is
   signal rom_access     : std_logic; -- always at 2mhz, no contention
   signal ram_access     : std_logic; -- 1MHz/2Mhz/Stopped
 
-  -- stretch clock high cycle when reading keyboard, to give pullups a chance to
-  -- overpower the 74lvth162245 bus hold.
   signal kbd_access     : std_logic;
-  signal kbd_delay      : std_logic := '0';  -- set to 0 to not delay on keyboard accesses
-  -- counts 2**len-1 clocks, holding the clock high, on a keyboard access cycle
-  -- i.e. 4 downto 0 = 16 clocks = 1 us
-  -- 16 downto 0 = 2**15 = 32768 clocks = 2.048 ms, which lets me scope up kbd* and see how long the pullups are taking
-  signal kbd_delay_counter : std_logic_vector(16 downto 0);
+  -- set to 1 to read keyboard at 1MHz, if there's too much capacitance on the
+  -- buffer inputs.  (seems unnecessary with extra pullup on kbd* lines)
+  signal kbd_delay      : std_logic := '0';
 
   signal clk_state      : std_logic_vector(2 downto 0);
   signal cpu_clken      : std_logic;
@@ -1158,35 +1154,25 @@ begin
             if clken_counter(0) = '1' and clken_counter(1) = '1' then
                 case clk_state is
                 when "000" =>
-                    if rom_access = '1' then
+                    if rom_access = '1' and (kbd_access = '0' or kbd_delay = '0') then
                         -- 2MHz no contention
                         clk_state <= "001";
                     else
                         -- 1MHz, possible contention
-                        if kbd_delay = '1' and kbd_access = '1' and kbd_delay_counter(kbd_delay_counter'high) = '0' then
-                          kbd_delay_counter <= kbd_delay_counter + 1;
-                        else
-                          clk_state <= "101";
-                        end if;
+                        clk_state <= "101";
                     end if;
                 when "001" =>
-                    kbd_delay_counter <= (others => '0');
                     -- CPU is clocked in this state
                     clk_state <= "010";
                 when "010" =>
-                    if rom_access = '1' then
+                    if rom_access = '1' and (kbd_access = '0' or kbd_delay = '0') then
                         -- 2MHz no contention
                         clk_state <= "011";
                     else
                         -- 1MHz, possible contention
-                        if kbd_delay = '1' and kbd_access = '1' and kbd_delay_counter(kbd_delay_counter'high) = '0' then
-                          kbd_delay_counter <= kbd_delay_counter + 1;
-                        else
-                          clk_state <= "111";
-                        end if;
+                        clk_state <= "111";
                     end if;
                 when "011" =>
-                    kbd_delay_counter <= (others => '0');
                     -- CPU is clocked in this state
                     clk_state <= "000";
                 when "100" =>
