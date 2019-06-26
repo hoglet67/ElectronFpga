@@ -8,8 +8,6 @@ use ieee.std_logic_1164.all;
 use ieee.std_logic_unsigned.all;
 use ieee.numeric_std.all;
 
--- TODO change PLL to generate clock_32, and make clock_24 using a divider
-
 -- TODO figure out how to emulate BBC/Master keyboard reads using an internal CPU
 
 entity ElectronULA_max10 is
@@ -133,7 +131,7 @@ signal clock_32          : std_logic;
 signal clock_33          : std_logic;
 signal clock_40          : std_logic;
 signal clock_96          : std_logic := '1';
-signal clock_div_96_32   : std_logic_vector(1 downto 0) := (others => '0');
+signal clock_div_96_24   : std_logic_vector(1 downto 0) := (others => '0');
 
 -- Divide clock_16 down to ~1 Hz to blink the caps LED
 signal blinky_div        : std_logic_vector(24 downto 0) := (others => '0');
@@ -626,8 +624,8 @@ begin
         areset   => pll_reset,
         inclk0   => clock_input, -- PLL input: 16MHz from oscillator or ULA pin
         c0       => clock_16,    -- main system clock / sRGB video clock
-        c1       => clock_24,    -- for the SAA5050 in Mode 7
-        c2       => clock_96,    -- SDRAM/flash, divided to 32 for scan doubler for the SAA5050 in Mode 7
+        c1       => clock_32,    -- for scan doubler for the SAA5050 in Mode 7
+        c2       => clock_96,    -- SDRAM/flash, divided to 24 for the SAA5050 in Mode 7
         c3       => clock_40,    -- video clock when in 60Hz VGA Mode
         c4       => clock_33,    -- video clock when in 50Hz VGA Mode
         locked   => pll1_locked
@@ -706,15 +704,12 @@ begin
     divide_96mhz : process(clock_96)
     begin
         if rising_edge(clock_96) then
-            -- Divide 96/3 to get 32MHz
-            if clock_div_96_32 = "10" then
-                -- if clock_32 = '0' then
-                --     clock_16 <= not clock_16;
-                -- end if;
-                clock_32 <= not clock_32;
-                clock_div_96_32 <= "00";
+            -- Divide 96/4 to get 24MHz
+            if clock_div_96_24 = "11" then
+                clock_24 <= not clock_24;
+                clock_div_96_24 <= "00";
             else
-                clock_div_96_32 <= clock_div_96_32 + 1;
+                clock_div_96_24 <= clock_div_96_24 + 1;
             end if;
 
             -- Divide 96/833 to get serial clock
