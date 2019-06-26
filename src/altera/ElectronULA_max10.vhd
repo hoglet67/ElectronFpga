@@ -324,15 +324,19 @@ begin
     green <= video_green(3);
     blue  <= video_blue(3);
     csync <= video_hsync;
-    --caps  <= not caps_led;
-    blink_caps : process(clock_16)
-    begin
-        if rising_edge(clock_16) then
-            blinky_div <= blinky_div + 1;
-        end if;
-    end process;
+    caps  <= not caps_led;
+
+    -- Blink CAPS at 1 Hz
+    --blink_caps : process(clock_16)
+    --begin
+    --    if rising_edge(clock_16) then
+    --        blinky_div <= blinky_div + 1;
+    --    end if;
+    --end process;
     --caps <= blinky_div(blinky_div'high);
-    caps <= RST_n_sync_16(1);
+
+    -- Light up CAPS on reset
+    --caps <= RST_n_sync_16(1);
     
     -- IRQ_n_out drives the enable on an open collector buffer which pulls the external IRQ line down
     IRQ_n_out <= ula_irq_n;
