@@ -33,9 +33,9 @@ import myelin_kicad_pcb
 Pin = myelin_kicad_pcb.Pin
 
 # TODO(v2) CRITICAL add 10k pullups for nNMI_5V and nIRQ_5V
-# TODO(v2) CRITICAL swap DBUF for two 74LVC245 chips and move regulator outside ULA footprint
+# TODO(v2) CRITICAL swap DBUF with a 74LVC16245 (and maybe ABUF too)
 # TODO(v2) CRITICAL add 10k pullups for KBD* to 5V (and use LVC rather than LVTH buffer)
-# TODO(v2) CRITICAL pull CAS_IN_5V to CAS_IN_divider with 10k, and add 10u decoupling cap from CAS_IN_divider to GND
+# TODO(v2) CRITICAL pull CAS_IN_5V to CAS_IN_divider with 10k, and add 10u NF decoupling cap from CAS_IN_divider to GND
 
 # TODO(v2) rename all 100n caps to DC*
 # TODO(v2) put resistor/capacitor values for R*/AR*/C*/AC* on silkscreen
