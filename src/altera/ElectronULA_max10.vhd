@@ -8,7 +8,17 @@ use ieee.std_logic_1164.all;
 use ieee.std_logic_unsigned.all;
 use ieee.numeric_std.all;
 
+-- TODO change PLL to generate clock_32, and make clock_24 using a divider
+
+-- TODO figure out how to emulate BBC/Master keyboard reads using an internal CPU
+
 entity ElectronULA_max10 is
+    generic (
+        -- Set this to true to include an internal 6502 core.
+        -- You MUST remove the CPU from the main board when doing this,
+        -- as the ULA will drive the address bus and RnW.
+        InternalCPU   : boolean := true
+    );
     port (
         -- 16 MHz clock from Electron
         clk_in        : in std_logic;
@@ -152,11 +162,11 @@ signal start_read_96     : std_logic;
 signal wait_for_ads_counter : std_logic_vector(4 downto 0) := (others => '1');
 
 signal kbd_access        : std_logic;
-signal data_in           : std_logic_vector(7 downto 0);
+signal bus_write_from_internal_device : std_logic;
 
 signal ula_enable        : std_logic;
 signal ula_addr          : std_logic_vector(15 downto 0);
-signal ula_data          : std_logic_vector(7 downto 0);
+signal ula_data_out      : std_logic_vector(7 downto 0);
 signal ula_irq_n         : std_logic;
 signal video_red         : std_logic_vector(3 downto 0);
 signal video_green       : std_logic_vector(3 downto 0);
@@ -173,6 +183,15 @@ signal NMI_n_sync_16     : std_logic_vector(1 downto 0);
 -- Active high reset for flash and SDRAM; will be high until ~1us after the PLL locks
 signal memory_reset_96   : std_logic := '1';
 signal reset_counter_96  : std_logic_vector(8 downto 0);
+
+-- Outbound CPU signals when soft CPU is being used
+signal cpu_addr          : std_logic_vector(23 downto 0);
+signal cpu_data_out      : std_logic_vector(7 downto 0);
+signal cpu_RnW_out       : std_logic;
+
+-- Internal variable for data bus
+signal data_in           : std_logic_vector(7 downto 0);
+signal RnW               : std_logic;
 
 signal turbo             : std_logic_vector(1 downto 0);
 
@@ -221,7 +240,7 @@ begin
                         "10101010" &  -- AA
                         addr &        -- FF FF
                         data &        -- FF
-                        RnW_in & '0' & powerup_reset_n & RST_n_in & powerup_reset_n & IRQ_n_in & ula_irq_n & NMI_n_in &  -- BF
+                        RnW & '0' & powerup_reset_n & RST_n_in & powerup_reset_n & IRQ_n_in & ula_irq_n & NMI_n_in &  -- BF
                         kbd & '1' & '1' & '1' & '1'; -- FF
                 end if;
                 if mcu_SCK_sync(2) = '1' and mcu_SCK_sync(1) = '0' then
@@ -273,9 +292,9 @@ begin
         -- CPU Interface
         addr      => ula_addr,  -- Updated on rising clk_out edge
         data_in   => data_in,
-        data_out  => ula_data,
+        data_out  => ula_data_out,
         data_en   => ula_enable,
-        R_W_n     => RnW_in,
+        R_W_n     => RnW,
         RST_n     => RST_n_sync_16(1),
         IRQ_n     => ula_irq_n,  -- IRQ output from ULA
         NMI_n     => NMI_n_sync_16(1),
@@ -341,24 +360,74 @@ begin
     -- IRQ_n_out drives the enable on an open collector buffer which pulls the external IRQ line down
     IRQ_n_out <= ula_irq_n;
 
-    -- Enable data bus transceiver when ULA/flash/RAM selected or we want to snoop on the data bus
+    -- CPU data bus and RnW signal
+    data_in <= data;
+    RnW <= cpu_RnW_out when InternalCPU else RnW_in;
+
+    -- '1' when the CPU is reading from a device on the ULA PCB
+    bus_write_from_internal_device <= '1' when RnW = '1' and (
+        flash_enable = '1'    -- Output from flash
+        or sdram_enable = '1' -- Output from SDRAM
+        or ula_enable = '1'   -- Output from ULA
+    ) else '0';
+
+    -- '0' to enable data bus buffer
     D_buf_nOE <= '0' when (
-        boundary_scan = '1'
-        or flash_enable = '1'
-        or sdram_enable = '1'
-        or ula_enable = '1'
+        InternalCPU                              -- Input to/output from internal CPU
+        or boundary_scan = '1'                   -- Input to boundary scan
+        or bus_write_from_internal_device = '1'  -- Something local wants to write to the bus
     ) else '1';
 
     -- DIR=1 buffers from Elk to FPGA, DIR=0 buffers from FPGA to Elk
-    D_buf_DIR <= '1' when RnW_in = '0' or boundary_scan = '1' else '0';
+    D_buf_DIR <=
+        -- outwards when something local is writing to the bus
+        '0' when bus_write_from_internal_device = '1' else
+        -- inwards when the internal CPU is reading, outwards when it is writing
+        RnW when InternalCPU else
+        -- inwards when external CPU is writing
+        '1' when RnW = '0' else
+        -- inwards during boundary scan
+        '1' when boundary_scan = '1' else
+        -- default outwards (buffer should be disabled)
+        '0';
 
-    data_in <= data;
+    -- Order here should match D_buf_DIR expression above.
+    data <= ula_data_out   when RnW = '1' and ula_enable = '1' else
+            flash_data_out when RnW = '1' and flash_enable = '1' else
+            sdram_data_out when RnW = '1' and sdram_enable = '1' else
+            cpu_data_out   when RnW = '0' and InternalCPU else
+            "ZZZZZZZZ";  -- ext CPU, RnW = '0' or boundary_scan = '1'
 
-    data <= "ZZZZZZZZ"     when RnW_in = '0' or boundary_scan = '1' else
-            ula_data       when ula_enable = '1' else
-            flash_data_out when flash_enable = '1' else
-            sdram_data_out when sdram_enable = '1' else
-            "ZZZZZZZZ";
+
+--------------------------------------------------------
+-- Internal CPU (optional)
+--------------------------------------------------------
+
+    GenCPU: if InternalCPU generate
+        T65core : entity work.T65
+        port map (
+            Mode            => "00",
+            Abort_n         => '1',
+            SO_n            => '1',  -- Signal not routed to the ULA
+            Res_n           => RST_n_in,
+            Enable          => cpu_clken,
+            Clk             => clock_16,
+            Rdy             => '1',  -- Signal not routed to the ULA
+            IRQ_n           => IRQ_n_in,
+            NMI_n           => NMI_n_in,
+            R_W_n           => cpu_RnW_out,
+            Sync            => open,  -- Signal not routed to the ULA
+            A               => cpu_addr,
+            DI              => data_in,
+            DO              => cpu_data_out
+        );
+        -- Buffer address outwards
+		  addr <= cpu_addr(15 downto 0);
+        A_buf_DIR <= '0';
+        -- Buffer RnW outwards
+        RnW_out <= cpu_RnW_out;
+        RnW_nOE <= '0';
+    end generate;
 
 
 --------------------------------------------------------
@@ -613,7 +682,7 @@ begin
             start_write_96 <= '0';
             start_read_96 <= '0';
             if cpu_clken_96_sync(2) = '1' and cpu_clken_96_sync(1) = '0' then
-                if RnW_in = '0' then
+                if RnW = '0' then
                     start_write_96 <= '1';
                 end if;
                 wait_for_ads_counter <= "00000";
@@ -625,7 +694,7 @@ begin
                 -- For 14MHz parts -- W65C02S6TPG-14: tADS = 30 ns
                 -- These are referenced to PHI2, which can be delayed up to 30ns from PHI0.
                 -- So we really want a delay of about 170 ns (~17 * clock_96) from clk_out low to start_read_96 high.
-                if wait_for_ads_counter = 17 and RnW_in = '1' then
+                if wait_for_ads_counter = 17 and RnW = '1' then
                     start_read_96 <= '1';
                 end if;
                 wait_for_ads_counter <= wait_for_ads_counter + 1;
