@@ -25,11 +25,11 @@ entity ElectronULA_max10 is
 
         -- QSPI flash chip
         flash_nCE     : out std_logic := '1';  -- pulled high on board
-        flash_SCK     : out std_logic := '1';
-        flash_IO0     : inout std_logic := 'Z';
-        flash_IO1     : inout std_logic := 'Z';
-        flash_IO2     : inout std_logic := 'Z';
-        flash_IO3     : inout std_logic := 'Z';
+        flash_SCK     : out std_logic := '0';
+        flash_IO0     : inout std_logic := 'Z';  -- MOSI
+        flash_IO1     : inout std_logic := 'Z';  -- MISO
+        flash_IO2     : inout std_logic := 'Z';  -- /WP
+        flash_IO3     : inout std_logic := 'Z';  -- /HOLD or /RESET
 
         -- SDRAM
         sdram_DQ      : inout std_logic_vector(15 downto 0) := (others => 'Z');
@@ -198,6 +198,18 @@ signal caps_led          : std_logic;
 signal mcu_MOSI_sync     : std_logic_vector(2 downto 0) := "000";
 signal mcu_SS_sync       : std_logic_vector(2 downto 0) := "111";
 signal mcu_SCK_sync      : std_logic_vector(2 downto 0) := "000";
+signal mcu_shifter       : std_logic_vector(7 downto 0) := (others => '0');
+signal mcu_shift_count   : std_logic_vector(2 downto 0) := (others => '0');
+signal mcu_shifter_byte  : std_logic_vector(7 downto 0);
+signal mcu_MISO_int      : std_logic;
+signal mcu_state         : std_logic_vector(7 downto 0);  -- state machine state
+signal mcu_flash_spi     : std_logic := '0';  -- connect MCU to flash
+signal mcu_flash_spi_clocking : std_logic := '0';  -- '0' during first clock cycle after connecting MCU to flash
+signal mcu_flash_qpi     : std_logic := '0';  -- connect MCU to flash
+signal mcu_flash_qpi_cmd : std_logic := '0';  -- '1' when reading QPI rnw/command over SPI
+signal mcu_flash_qpi_rnw : std_logic := '1';  -- QPI RnW
+signal mcu_flash_qpi_txn : std_logic := '0';  -- QPI strobe
+signal mcu_flash_qpi_counter : std_logic_vector(1 downto 0);
 
 -- debug boundary scan over SPI
 signal boundary_scan     : std_logic := '0';
@@ -222,51 +234,154 @@ begin
 -- Debugging
 --------------------------------------------------------
 
-    -- debug SPI interface with mcu; currently just a boundary scan that reads most of the inputs.
-    -- to read: bring SS high then low, then clock out 48 bits.
+    -- SPI interface with mcu
     spi : process(clock_96)
     begin
         if rising_edge(clock_96) then
+            -- Synchronous SPI; 48MHz ATSAMD MCU can do 12 MHz max, so we have plenty of time
             mcu_MOSI_sync <= mcu_MOSI_sync(1 downto 0) & mcu_MOSI;
             mcu_SCK_sync <= mcu_SCK_sync(1 downto 0) & mcu_SCK;
             mcu_SS_sync <= mcu_SS_sync(1 downto 0) & mcu_SS;
 
-            if mcu_SS_sync(2) = '0' then
-                if mcu_SS_sync(1) = '1' then
-                    -- start of transaction
-                    debug_boundary_vector <=
-                        "10101010" &  -- AA
-                        addr &        -- FF FF
-                        data &        -- FF
-                        RnW & '0' & powerup_reset_n & RST_n_in & powerup_reset_n & IRQ_n_in & ula_irq_n & NMI_n_in &  -- BF
-                        kbd & '1' & '1' & '1' & '1'; -- FF
-                end if;
-                if mcu_SCK_sync(2) = '1' and mcu_SCK_sync(1) = '0' then
-                    -- rising SCK edge; mcu_MOSI_sync(2) contains the input bit
+            if mcu_SS_sync(1) = '1' then
+                -- SS high; reset everything
+                mcu_shifter <= x"AA";
+                mcu_shift_count <= "000";
+                mcu_state <= x"00";
+                mcu_flash_spi <= '0';
+                mcu_flash_spi_clocking <= '0';
+                mcu_flash_qpi <= '0';
+                mcu_flash_qpi_cmd <= '0';
+                mcu_flash_qpi_txn <= '0';
+                mcu_flash_qpi_counter <= "00";
+                flash_nCE <= '1';
+                flash_SCK <= '0';
+            else
+                -- SS low
+                if mcu_SS_sync(2) = '1' then
+                    -- SS just fell; start of transaction
+                    mcu_MISO_int <= mcu_shifter(7);
                 end if;
                 if mcu_SCK_sync(2) = '0' and mcu_SCK_sync(1) = '1' then
-                    -- falling SCK edge; shift debug_boundary_vector out mcu_MISO, MSB first
-                    debug_boundary_vector <= debug_boundary_vector(debug_boundary_vector'high-1 downto 0) & '0';
+                    -- rising SCK edge happened 2-3 cycles ago, so we can update MISO right now
+                    mcu_MISO_int <= mcu_shifter(6);
+                    mcu_shifter <= mcu_shifter_byte;  -- {mcu_shifter[6:0], mcu_MOSI_sync[2]}
+                    mcu_shift_count <= mcu_shift_count + 1;
+
+                    if mcu_shift_count = "111" then
+                        -- just received a byte: mcu_shifter_byte
+                        case mcu_state is
+                            when x"00" =>  -- command byte
+                                mcu_state <= mcu_shifter_byte;
+                                mcu_shifter <= x"55";  -- debug
+                                case mcu_shifter_byte is
+                                    when x"02" =>
+                                        -- pass remainder of transaction through to flash
+                                        mcu_flash_spi <= '1';
+                                        flash_nCE <= '0';
+                                    when x"03" =>
+                                        -- Starting a QPI flash transaction
+                                        flash_nCE <= '0';
+                                        mcu_flash_qpi <= '1';
+                                        mcu_flash_qpi_cmd <= '1';
+                                    when x"05" =>
+                                        -- Boundary scan
+                                        debug_boundary_vector <=
+                                            "10101010" &  -- AA
+                                            addr &        -- FF FF
+                                            data &        -- FF
+                                            RnW & '0' & powerup_reset_n & RST_n_in & powerup_reset_n & IRQ_n_in & ula_irq_n & NMI_n_in &  -- BF
+                                            kbd & '1' & '1' & '1' & '1'; -- FF
+                                    when others =>
+                                end case;
+                            when x"01" =>  -- config byte; TODO implement
+                            when x"02" =>  -- SPI to flash; no-op
+                            when x"03" =>  -- QPI to flash
+                                -- Begin QPI tx/rx byte
+                                -- Alternate command / data bytes
+                                if mcu_flash_qpi_cmd = '1' then
+                                    -- Just read a command byte: 0 for tx, 1 for rx
+                                    if mcu_shifter_byte(0) = '0' then
+                                        -- TX
+                                        mcu_flash_qpi_rnw <= '0';  -- TX
+                                        mcu_flash_qpi_cmd <= '0';  -- Next byte is data
+                                    else
+                                        -- RX
+                                        mcu_flash_qpi_rnw <= '1';  -- RX
+                                        mcu_flash_qpi_txn <= '1';  -- Read now
+                                    end if;
+                                else
+                                    -- Just read a data byte for a TX transaction
+                                    mcu_flash_qpi_cmd <= '1';  -- Next byte is command
+                                    mcu_flash_qpi_txn <= '1';  -- Write now
+                                end if;
+                                -- Result reads out during the next command byte.
+                            when x"04" =>  -- USB serial port; TODO implement
+                            when x"05" =>  -- Boundary scan
+                                -- Copy in the next byte
+                                mcu_shifter <= debug_boundary_vector(47 downto 40);
+                                debug_boundary_vector <= debug_boundary_vector(39 downto 0) & x"00";
+                            when others =>
+                        end case;
+                    end if;
+
+                    -- override all that if we're passing SPI through to the flash
+                    --if mcu_flash_spi = '1' then
+                    --    flash_IO0 <= mcu_MOSI_sync(2);
+                    --    mcu_MISO_int <= flash_IO1;
+                    --end if;
+                elsif mcu_SCK_sync(2) = '1' and mcu_SCK_sync(1) = '0' then
+                    -- falling SCK edge
+                    if mcu_flash_spi = '1' then
+                        -- We've just started SPI passthrough and have been waiting
+                        -- for mcu_SCK to go low before starting to buffer it.
+                        mcu_flash_spi_clocking <= '1';
+                    end if;
                 end if;
+            end if;
+
+            -- QPI transaction (quick enough to perform between mcu_SCK clock edges!)
+            if mcu_flash_qpi_txn = '1' then
+                mcu_flash_qpi_counter <= mcu_flash_qpi_counter + 1;
+                if mcu_flash_qpi_counter(0) = '1' then
+                    if mcu_flash_qpi_rnw = '1' then
+                        -- RX; clock data from flash_IO* into mcu_shifter
+                        mcu_shifter <= mcu_shifter(3 downto 0) & flash_IO3 & flash_IO2 & flash_IO1 & flash_IO0;
+                    else
+                        -- TX; shift mcu_shifter to update flash_IO*
+                        mcu_shifter <= mcu_shifter(3 downto 0) & "0000";
+                    end if;
+                    if mcu_flash_qpi_counter(1) = '1' then
+                        mcu_flash_qpi_txn <= '0';  -- Done!
+                    end if;
+                end if;
+            end if;
+
+            -- Override all that if we're passing SPI through to the flash
+            if mcu_flash_spi_clocking = '1' then
+                flash_SCK <= mcu_SCK_sync(0);
+                flash_IO0 <= mcu_MOSI_sync(0);
+                mcu_MISO_int <= flash_IO1;
             end if;
         end if;
     end process;
+    mcu_shifter_byte <= mcu_shifter(6 downto 0) & mcu_MOSI_sync(2);
+    mcu_MISO <= mcu_MISO_int;
 
-    -- when mcu_debug_TXD is low, pass MCU SPI port through to flash
-    boundary_scan <= '0';  -- Boundary scan off (needed to operate as ULA)
-    --boundary_scan <= mcu_debug_TXD;  -- Turn on boundary scan when SPI is connected to debug SPI
-    mcu_MISO <= flash_IO1 when mcu_debug_TXD = '0' else debug_boundary_vector(debug_boundary_vector'high);
-    flash_nCE <= mcu_SS when mcu_debug_TXD = '0' else '1';
-    flash_IO0 <= mcu_MOSI when mcu_debug_TXD = '0' else '1';
-    flash_SCK <= mcu_SCK when mcu_debug_TXD = '0' else '1';
+    --flash_IO3 <= mcu_shifter(3) if mcu_flash_qpi = '1' and mcu_flash_qpi_rnw = '0' else 'Z';
+    --flash_IO2 <= mcu_shifter(2) if mcu_flash_qpi = '1' and mcu_flash_qpi_rnw = '0' else 'Z';
+    --flash_IO1 <= mcu_shifter(1) if mcu_flash_qpi = '1' and mcu_flash_qpi_rnw = '0' else 'Z';
+    --flash_IO0 <= mcu_shifter(0) if mcu_flash_qpi = '1' and mcu_flash_qpi_rnw = '0' else 'Z';
+
+    -- DEBUG I/O
     mcu_debug_RXD <= mcu_debug_TXD;  -- loopback serial for MCU debugging
-
     --serial_TXD <= '1' when serial_tx_count < 417 else '0'; -- verified on scope
     --serial_TXD <= clock_16; -- verified on scope
     --serial_TXD <= cpu_clken; -- verified on scope
     serial_TXD <= clk_out_int; -- verified on scope
     --serial_RXD <= kbd(3);
-    serial_RXD <= kbd_access;
+    --serial_RXD <= kbd_access;
+    serial_RXD <= sound_bit;
 
 
 --------------------------------------------------------
