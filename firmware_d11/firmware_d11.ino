@@ -115,14 +115,31 @@ uint8_t debug_transfer(uint8_t b) {
 // #define fpga_spi_transfer debug_transfer
 #define fpga_spi_transfer fpga_spi.transfer
 
-static void flash_start_spi() {
+static boolean spi_started = false;
+
+static void flash_start_spi(uint8_t cmd) {
+  if (spi_started) {
+    Serial.println("Attempt to start SPI when already started!");
+    while (1);
+  }
+  spi_started = true;
+
   digitalWrite(FPGA_SS_PIN, LOW);
 
   // Init passthrough to flash
   fpga_spi_transfer(0x02);
+
+  // Send command
+  fpga_spi_transfer(cmd);
 }
 
 static void flash_end_spi() {
+  if (!spi_started) {
+    Serial.println("Attempt to end SPI when not started!");
+    while (1);
+  }
+  spi_started = false;
+
   digitalWrite(FPGA_SS_PIN, HIGH);
 }
 
@@ -132,16 +149,14 @@ static void flash_end_spi() {
 #define STATUS2_QE 0x02
 
 uint8_t read_status1() {
-  flash_start_spi();
-  fpga_spi_transfer(0x05);
+  flash_start_spi(0x05);
   uint8_t status1 = fpga_spi_transfer(0);
   flash_end_spi();
   return status1;
 }
 
 uint8_t read_status2() {
-  flash_start_spi();
-  fpga_spi_transfer(0x35);
+  flash_start_spi(0x35);
   uint8_t status2 = fpga_spi_transfer(0);
   flash_end_spi();
   return status2;
@@ -153,15 +168,19 @@ boolean flash_busy() {
   return r;
 }
 
+static void flash_end_spi_after_write() {
+  flash_end_spi();
+  while (flash_busy());
+  // Flash write is automatically disabled; we don't need to call flash_write_disable() now.
+}
+
 void flash_write_enable() {
-  flash_start_spi();
-  fpga_spi_transfer(0x06);
+  flash_start_spi(0x06);
   flash_end_spi();
 }
 
 void flash_write_disable() {
-  flash_start_spi();
-  fpga_spi_transfer(0x04);
+  flash_start_spi(0x04);
   flash_end_spi();
 }
 
@@ -173,17 +192,15 @@ void flash_send_24bit_addr(uint32_t addr) {
 
 void erase_sector(uint32_t addr) {
   flash_write_enable();
-  flash_start_spi();
-  fpga_spi_transfer(0x20);  // Sector erase
+  flash_start_spi(0x20);  // Sector erase
   flash_send_24bit_addr(addr);
-  flash_end_spi();
-  while (flash_busy());
-  // Flash write is automatically disabled; we don't need to call flash_write_disable() now.
+  flash_end_spi_after_write();
 }
 
 boolean online = false;
 boolean flash_detected = false;
 
+uint32_t page_buf_size = 256;
 uint8_t page_buf[256];
 
 void loop() {
@@ -219,9 +236,8 @@ void loop() {
     Serial.println(fpga_spi_transfer(0), HEX);
     digitalWrite(FPGA_SS_PIN, HIGH);
 
-    flash_start_spi();
     Serial.print("Flash: ");
-    Serial.print(fpga_spi_transfer(0x90), HEX);  // read manufacturer / device ID
+    flash_start_spi(0x90);  // read manufacturer / device ID
     flash_send_24bit_addr(0);
     Serial.print(" Winbond: ");
     uint8_t manufacturer = fpga_spi_transfer(0);
@@ -242,21 +258,17 @@ void loop() {
       Serial.print("Read status 2: ");  // default 0; will be 2 when QE is set
       Serial.println(read_status2(), HEX);
 
-      flash_start_spi();
       Serial.print("Read status 3: ");  // default 0x60 (25% drive strength)
-      fpga_spi_transfer(0x15);
+      flash_start_spi(0x15);
       Serial.println(fpga_spi_transfer(0), HEX);
       flash_end_spi();
 
       if (!(read_status2() & STATUS2_QE)) {
         Serial.print("Write NV quad enable bit: ");  // write 0x02 to status 2
         flash_write_enable();
-        flash_start_spi();
-        fpga_spi_transfer(0x31);  // write status 2
+        flash_start_spi(0x31);  // write status 2
         fpga_spi_transfer(STATUS2_QE);
-        flash_end_spi();
-        while (flash_busy());
-        flash_write_disable();
+        flash_end_spi_after_write();
         Serial.println("done");
       }
     }
@@ -272,8 +284,7 @@ void loop() {
       case 'r': {
         // Read some data.  03h instruction is good up to 50 MHz, so we can use that here.
         Serial.println("Reading data:");
-        flash_start_spi();
-        fpga_spi_transfer(0x03);  // Read data
+        flash_start_spi(0x03);  // Read data
         flash_send_24bit_addr(0);
         uint32_t addr;
         uint32_t checksum = 0;
@@ -294,19 +305,24 @@ void loop() {
       case 'R': {
         // Read 64kB with binary output
         Serial.print("DATA:");
-        flash_start_spi();
-        fpga_spi_transfer(0x03);  // Read data
-        flash_send_24bit_addr(0);
-        uint32_t addr;
         uint32_t checksum = 0;
-        for (addr = 0; addr < 65536; ++addr) {
-          if (!Serial.dtr()) break;
-          uint8_t b = fpga_spi_transfer(0);
-          Serial.write(b);
-          checksum += b;
+        uint32_t addr;
+        uint32_t blocksize = 256;
+
+        for (uint32_t sector = 0; sector < 65536L; sector += page_buf_size) {
+          flash_start_spi(0x03);  // Read data
+          flash_send_24bit_addr(sector);
+          for (int offset = 0; offset < page_buf_size; ++offset) {
+            if (!Serial.dtr()) break;
+            page_buf[offset] = fpga_spi_transfer(0);
+          }
+          flash_end_spi();
+          for (int offset = 0; offset < page_buf_size; ++offset) {
+            Serial.write(page_buf[offset]);
+            checksum += page_buf[offset];
+          }
         }
         Serial.println();
-        flash_end_spi();
         Serial.print(addr);
         Serial.print(" bytes read; checksum ");
         Serial.println(checksum, HEX);
@@ -324,16 +340,13 @@ void loop() {
       case 'p': {
         Serial.println("Programming something");
         flash_write_enable();
-        flash_start_spi();
-        fpga_spi_transfer(0x02);  // Page program
+        flash_start_spi(0x02);  // Page program
         flash_send_24bit_addr(0);
         // program 256 bytes
         for (int a = 0; a < 256; ++a) {
           fpga_spi_transfer((uint8_t)a);
         }
-        flash_end_spi();
-        while (flash_busy());
-        // Flash write is automatically disabled; we don't need to call flash_write_disable() now.
+        flash_end_spi_after_write();
         Serial.println("Programmed 256 bytes at 0");
         break;
       }
@@ -369,24 +382,19 @@ void loop() {
 
             flash_write_enable();
 
-            flash_start_spi();
-            fpga_spi_transfer(0x02);  // Page program
+            flash_start_spi(0x02);  // Page program
             flash_send_24bit_addr(addr);
             // program 256 bytes
             for (int a = 0; a < 256; ++a) {
               fpga_spi_transfer(page_buf[a]);
             }
-            flash_end_spi();
-
-            while (flash_busy());
-            // Flash write is automatically disabled; we don't need to call flash_write_disable() now.
+            flash_end_spi_after_write();
 
             Serial.print("Programmed 256 bytes at ");
             Serial.println(addr);
 
             // Verify
-            flash_start_spi();
-            fpga_spi_transfer(0x03);  // Read data
+            flash_start_spi(0x03);  // Read data
             flash_send_24bit_addr(addr);
             boolean mismatch = false;
             for (int a = 0; a < 256; ++a) {
