@@ -94,4 +94,6 @@ def upload(rom):
             time.sleep(0.1)
 
 if __name__ == '__main__':
-    upload(open(sys.argv[1], 'rb').read())
+    data = open(sys.argv[1], 'rb').read()
+    upload(data)
+    assert data == open("readback.rom").read(), "verification failed"

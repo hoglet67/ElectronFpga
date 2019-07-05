@@ -215,7 +215,7 @@ void loop() {
 
     digitalWrite(FPGA_SS_PIN, LOW);
     Serial.print("FPGA: ");
-    Serial.print(fpga_spi_transfer(0), HEX);  // Expect AA
+    Serial.print(fpga_spi_transfer(5), HEX);  // Expect AA
     Serial.print(" ");
     Serial.print(fpga_spi_transfer(0), HEX);  // Expect 55
     Serial.print(" ");
@@ -235,6 +235,13 @@ void loop() {
     Serial.print(" ");
     Serial.println(fpga_spi_transfer(0), HEX);
     digitalWrite(FPGA_SS_PIN, HIGH);
+
+    Serial.println("Exit QPI + cont read mode");
+    flash_start_spi(0xFF);  // Eight clocks, i.e. FF FF FF FF, which will disable continuous read
+    flash_end_spi();
+
+    flash_start_spi(0xFF);  // Eight clocks, i.e. FF FF FF FF, which should disable QPI
+    flash_end_spi();
 
     Serial.print("Flash: ");
     flash_start_spi(0x90);  // read manufacturer / device ID
@@ -278,6 +285,12 @@ void loop() {
     switch (Serial.read()) {
       case '\n': {
         Serial.println("OK");
+        break;
+      }
+
+      case 'x': {
+        // Reset
+        online = 0;
         break;
       }
 

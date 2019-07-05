@@ -122,6 +122,29 @@ end;
 
 architecture behavioral of ElectronULA_max10 is
 
+-- Need to declare this as a component because Quartus can't do entity
+-- instantiation with Verilog modules.
+component qpi_flash is
+    port (
+        clk : in std_logic;
+        ready : out std_logic;
+        reset : in std_logic;
+        read : in std_logic;
+        addr : in std_logic_vector(23 downto 0);
+        data_out : out std_logic_vector(7 downto 0);
+        passthrough : in std_logic;
+        passthrough_nCE : in std_logic;
+        passthrough_SCK : in std_logic;
+        passthrough_MOSI : in std_logic;
+        flash_nCE : out std_logic;
+        flash_SCK : out std_logic;
+        flash_IO0 : inout std_logic;
+        flash_IO1 : inout std_logic;
+        flash_IO2 : inout std_logic;
+        flash_IO3 : inout std_logic
+    );
+end component qpi_flash;
+
 -- Maps to either clk_in or clk_osc depending which one we are using
 signal clock_input       : std_logic;
 -- Generated clocks:
@@ -162,6 +185,7 @@ signal wait_for_ads_counter : std_logic_vector(4 downto 0) := (others => '1');
 signal kbd_access        : std_logic;
 signal bus_write_from_internal_device : std_logic;
 
+signal rom_enable_n      : std_logic;
 signal ula_enable        : std_logic;
 signal ula_addr          : std_logic_vector(15 downto 0);
 signal ula_data_out      : std_logic_vector(7 downto 0);
@@ -178,9 +202,9 @@ signal reset_counter     : std_logic_vector (15 downto 0);
 signal RST_n_sync_16     : std_logic_vector(1 downto 0);
 signal NMI_n_sync_16     : std_logic_vector(1 downto 0);
 
--- Active high reset for flash and SDRAM; will be high until ~1us after the PLL locks
+-- Active high reset for flash and SDRAM; will be high until ~42us after the PLL locks
 signal memory_reset_96   : std_logic := '1';
-signal reset_counter_96  : std_logic_vector(8 downto 0);
+signal reset_counter_96  : std_logic_vector(12 downto 0);
 
 -- Outbound CPU signals when soft CPU is being used
 signal cpu_addr          : std_logic_vector(23 downto 0);
@@ -205,18 +229,22 @@ signal mcu_MISO_int      : std_logic;
 signal mcu_state         : std_logic_vector(7 downto 0);  -- state machine state
 signal mcu_flash_spi     : std_logic := '0';  -- connect MCU to flash
 signal mcu_flash_spi_clocking : std_logic := '0';  -- '0' during first clock cycle after connecting MCU to flash
-signal mcu_flash_qpi     : std_logic := '0';  -- connect MCU to flash
-signal mcu_flash_qpi_cmd : std_logic := '0';  -- '1' when reading QPI rnw/command over SPI
-signal mcu_flash_qpi_rnw : std_logic := '1';  -- QPI RnW
-signal mcu_flash_qpi_txn : std_logic := '0';  -- QPI strobe
-signal mcu_flash_qpi_counter : std_logic_vector(1 downto 0);
+--signal mcu_flash_qpi     : std_logic := '0';  -- connect MCU to flash
+--signal mcu_flash_qpi_cmd : std_logic := '0';  -- '1' when reading QPI rnw/command over SPI
+--signal mcu_flash_qpi_rnw : std_logic := '1';  -- QPI RnW
+--signal mcu_flash_qpi_txn : std_logic := '0';  -- QPI strobe
+--signal mcu_flash_qpi_counter : std_logic_vector(1 downto 0);
 
 -- debug boundary scan over SPI
 signal boundary_scan     : std_logic := '0';
 signal debug_boundary_vector : std_logic_vector(47 downto 0);
 
-signal flash_enable      : std_logic;
+signal empty_bank_enable : std_logic;
+
+signal flash_enable      : std_logic := '0';
+signal flash_bank        : std_logic_vector(7 downto 0) := x"00";  -- bits 23-16 of flash address
 signal flash_data_out    : std_logic_vector(7 downto 0) := x"FF";
+signal flash_ready       : std_logic;
 signal flash_reset       : std_logic;
 signal flash_read        : std_logic;
 
@@ -239,6 +267,38 @@ begin
     begin
         if rising_edge(clock_96) then
             -- Synchronous SPI; 48MHz ATSAMD MCU can do 12 MHz max, so we have plenty of time
+
+            -- Assume 12 MHz master, so we have 8 clocks per master clock.
+
+            -- clk  0 - sck=0 sync(0)=0 sync(1)=0 sync(2)=0
+            -- clk  1 - sck=1 sync(0)=0 sync(1)=0 sync(2)=0  -- master clocks in bit from us now
+            -- clk  2 - sck=1 sync(0)=1 sync(1)=0 sync(2)=0
+            -- clk  3 - sck=1 sync(0)=1 sync(1)=1 sync(2)=0
+            --          edge detected; our activity affects clk 4
+            -- clk  4 - sck=1 sync(0)=1 sync(1)=1 sync(2)=1
+            -- clk  5 - sck=1 sync(0)=1 sync(1)=1 sync(2)=1
+            -- clk  6 - sck=1 sync(0)=1 sync(1)=1 sync(2)=1
+            -- clk  7 - sck=1 sync(0)=1 sync(1)=1 sync(2)=1
+            -- clk  8 - sck=1 sync(0)=1 sync(1)=1 sync(2)=1
+            -- clk  9 - sck=0 sync(0)=1 sync(1)=1 sync(2)=1
+            -- clk 10 - sck=0 sync(0)=0 sync(1)=1 sync(2)=1
+            -- clk 11 - sck=0 sync(0)=0 sync(1)=0 sync(2)=1
+            --          edge detected; our activity affects clk 12
+            -- clk 12 - sck=0 sync(0)=0 sync(1)=0 sync(2)=0
+            -- clk 13 - sck=0 sync(0)=0 sync(1)=0 sync(2)=0
+            -- clk 14 - sck=0 sync(0)=0 sync(1)=0 sync(2)=0
+            -- clk 15 - sck=0 sync(0)=0 sync(1)=0 sync(2)=0
+            -- clk 16 - sck=0 sync(0)=0 sync(1)=0 sync(2)=0
+            -- clk 17 - sck=1 sync(0)=0 sync(1)=0 sync(2)=0 -- master clocks in bit from us now
+            -- clk 18 - sck=1 sync(0)=1 sync(1)=0 sync(2)=0
+
+            -- MOSI is stable except around clocks 10-13, so it should be
+            -- pretty safe for us to do everything in clock 3, and copy
+            -- mcu_shifter(7) into mcu_MISO_int on every clock.  That way
+            -- we'll update MISO around clock 5.
+
+            -- SCK rise: detected
+
             mcu_MOSI_sync <= mcu_MOSI_sync(1 downto 0) & mcu_MOSI;
             mcu_SCK_sync <= mcu_SCK_sync(1 downto 0) & mcu_SCK;
             mcu_SS_sync <= mcu_SS_sync(1 downto 0) & mcu_SS;
@@ -250,21 +310,16 @@ begin
                 mcu_state <= x"00";
                 mcu_flash_spi <= '0';
                 mcu_flash_spi_clocking <= '0';
-                mcu_flash_qpi <= '0';
-                mcu_flash_qpi_cmd <= '0';
-                mcu_flash_qpi_txn <= '0';
-                mcu_flash_qpi_counter <= "00";
-                flash_nCE <= '1';
-                flash_SCK <= '0';
+                --mcu_flash_qpi <= '0';
+                --mcu_flash_qpi_cmd <= '0';
+                --mcu_flash_qpi_txn <= '0';
+                --mcu_flash_qpi_counter <= "00";
             else
                 -- SS low
-                if mcu_SS_sync(2) = '1' then
-                    -- SS just fell; start of transaction
-                    mcu_MISO_int <= mcu_shifter(7);
-                end if;
+                mcu_MISO_int <= mcu_shifter(7);
                 if mcu_SCK_sync(2) = '0' and mcu_SCK_sync(1) = '1' then
-                    -- rising SCK edge happened 2-3 cycles ago, so we can update MISO right now
-                    mcu_MISO_int <= mcu_shifter(6);
+                    -- rising SCK edge happened 2-3 cycles ago
+                    --mcu_MISO_int <= mcu_shifter(6);
                     mcu_shifter <= mcu_shifter_byte;  -- {mcu_shifter[6:0], mcu_MOSI_sync[2]}
                     mcu_shift_count <= mcu_shift_count + 1;
 
@@ -278,58 +333,53 @@ begin
                                     when x"02" =>
                                         -- pass remainder of transaction through to flash
                                         mcu_flash_spi <= '1';
-                                        flash_nCE <= '0';
-                                    when x"03" =>
-                                        -- Starting a QPI flash transaction
-                                        flash_nCE <= '0';
-                                        mcu_flash_qpi <= '1';
-                                        mcu_flash_qpi_cmd <= '1';
+                                    --when x"03" =>
+                                    --    -- Starting a QPI flash transaction
+                                    --    flash_nCE <= '0';
+                                    --    mcu_flash_qpi <= '1';
+                                    --    mcu_flash_qpi_cmd <= '1';
                                     when x"05" =>
                                         -- Boundary scan
                                         debug_boundary_vector <=
                                             "10101010" &  -- AA
-                                            addr &        -- FF FF
-                                            data &        -- FF
+                                            x"FFFF" & flash_data_out &
+                                            -- addr &        -- FF FF
+                                            -- data &        -- FF
                                             RnW & '0' & powerup_reset_n & RST_n_in & powerup_reset_n & IRQ_n_in & ula_irq_n & NMI_n_in &  -- BF
                                             kbd & '1' & '1' & '1' & '1'; -- FF
                                     when others =>
                                 end case;
                             when x"01" =>  -- config byte; TODO implement
                             when x"02" =>  -- SPI to flash; no-op
-                            when x"03" =>  -- QPI to flash
-                                -- Begin QPI tx/rx byte
-                                -- Alternate command / data bytes
-                                if mcu_flash_qpi_cmd = '1' then
-                                    -- Just read a command byte: 0 for tx, 1 for rx
-                                    if mcu_shifter_byte(0) = '0' then
-                                        -- TX
-                                        mcu_flash_qpi_rnw <= '0';  -- TX
-                                        mcu_flash_qpi_cmd <= '0';  -- Next byte is data
-                                    else
-                                        -- RX
-                                        mcu_flash_qpi_rnw <= '1';  -- RX
-                                        mcu_flash_qpi_txn <= '1';  -- Read now
-                                    end if;
-                                else
-                                    -- Just read a data byte for a TX transaction
-                                    mcu_flash_qpi_cmd <= '1';  -- Next byte is command
-                                    mcu_flash_qpi_txn <= '1';  -- Write now
-                                end if;
-                                -- Result reads out during the next command byte.
+                            --when x"03" =>  -- QPI to flash
+                            --    -- Begin QPI tx/rx byte
+                            --    -- Alternate command / data bytes
+                            --    if mcu_flash_qpi_cmd = '1' then
+                            --        -- Just read a command byte: 0 for tx, 1 for rx
+                            --        if mcu_shifter_byte(0) = '0' then
+                            --            -- TX
+                            --            mcu_flash_qpi_rnw <= '0';  -- TX
+                            --            mcu_flash_qpi_cmd <= '0';  -- Next byte is data
+                            --        else
+                            --            -- RX
+                            --            mcu_flash_qpi_rnw <= '1';  -- RX
+                            --            mcu_flash_qpi_txn <= '1';  -- Read now
+                            --        end if;
+                            --    else
+                            --        -- Just read a data byte for a TX transaction
+                            --        mcu_flash_qpi_cmd <= '1';  -- Next byte is command
+                            --        mcu_flash_qpi_txn <= '1';  -- Write now
+                            --    end if;
+                            --    -- Result reads out during the next command byte.
                             when x"04" =>  -- USB serial port; TODO implement
                             when x"05" =>  -- Boundary scan
                                 -- Copy in the next byte
                                 mcu_shifter <= debug_boundary_vector(47 downto 40);
+                                --mcu_MISO_int <= debug_boundary_vector(47);  -- work around off by one error
                                 debug_boundary_vector <= debug_boundary_vector(39 downto 0) & x"00";
                             when others =>
                         end case;
                     end if;
-
-                    -- override all that if we're passing SPI through to the flash
-                    --if mcu_flash_spi = '1' then
-                    --    flash_IO0 <= mcu_MOSI_sync(2);
-                    --    mcu_MISO_int <= flash_IO1;
-                    --end if;
                 elsif mcu_SCK_sync(2) = '1' and mcu_SCK_sync(1) = '0' then
                     -- falling SCK edge
                     if mcu_flash_spi = '1' then
@@ -341,26 +391,24 @@ begin
             end if;
 
             -- QPI transaction (quick enough to perform between mcu_SCK clock edges!)
-            if mcu_flash_qpi_txn = '1' then
-                mcu_flash_qpi_counter <= mcu_flash_qpi_counter + 1;
-                if mcu_flash_qpi_counter(0) = '1' then
-                    if mcu_flash_qpi_rnw = '1' then
-                        -- RX; clock data from flash_IO* into mcu_shifter
-                        mcu_shifter <= mcu_shifter(3 downto 0) & flash_IO3 & flash_IO2 & flash_IO1 & flash_IO0;
-                    else
-                        -- TX; shift mcu_shifter to update flash_IO*
-                        mcu_shifter <= mcu_shifter(3 downto 0) & "0000";
-                    end if;
-                    if mcu_flash_qpi_counter(1) = '1' then
-                        mcu_flash_qpi_txn <= '0';  -- Done!
-                    end if;
-                end if;
-            end if;
+            --if mcu_flash_qpi_txn = '1' then
+            --    mcu_flash_qpi_counter <= mcu_flash_qpi_counter + 1;
+            --    if mcu_flash_qpi_counter(0) = '1' then
+            --        if mcu_flash_qpi_rnw = '1' then
+            --            -- RX; clock data from flash_IO* into mcu_shifter
+            --            mcu_shifter <= mcu_shifter(3 downto 0) & flash_IO3 & flash_IO2 & flash_IO1 & flash_IO0;
+            --        else
+            --            -- TX; shift mcu_shifter to update flash_IO*
+            --            mcu_shifter <= mcu_shifter(3 downto 0) & "0000";
+            --        end if;
+            --        if mcu_flash_qpi_counter(1) = '1' then
+            --            mcu_flash_qpi_txn <= '0';  -- Done!
+            --        end if;
+            --    end if;
+            --end if;
 
             -- Override all that if we're passing SPI through to the flash
             if mcu_flash_spi_clocking = '1' then
-                flash_SCK <= mcu_SCK_sync(0);
-                flash_IO0 <= mcu_MOSI_sync(0);
                 mcu_MISO_int <= flash_IO1;
             end if;
         end if;
@@ -413,7 +461,7 @@ begin
         NMI_n     => NMI_n_sync_16(1),
 
         -- Rom Enable
-        ROM_n     => ROM_n,
+        ROM_n     => rom_enable_n,
 
         -- Video
         red       => video_red,
@@ -452,6 +500,7 @@ begin
         turbo_out      => turbo
     );
 
+    ROM_n <= rom_enable_n;
     red   <= video_red(3);
     green <= video_green(3);
     blue  <= video_blue(3);
@@ -479,7 +528,8 @@ begin
 
     -- '1' when the CPU is reading from a device on the ULA PCB
     bus_write_from_internal_device <= '1' when RnW = '1' and (
-        flash_enable = '1'    -- Output from flash
+        empty_bank_enable = '1'
+        or flash_enable = '1'    -- Output from flash
         or sdram_enable = '1' -- Output from SDRAM
         or ula_enable = '1'   -- Output from ULA
     ) else '0';
@@ -506,6 +556,7 @@ begin
 
     -- Order here should match D_buf_DIR expression above.
     data <= ula_data_out   when RnW = '1' and ula_enable = '1' else
+            x"FF"          when RnW = '1' and empty_bank_enable = '1' else
             flash_data_out when RnW = '1' and flash_enable = '1' else
             sdram_data_out when RnW = '1' and sdram_enable = '1' else
             cpu_data_out   when RnW = '0' and InternalCPU else
@@ -649,34 +700,38 @@ begin
 -- Paged ROM
 --------------------------------------------------------
 
-    -- Provide ROMs 14 and 15 using the QPI flash chip
-    flash_enable <= '1' when addr(15 downto 14) = "10" and (rom_latch = 12 or rom_latch = 13 or rom_latch = 14 or rom_latch = 15) else '0';
+    -- Drive data bus with FF when nothing else is (required with bus hold buffers in v1)
+    empty_bank_enable <= '1' when (
+        addr(15 downto 14) = "10"
+        and rom_enable_n = '1' and flash_enable = '0' and sdram_enable = '0' and ula_enable = '0'
+    ) else '0';
 
-    -- We clock the flash at 96MHz and use the QPI fast read function.
-    -- 1: drop /CE
-    -- 2-3: cmd
-    -- 4-9: addr
-    -- 10-15: dummy
-    -- 16-17: read byte
-    -- 18: raise /CE
-    -- so flash_data_out will be valid 18 clocks (187.5ns) after start_read_96.
+    -- Provide ROMs using the QPI flash chip
+    flash_enable <= '1' when addr(15 downto 14) = "10" and rom_latch < 4 else '0';
+    -- Right now this maps to the first 4 x 16kB = 64kB of flash.
 
-    --flash : entity work.qpi_flash
-    --port map (
-    --    clk => clock_96,
-    --    en => flash_enable,  -- Asynchronous but safe to sample when read = '1'
-    --    reset => memory_reset_96,
-    --    read => start_read_96,  -- Read cycle trigger
-    --    addr => flash_bank & addr,
-    --    data_out => flash_data_out,
-    --    -- External pins
-    --    flash_nCE => flash_nCE,
-    --    flash_SCK => flash_SCK,
-    --    flash_IO0 => flash_IO0,
-    --    flash_IO1 => flash_IO1,
-    --    flash_IO2 => flash_IO2,
-    --    flash_IO3 => flash_IO3
-    --);
+    flash : qpi_flash
+    port map (
+        clk => clock_96,
+        ready => flash_ready,
+        reset => memory_reset_96,
+        read => start_read_96 and flash_enable,  -- Read cycle trigger
+        addr => flash_bank & rom_latch(1 downto 0) & addr(13 downto 0),
+        data_out => flash_data_out,
+        -- Passthrough: when active (passthrough = '1'), IO1/2/3 are inputs with
+        -- a weak pullup, and nCE/SCK/IO0 are passed through (registered on clock_96).
+        passthrough => mcu_flash_spi_clocking,
+        passthrough_nCE => not mcu_flash_spi_clocking,
+        passthrough_SCK => mcu_SCK_sync(0),
+        passthrough_MOSI => mcu_MOSI_sync(0),
+        -- External pins
+        flash_nCE => flash_nCE,
+        flash_SCK => flash_SCK,
+        flash_IO0 => flash_IO0,
+        flash_IO1 => flash_IO1,
+        flash_IO2 => flash_IO2,
+        flash_IO3 => flash_IO3
+    );
 
 
 --------------------------------------------------------
@@ -717,7 +772,10 @@ begin
     reset_gen_96 : process(clock_96)
     begin
         if rising_edge(clock_96) then
-            -- synchronize pll1_locked with clock_96, then release reset 128 clocks later
+            -- Serial flash needs at least 20 us to start up, and 30us after a software reset,
+            -- so delay at least 30 us (2880 clocks).  Easy option: 4096 clocks (42.7 us).
+
+            -- Synchronize pll1_locked with clock_96, then release reset 4096 clocks later:
             pll_locked_sync_96 <= pll_locked_sync_96(1 downto 0) & pll1_locked;
             if pll_locked_sync_96(2) = '1' and reset_counter_96(reset_counter_96'high) = '0' then
                 reset_counter_96 <= reset_counter_96 + 1;
@@ -785,16 +843,37 @@ begin
     generate_start_read_write_signals : process(clock_96)
     begin
         if rising_edge(clock_96) then
-            -- Probably don't need a synchronizer here, but just in case...
-            -- cpu_clken_16_sync will go high shortly after clock_16.
-            -- cpu_clken_96_sync(2): 3/96 (0.5/16) us after clock_16, i.e 0.5/16 us before clk_out low
+
+            -- cpu_clken_16_sync is synchronized with clock_16.
+
+            -- With InternalCPU, it will be high for the clock *after* a T65
+            -- cycle, so as soon as it goes low, it's safe for clock_96
+            -- processes to sample addr/data.  Assuming aligned clock_16 and
+            -- clock_96 edges, cpu_clken_96_sync(1) will go low 20.83 ns
+            -- later.
+
+            -- With an external CPU, it will be low during the first 62.5 ns
+            -- of the low clk_out period.  Assuming aligned clock_16 and
+            -- clock_96 edges, cpu_clken_96_sync(1) will go low 20.83 ns into
+            -- the low clk_out period.  TODO figure out memory timing.
+
             cpu_clken_96_sync <= cpu_clken_96_sync(1 downto 0) & cpu_clken_16_sync;
 
-            -- start_write_96: high for 1/96 us, .33/16 us before clk_out low when RnW = '0'
-            -- start_read_96: high for 1/96 us when it's safe to sample addr for a read from sdram or flash
+            -- start_write_96: high for 1/96 us when it's safe to sample addr/data for a memory (sdram/flash) write.
+            -- start_read_96: high for 1/96 us when it's safe to sample addr for a memory (sdram/flash) read.
             start_write_96 <= '0';
             start_read_96 <= '0';
-            if cpu_clken_96_sync(2) = '1' and cpu_clken_96_sync(1) = '0' then
+            If InternalCPU then
+                if cpu_clken_96_sync(2) = '1' and cpu_clken_96_sync(1) = '0' then
+                    -- falling edge of cpu_clken_16_sync; T65 clock should be all done by now
+                    if RnW = '0' then
+                        start_write_96 <= '1';
+                    else
+                        start_read_96 <= '1';
+                    end if;
+                end if;
+            elsif cpu_clken_96_sync(2) = '1' and cpu_clken_96_sync(1) = '0' then
+                -- falling edge of cpu_clken
                 if RnW = '0' then
                     start_write_96 <= '1';
                 end if;
