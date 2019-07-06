@@ -1,11 +1,13 @@
 xilinx/iseconfig/
 xilinx/working/
 
-
 altera/db/
 altera/incremental_db/
 altera/output_files/
 altera/greybox_tmp
+
+*.vcd
+*.vvp
 
 nohup.out
 *~
