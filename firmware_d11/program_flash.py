@@ -95,8 +95,10 @@ def upload(rom):
 
 if __name__ == '__main__':
     data = open(sys.argv[1], 'rb').read()
+    if len(data) < 64*1024:
+        data += '\xff' * (64*1024 - len(data))
     upload(data)
     if data == open("readback.rom").read():
-        print "verified"
+        print("verified")
     else:
         raise Exception("verification failed")
