@@ -117,7 +117,7 @@ uint8_t debug_transfer(uint8_t b) {
 
 static boolean spi_started = false;
 
-static void flash_start_spi(uint8_t cmd) {
+static void start_spi(uint8_t cmd) {
   if (spi_started) {
     Serial.println("Attempt to start SPI when already started!");
     while (1);
@@ -126,14 +126,18 @@ static void flash_start_spi(uint8_t cmd) {
 
   digitalWrite(FPGA_SS_PIN, LOW);
 
+  fpga_spi_transfer(cmd);
+}
+
+static void flash_start_spi(uint8_t cmd) {
   // Init passthrough to flash
-  fpga_spi_transfer(0x02);
+  start_spi(0x02);
 
   // Send command
   fpga_spi_transfer(cmd);
 }
 
-static void flash_end_spi() {
+static void end_spi() {
   if (!spi_started) {
     Serial.println("Attempt to end SPI when not started!");
     while (1);
@@ -151,14 +155,14 @@ static void flash_end_spi() {
 uint8_t read_status1() {
   flash_start_spi(0x05);
   uint8_t status1 = fpga_spi_transfer(0);
-  flash_end_spi();
+  end_spi();
   return status1;
 }
 
 uint8_t read_status2() {
   flash_start_spi(0x35);
   uint8_t status2 = fpga_spi_transfer(0);
-  flash_end_spi();
+  end_spi();
   return status2;
 }
 
@@ -169,19 +173,19 @@ boolean flash_busy() {
 }
 
 static void flash_end_spi_after_write() {
-  flash_end_spi();
+  end_spi();
   while (flash_busy());
   // Flash write is automatically disabled; we don't need to call flash_write_disable() now.
 }
 
 void flash_write_enable() {
   flash_start_spi(0x06);
-  flash_end_spi();
+  end_spi();
 }
 
 void flash_write_disable() {
   flash_start_spi(0x04);
-  flash_end_spi();
+  end_spi();
 }
 
 void flash_send_24bit_addr(uint32_t addr) {
@@ -213,10 +217,8 @@ void loop() {
     // New connection
     online = true;
 
-    digitalWrite(FPGA_SS_PIN, LOW);
+    start_spi(5);
     Serial.print("FPGA: ");
-    Serial.print(fpga_spi_transfer(5), HEX);  // Expect AA
-    Serial.print(" ");
     Serial.print(fpga_spi_transfer(0), HEX);  // Expect 55
     Serial.print(" ");
     Serial.print(fpga_spi_transfer(0), HEX);
@@ -234,14 +236,19 @@ void loop() {
     Serial.print(fpga_spi_transfer(0), HEX);
     Serial.print(" ");
     Serial.println(fpga_spi_transfer(0), HEX);
-    digitalWrite(FPGA_SS_PIN, HIGH);
+    end_spi();
+
+    Serial.println("Lock passthrough");
+    start_spi(1);  // config
+    fpga_spi_transfer(0x01);  // passthrough
+    end_spi();
 
     Serial.println("Exit QPI + cont read mode");
     flash_start_spi(0xFF);  // Eight clocks, i.e. FF FF FF FF, which will disable continuous read
-    flash_end_spi();
+    end_spi();
 
     flash_start_spi(0xFF);  // Eight clocks, i.e. FF FF FF FF, which should disable QPI
-    flash_end_spi();
+    end_spi();
 
     Serial.print("Flash: ");
     flash_start_spi(0x90);  // read manufacturer / device ID
@@ -252,7 +259,7 @@ void loop() {
     Serial.print(" W25Q128JV: ");
     uint8_t device_id = fpga_spi_transfer(0);
     Serial.println(device_id, HEX);  // Expect 17 (W25Q128JV)
-    flash_end_spi();
+    end_spi();
 
     if (manufacturer != 0xef || device_id != 0x17) {
       Serial.println("Flash not detected; aborting");
@@ -268,7 +275,7 @@ void loop() {
       Serial.print("Read status 3: ");  // default 0x60 (25% drive strength)
       flash_start_spi(0x15);
       Serial.println(fpga_spi_transfer(0), HEX);
-      flash_end_spi();
+      end_spi();
 
       if (!(read_status2() & STATUS2_QE)) {
         Serial.print("Write NV quad enable bit: ");  // write 0x02 to status 2
@@ -279,6 +286,13 @@ void loop() {
         Serial.println("done");
       }
     }
+
+    Serial.println("Unlock passthrough");
+    start_spi(1);  // config
+    fpga_spi_transfer(0x00);  // passthrough
+    end_spi();
+    Serial.println();
+
   }
 
   if (Serial.available()) {
@@ -291,6 +305,15 @@ void loop() {
       case 'x': {
         // Reset
         online = 0;
+        break;
+      }
+
+      case 'z': {
+        // Reset flash
+        start_spi(6);
+        fpga_spi_transfer(0);
+        end_spi();
+        Serial.println("06 00 sent -- FPGA should reset flash now");
         break;
       }
 
@@ -308,7 +331,7 @@ void loop() {
           checksum += b;
         }
         Serial.println();
-        flash_end_spi();
+        end_spi();
         Serial.print(addr);
         Serial.print(" bytes read; checksum ");
         Serial.println(checksum, HEX);
@@ -329,7 +352,7 @@ void loop() {
             if (!Serial.dtr()) break;
             page_buf[offset] = fpga_spi_transfer(0);
           }
-          flash_end_spi();
+          end_spi();
           for (int offset = 0; offset < page_buf_size; ++offset) {
             Serial.write(page_buf[offset]);
             checksum += page_buf[offset];
@@ -418,7 +441,7 @@ void loop() {
                 mismatch = true;
               }
             }
-            flash_end_spi();
+            end_spi();
             if (mismatch) {
               Serial.println("ERROR - mismatch");
               goto programming_finished;

@@ -227,6 +227,7 @@ signal mcu_shift_count   : std_logic_vector(2 downto 0) := (others => '0');
 signal mcu_shifter_byte  : std_logic_vector(7 downto 0);
 signal mcu_MISO_int      : std_logic;
 signal mcu_state         : std_logic_vector(7 downto 0);  -- state machine state
+signal mcu_flash_passthrough : std_logic := '0';  -- sticky passthrough bit
 signal mcu_flash_spi     : std_logic := '0';  -- connect MCU to flash
 signal mcu_flash_spi_clocking : std_logic := '0';  -- '0' during first clock cycle after connecting MCU to flash
 --signal mcu_flash_qpi     : std_logic := '0';  -- connect MCU to flash
@@ -245,7 +246,7 @@ signal flash_enable      : std_logic := '0';
 signal flash_bank        : std_logic_vector(7 downto 0) := x"00";  -- bits 23-16 of flash address
 signal flash_data_out    : std_logic_vector(7 downto 0) := x"FF";
 signal flash_ready       : std_logic;
-signal flash_reset       : std_logic;
+signal flash_reset       : std_logic := '0';
 signal flash_read        : std_logic;
 
 signal sdram_enable      : std_logic;
@@ -303,6 +304,8 @@ begin
             mcu_SCK_sync <= mcu_SCK_sync(1 downto 0) & mcu_SCK;
             mcu_SS_sync <= mcu_SS_sync(1 downto 0) & mcu_SS;
 
+            flash_reset <= '0';
+
             if mcu_SS_sync(1) = '1' then
                 -- SS high; reset everything
                 mcu_shifter <= x"AA";
@@ -349,7 +352,9 @@ begin
                                             kbd & '1' & '1' & '1' & '1'; -- FF
                                     when others =>
                                 end case;
-                            when x"01" =>  -- config byte; TODO implement
+                            when x"01" =>  -- configure passthrough
+                                -- Bit 0 = flash passthrough (send 01 01 to set passthrough, 01 00 to unset)
+                                mcu_flash_passthrough <= mcu_shifter_byte(0);
                             when x"02" =>  -- SPI to flash; no-op
                             --when x"03" =>  -- QPI to flash
                             --    -- Begin QPI tx/rx byte
@@ -377,6 +382,8 @@ begin
                                 mcu_shifter <= debug_boundary_vector(47 downto 40);
                                 --mcu_MISO_int <= debug_boundary_vector(47);  -- work around off by one error
                                 debug_boundary_vector <= debug_boundary_vector(39 downto 0) & x"00";
+                            when x"06" =>  -- Reset flash (06 00)
+                                flash_reset <= '1';
                             when others =>
                         end case;
                     end if;
@@ -438,7 +445,7 @@ begin
 
     ula : entity work.ElectronULA
     generic map (
-        IncludeMMC       => false,
+        IncludeMMC       => true,
         Include32KRAM    => true,
         IncludeVGA       => false, -- TODO disabled to simplify clocks
         IncludeJafaMode7 => false  -- TODO get character ROM working
@@ -714,13 +721,13 @@ begin
     port map (
         clk => clock_96,
         ready => flash_ready,
-        reset => memory_reset_96,
+        reset => memory_reset_96 or flash_reset,
         read => start_read_96 and flash_enable,  -- Read cycle trigger
         addr => flash_bank & rom_latch(1 downto 0) & addr(13 downto 0),
         data_out => flash_data_out,
         -- Passthrough: when active (passthrough = '1'), IO1/2/3 are inputs with
         -- a weak pullup, and nCE/SCK/IO0 are passed through (registered on clock_96).
-        passthrough => mcu_flash_spi_clocking,
+        passthrough => mcu_flash_spi_clocking or mcu_flash_passthrough,
         passthrough_nCE => not mcu_flash_spi_clocking,
         passthrough_SCK => mcu_SCK_sync(0),
         passthrough_MOSI => mcu_MOSI_sync(0),
