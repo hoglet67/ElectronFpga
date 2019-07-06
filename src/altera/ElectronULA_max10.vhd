@@ -15,7 +15,9 @@ entity ElectronULA_max10 is
         -- Set this to true to include an internal 6502 core.
         -- You MUST remove the CPU from the main board when doing this,
         -- as the ULA will drive the address bus and RnW.
-        InternalCPU   : boolean := true
+        InternalCPU   : boolean := true;
+        -- Set this as true to include the experimental DAC code
+        IncludeAudio    : boolean := true
     );
     port (
         -- 16 MHz clock from Electron
@@ -87,7 +89,7 @@ entity ElectronULA_max10 is
         dac_lrclk     : out std_logic := '0';  -- Left/right clock
         dac_bclk      : out std_logic := '0';  -- Bit clock
         dac_mclk      : out std_logic := '0';  -- Master clock
-        dac_nmute     : out std_logic := '0';
+        dac_nmute     : out std_logic := '0';  -- '0' for standby mode
 
         -- Keyboard
         kbd           : in  std_logic_vector(3 downto 0);
@@ -219,6 +221,14 @@ signal turbo             : std_logic_vector(1 downto 0);
 
 signal caps_led          : std_logic;
 
+signal sound_bit         : std_logic;
+signal audio_bit_clock   : std_logic := '0';
+signal audio_lr_clock    : std_logic := '0';
+signal audio_data_out    : std_logic := '0';
+signal audio_counter     : std_logic_vector(5 downto 0) := (others => '0');
+signal audio_shifter     : std_logic_vector(15 downto 0) := (others => '0');
+
+-- SPI comms with microcontroller
 signal mcu_MOSI_sync     : std_logic_vector(2 downto 0) := "000";
 signal mcu_SS_sync       : std_logic_vector(2 downto 0) := "111";
 signal mcu_SCK_sync      : std_logic_vector(2 downto 0) := "000";
@@ -433,10 +443,14 @@ begin
     --serial_TXD <= '1' when serial_tx_count < 417 else '0'; -- verified on scope
     --serial_TXD <= clock_16; -- verified on scope
     --serial_TXD <= cpu_clken; -- verified on scope
-    serial_TXD <= clk_out_int; -- verified on scope
+    --serial_TXD <= clk_out_int; -- verified on scope
+    --serial_TXD <= audio_bit_clock; -- verified 8MHz
+    serial_TXD <= audio_data_out;
+
     --serial_RXD <= kbd(3);
     --serial_RXD <= kbd_access;
-    serial_RXD <= sound_bit;
+    serial_RXD <= audio_lr_clock;  -- verified 125 kHz
+    --serial_RXD <= flash_ready;  -- goes low for 0.26 us (250 ns in simulation, so that's about right)
 
 
 --------------------------------------------------------
@@ -478,7 +492,7 @@ begin
         hsync     => video_hsync,
 
         -- Audio
-        sound     => dac_dacdat,  -- TODO support DAC interface / add jumper on PCB
+        sound     => sound_bit,
 
         -- SD Card
         SDMISO    => sd_DAT0_MISO,
@@ -605,15 +619,53 @@ begin
 -- Audio DAC
 --------------------------------------------------------
 
-    -- Standby mode
-    dac_bclk <= clock_16;
-    dac_mclk <= clock_16;
-    dac_nmute <= '0';
+    GenDAC: if IncludeAudio generate
 
-    -- Master clock runs at 16 MHz
-    -- Divide by 128 to get fs = 125 kHz sample rate
-    -- We need 17 BCLK times per sample because I2S requires a dummy BCLK cycle after a LRCLK transition
-    -- So BCLK >= fs * 17 * 2 = 6.375 MHz; probably just use 8MHz.
+        -- Simple I2S implementation for 1-bit mono output to the WM8524 DAC
+
+        -- Master clock runs at 16 MHz
+        -- Divide by 128 to get fs = 125 kHz sample rate
+        -- We need 17 BCLK times per sample because I2S requires a dummy BCLK cycle after a LRCLK transition
+        -- So BCLK >= fs * 17 * 2 = 6.375 MHz.  8 MHz is convenient so we'll use that.
+        -- So we have 64 BCLK periods per sample, or 32 per channel.
+
+        -- DACDAT and LRCLK inputs are sampled on the rising edge of BCLK, and need 7ns setup / 5ns hold.
+        -- BCLK has a period of 125ns so it's easy to meet these by just changing them on its falling edge.
+
+        dac_nmute <= '1';
+        dac_mclk <= clock_16;
+        dac_bclk <= audio_bit_clock;
+        dac_lrclk <= audio_lr_clock;
+        dac_dacdat <= audio_data_out;
+        i2s_process : process(clock_16)
+        begin
+          if rising_edge(clock_16) then
+            audio_bit_clock <= not audio_bit_clock;
+            if audio_bit_clock = '1' then
+                -- Update LRCLK and DACDAT on falling edge of BCLK
+                audio_counter <= audio_counter + 1;
+                audio_lr_clock <= audio_counter(5);
+                audio_data_out <= audio_shifter(15);
+                audio_shifter <= audio_shifter(14 downto 0) & '0';
+                -- Reload audio_shifter one clock after changing dac_lrclk
+                if audio_counter(4 downto 0) = "00000" then
+                    --audio_shifter <= sound_bit & "000000000000000";  -- Full volume
+                    audio_shifter <= "0" & sound_bit & "00000000000000";  -- Half volume
+                end if;
+            end if;
+          end if;
+        end process;
+
+    end generate;
+
+    NoGenDAC: if not IncludeAudio generate
+
+        -- Standby mode
+        dac_bclk <= clock_16;
+        dac_mclk <= clock_16;
+        dac_nmute <= '0';
+
+    end generate;
 
 --------------------------------------------------------
 -- SDRAM
