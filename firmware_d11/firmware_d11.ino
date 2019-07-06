@@ -147,6 +147,20 @@ static void end_spi() {
   digitalWrite(FPGA_SS_PIN, HIGH);
 }
 
+static void enter_passthrough() {
+  start_spi(1);  // config passthrough
+  fpga_spi_transfer(0x01);  // passthrough active
+  end_spi();
+  delay(1);
+}
+
+static void exit_passthrough() {
+  start_spi(1);  // config passthrough
+  fpga_spi_transfer(0x00);  // passthrough off
+  end_spi();
+  delay(1);
+}
+
 // Erase/write in progress
 #define STATUS1_BUSY 0x01
 // Quad IO enable bit in status 2 register
@@ -239,16 +253,7 @@ void loop() {
     end_spi();
 
     Serial.println("Lock passthrough");
-    start_spi(1);  // config
-    fpga_spi_transfer(0x01);  // passthrough
-    end_spi();
-
-    Serial.println("Exit QPI + cont read mode");
-    flash_start_spi(0xFF);  // Eight clocks, i.e. FF FF FF FF, which will disable continuous read
-    end_spi();
-
-    flash_start_spi(0xFF);  // Eight clocks, i.e. FF FF FF FF, which should disable QPI
-    end_spi();
+    enter_passthrough();
 
     Serial.print("Flash: ");
     flash_start_spi(0x90);  // read manufacturer / device ID
@@ -288,9 +293,7 @@ void loop() {
     }
 
     Serial.println("Unlock passthrough");
-    start_spi(1);  // config
-    fpga_spi_transfer(0x00);  // passthrough
-    end_spi();
+    exit_passthrough();
     Serial.println();
 
   }
@@ -319,6 +322,7 @@ void loop() {
 
       case 'r': {
         // Read some data.  03h instruction is good up to 50 MHz, so we can use that here.
+        enter_passthrough();
         Serial.println("Reading data:");
         flash_start_spi(0x03);  // Read data
         flash_send_24bit_addr(0);
@@ -335,11 +339,13 @@ void loop() {
         Serial.print(addr);
         Serial.print(" bytes read; checksum ");
         Serial.println(checksum, HEX);
+        exit_passthrough();
         break;
       }
 
       case 'R': {
         // Read 64kB with binary output
+        enter_passthrough();
         Serial.print("DATA:");
         uint32_t checksum = 0;
         uint32_t addr;
@@ -362,19 +368,23 @@ void loop() {
         Serial.print(addr);
         Serial.print(" bytes read; checksum ");
         Serial.println(checksum, HEX);
+        exit_passthrough();
         break;
       }
 
       case 'e': {
         // Erase first sector
+        enter_passthrough();
         Serial.println("Erasing first sector");
         erase_sector(0);
         Serial.println("done");
+        exit_passthrough();
         break;
       }
 
       case 'p': {
         Serial.println("Programming something");
+        enter_passthrough();
         flash_write_enable();
         flash_start_spi(0x02);  // Page program
         flash_send_24bit_addr(0);
@@ -384,11 +394,13 @@ void loop() {
         }
         flash_end_spi_after_write();
         Serial.println("Programmed 256 bytes at 0");
+        exit_passthrough();
         break;
       }
 
       case 'P': {
         Serial.println("Program 64kB from serial port");
+        enter_passthrough();
         for (uint32_t sector = 0L; sector < 65536L; sector += 4096L) {
           if (!Serial.dtr()) goto programming_error;
           Serial.print("Erase at ");
@@ -454,6 +466,7 @@ void loop() {
         programming_finished:
         Serial.println("Finished programming");
         Serial.println("OK");
+        exit_passthrough();
       }
     }
   }
