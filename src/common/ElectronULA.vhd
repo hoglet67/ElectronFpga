@@ -735,45 +735,45 @@ begin
                         power_on_reset <= '0';
                     end if;
                     ---- Detect control+caps 1...4 and change video format
-                    --if (addr = x"9fff" and page_enable = '1' and page(2 downto 1) = "00") then
-                    --    if (kbd(2 downto 1) = "00") then
-                    --        ctrl_caps <= '1';
-                    --    else
-                    --        ctrl_caps <= '0';
-                    --    end if;
-                    --end if;
-                    ---- Detect "1" being pressed
-                    --if (addr = x"afff" and page_enable = '1' and page(2 downto 1) = "00" and ctrl_caps = '1' and kbd(0) = '0') then
-                    --    mode <= "00";
-                    --end if;
-                    ---- Detect "2" being pressed
-                    --if (addr = x"b7ff" and page_enable = '1' and page(2 downto 1) = "00" and ctrl_caps = '1' and kbd(0) = '0') then
-                    --    mode <= "01";
-                    --end if;
-                    ---- Detect "3" being pressed
-                    --if (addr = x"bbff" and page_enable = '1' and page(2 downto 1) = "00" and ctrl_caps = '1' and kbd(0) = '0' and --IncludeVGA) then
-                    --    mode <= "10";
-                    --end if;
-                    ---- Detect "4" being pressed
-                    --if (addr = x"bdff" and page_enable = '1' and page(2 downto 1) = "00" and ctrl_caps = '1' and kbd(0) = '0' and --IncludeVGA) then
-                    --    mode <= "11";
-                    --end if;
-                    ---- Detect "5" being pressed
-                    --if (addr = x"beff" and page_enable = '1' and page(2 downto 1) = "00" and ctrl_caps = '1' and kbd(0) = '0') then
-                    --    turbo_out <= "00";
-                    --end if;
-                    ---- Detect "6" being pressed
-                    --if (addr = x"bf7f" and page_enable = '1' and page(2 downto 1) = "00" and ctrl_caps = '1' and kbd(0) = '0') then
-                    --    turbo_out <= "01";
-                    --end if;
-                    ---- Detect "7" being pressed
-                    --if (addr = x"bfbf" and page_enable = '1' and page(2 downto 1) = "00" and ctrl_caps = '1' and kbd(0) = '0') then
-                    --    turbo_out <= "10";
-                    --end if;
-                    ---- Detect "8" being pressed
-                    --if (addr = x"bfdf" and page_enable = '1' and page(2 downto 1) = "00" and ctrl_caps = '1' and kbd(0) = '0') then
-                    --    turbo_out <= "11";
-                    --end if;
+                    if (addr = x"9fff" and page_enable = '1' and page(2 downto 1) = "00") then
+                        if (kbd(2 downto 1) = "00") then
+                            ctrl_caps <= '1';
+                        else
+                            ctrl_caps <= '0';
+                        end if;
+                    end if;
+                    -- Detect "1" being pressed: RGB non-interlaced (default)
+                    if (addr = x"afff" and page_enable = '1' and page(2 downto 1) = "00" and ctrl_caps = '1' and kbd(0) = '0') then
+                        mode <= "00";
+                    end if;
+                    -- Detect "2" being pressed: RGB interlaced
+                    if (addr = x"b7ff" and page_enable = '1' and page(2 downto 1) = "00" and ctrl_caps = '1' and kbd(0) = '0') then
+                        mode <= "01";
+                    end if;
+                    -- Detect "3" being pressed: SVGA @ 50 Hz (33 MHz clock)
+                    if (addr = x"bbff" and page_enable = '1' and page(2 downto 1) = "00" and ctrl_caps = '1' and kbd(0) = '0' and IncludeVGA) then
+                        mode <= "10";
+                    end if;
+                    -- Detect "4" being pressed: SVGA @ 60 Hz (40 MHz clock)
+                    if (addr = x"bdff" and page_enable = '1' and page(2 downto 1) = "00" and ctrl_caps = '1' and kbd(0) = '0' and IncludeVGA) then
+                        mode <= "11";
+                    end if;
+                    -- Detect "5" being pressed: 1MHz
+                    if (addr = x"beff" and page_enable = '1' and page(2 downto 1) = "00" and ctrl_caps = '1' and kbd(0) = '0') then
+                        turbo_out <= "00";
+                    end if;
+                    -- Detect "6" being pressed: 2MHz with contention (default)
+                    if (addr = x"bf7f" and page_enable = '1' and page(2 downto 1) = "00" and ctrl_caps = '1' and kbd(0) = '0') then
+                        turbo_out <= "01";
+                    end if;
+                    -- Detect "7" being pressed: 2MHz no contention
+                    if (addr = x"bfbf" and page_enable = '1' and page(2 downto 1) = "00" and ctrl_caps = '1' and kbd(0) = '0') then
+                        turbo_out <= "10";
+                    end if;
+                    -- Detect "8" being pressed: 4MHz
+                    if (addr = x"bfdf" and page_enable = '1' and page(2 downto 1) = "00" and ctrl_caps = '1' and kbd(0) = '0') then
+                        turbo_out <= "11";
+                    end if;
                     if (addr(15 downto 8) = x"FE") then
                         if (R_W_n = '1') then
                             -- Clear the power on reset flag on the first read of the ISR (FEx0)
