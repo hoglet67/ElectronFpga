@@ -461,7 +461,7 @@ begin
     generic map (
         IncludeMMC       => true,
         Include32KRAM    => true,
-        IncludeVGA       => false, -- TODO disabled to simplify clocks
+        IncludeVGA       => true,
         IncludeJafaMode7 => false  -- TODO get character ROM working
     )
     port map (
