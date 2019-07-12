@@ -198,6 +198,7 @@ set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to flash_IO1
 set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to mcu_debug_TXD
 set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to flash_IO3
 set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to flash_IO2
+set_global_assignment -name VHDL_FILE ../src/common/mode7/saa5050_rom_dual_port_uninitialized.vhd
 set_global_assignment -name VERILOG_FILE ../src/altera/qpi_flash.v
 set_global_assignment -name VERILOG_FILE ../src/common/ROM/expansion_rom.v
 set_global_assignment -name VHDL_FILE ../src/altera/ElectronULA_max10.vhd

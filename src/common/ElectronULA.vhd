@@ -28,14 +28,19 @@ entity ElectronULA is
         Include32KRAM    : boolean := true;
         IncludeVGA       : boolean := true;
         IncludeJafaMode7 : boolean := false;
-        UseClockMux      : boolean := false  -- false for Xilinx, true for Altera
+        UseClockMux      : boolean := false;  -- false for Xilinx, true for Altera
+        UseTTxtClock     : boolean := false;  -- true to use clk_ttxt/clken_ttxt_12M, false to use clk_24M00
+        IncludeTTxtROM   : boolean := true    -- false if the SAA5050 character ROM needs loading
     );
     port (
         clk_16M00 : in  std_logic;
-        clk_24M00 : in  std_logic;
+        clk_24M00 : in  std_logic := '0';
+        clk_ttxt  : in  std_logic := '0';
         clk_32M00 : in  std_logic;
         clk_33M33 : in  std_logic;
         clk_40M00 : in  std_logic;
+
+        clken_ttxt_12M : in std_logic := '0';
 
         -- CPU Interface
         addr      : in  std_logic_vector(15 downto 0);
@@ -84,7 +89,12 @@ entity ElectronULA is
         -- Clock Generation
         cpu_clken_out  : out std_logic;
         turbo          : in std_logic_vector(1 downto 0);
-        turbo_out      : out std_logic_vector(1 downto 0)
+        turbo_out      : out std_logic_vector(1 downto 0);
+
+        -- SAA5050 character ROM loading
+        char_rom_we   : in std_logic := '0';
+        char_rom_addr : in std_logic_vector(11 downto 0) := (others => '0');
+        char_rom_data : in std_logic_vector(7 downto 0) := (others => '0')
 
         );
 end;
@@ -222,6 +232,7 @@ architecture behavioral of ElectronULA is
   signal status_do      :   std_logic_vector(7 downto 0);
 
   -- SAA5050 signals (only used when Jafa Mode 7 is enabled)
+  signal ttxt_clock     :   std_logic;
   signal ttxt_clken     :   std_logic;
   signal ttxt_glr       :   std_logic;
   signal ttxt_dew       :   std_logic;
@@ -1377,12 +1388,22 @@ begin
             end if;
         end process;
 
-        process (clk_24M00)
-        begin
-            if rising_edge(clk_24M00) then
-                ttxt_clken <= not ttxt_clken;
-            end if;
-        end process;
+        using_ext_ttxt_clock : if UseTTxtClock generate
+            -- Use external 96 MHz clock / 12 MHz enable
+            ttxt_clock <= clk_ttxt;
+            ttxt_clken <= clken_ttxt_12M;
+        end generate;
+
+        using_24mhz_ttxt_clock : if not UseTTxtClock generate
+            -- Use 24 MHz clock and generate 12 MHz enable
+            ttxt_clock <= clk_24M00;
+            process (clk_24M00)
+            begin
+                if rising_edge(clk_24M00) then
+                    ttxt_clken <= not ttxt_clken;
+                end if;
+            end process;
+        end generate;
 
         crtc_enable <= '1' when addr(15 downto 0) = x"fc1c" or
                                 addr(15 downto 0) = x"fc1d" or
@@ -1423,7 +1444,7 @@ begin
 
         teletext : entity work.saa5050 port map (
             -- inputs
-            CLOCK    => clk_24M00,
+            CLOCK    => ttxt_clock,
             CLKEN    => ttxt_clken,
             nRESET   => RST_n,
             DI_CLOCK => clk_16M00,
@@ -1436,7 +1457,11 @@ begin
             -- outputs
             R        => ttxt_r_int,
             G        => ttxt_g_int,
-            B        => ttxt_b_int
+            B        => ttxt_b_int,
+            -- SAA5050 character ROM loading
+            char_rom_we   => char_rom_we,
+            char_rom_addr => char_rom_addr,
+            char_rom_data => char_rom_data
         );
 
         -- make the cursor visible

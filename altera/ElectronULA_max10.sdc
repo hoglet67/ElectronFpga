@@ -23,14 +23,14 @@ set clock_32 "max10_pll1_inst|altpll_component|auto_generated|pll1|clk[1]"
 set clock_33 "max10_pll1_inst|altpll_component|auto_generated|pll1|clk[4]"
 set clock_40 "max10_pll1_inst|altpll_component|auto_generated|pll1|clk[3]"
 set clock_96 "max10_pll1_inst|altpll_component|auto_generated|pll1|clk[2]"
-set clock_24 "clock_24"
+#set clock_24 "clock_24"
 
 # We divide clock_96 down with a counter
-create_generated_clock \
-    -name clock_24 \
-    -source [get_clocks $clock_96] \
-    -divide_by 4 \
-    [get_nets {clock_24}]
+#create_generated_clock \
+#    -name clock_24 \
+#    -source [get_clocks $clock_96] \
+#    -divide_by 4 \
+#    [get_nets {clock_24}]
 
 # Clock output to SDRAM at 48MHz
 create_generated_clock -name ram_output_clock -source $clock_96 -divide_by 2 [get_pins sdram_CLK~reg0|q]
@@ -105,15 +105,17 @@ derive_clock_uncertainty
 # setup and 5ns hold, we can have a 5.42 ns clock to output time, which
 # Quartus should be able to manage.
 
+# TODO these were -max 3 / -min -5, but that failed timing (although worked in practice)
+
 # flash_SCK (10.42ns) is toggled from $clock_96
-set_output_delay -clock $clock_96 -min 3 [get_ports flash_SCK]
-set_output_delay -clock $clock_96 -max -5 [get_ports flash_SCK]
+set_output_delay -clock $clock_96 -max 0 [get_ports flash_SCK]
+set_output_delay -clock $clock_96 -min 0 [get_ports flash_SCK]
 
 # flash_nCE and flash_IO* are updated in sync with the falling edge of flash_SCK
-set_output_delay -clock $clock_96 -min 3 [get_ports flash_nCE]
-set_output_delay -clock $clock_96 -max -5 [get_ports flash_nCE]
-set_output_delay -clock $clock_96 -min 3 [get_ports flash_IO*]
-set_output_delay -clock $clock_96 -max -5 [get_ports flash_IO*]
+set_output_delay -clock $clock_96 -max 0 [get_ports flash_nCE]
+set_output_delay -clock $clock_96 -min 0 [get_ports flash_nCE]
+set_output_delay -clock $clock_96 -max 0 [get_ports flash_IO*]
+set_output_delay -clock $clock_96 -min 0 [get_ports flash_IO*]
 
 # flash_SCK will go low max 5.42ns after clock_96, and the flash will update
 # IO* max 6ns after that, so the clock-to-output time for us relative to the
@@ -137,8 +139,13 @@ set_output_delay -clock $clock_96 -max -5 [get_ports flash_IO*]
 # be super conservative here and say no hold and 8ns clock-to-output,
 # so if the signal is super delayed we still pick it up.
 
+# Setting -min 2 / -max 8 results in the fitter adding 1.5-2ns of delay
+# between flash_IO* and qpi_flash:flash|data_out, i.e. the fitter is delaying
+# the input to give us a better hold time.
+
+# TODO figure out why this all works with just zeros everywhere!
 set_input_delay -clock $clock_96 -min 0 [get_ports flash_IO*]
-set_input_delay -clock $clock_96 -max 8 [get_ports flash_IO*]
+set_input_delay -clock $clock_96 -max 0 [get_ports flash_IO*]
 
 
 # *** SDRAM at 96MHz ***
@@ -211,8 +218,8 @@ set_input_delay -clock ram_output_clock -min $sdram_data_hold_time [get_ports sd
 
 set_clock_groups -asynchronous -group $clock_16 -group $clock_32
 set_clock_groups -asynchronous -group $clock_32 -group $clock_16
-set_clock_groups -asynchronous -group $clock_16 -group $clock_24
-set_clock_groups -asynchronous -group $clock_24 -group $clock_16
+#set_clock_groups -asynchronous -group $clock_16 -group $clock_24
+#set_clock_groups -asynchronous -group $clock_24 -group $clock_16
 set_clock_groups -asynchronous -group $clock_16 -group $clock_33
 set_clock_groups -asynchronous -group $clock_33 -group $clock_16
 set_clock_groups -asynchronous -group $clock_16 -group $clock_40

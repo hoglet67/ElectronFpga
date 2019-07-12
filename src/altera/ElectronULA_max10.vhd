@@ -17,7 +17,9 @@ entity ElectronULA_max10 is
         -- as the ULA will drive the address bus and RnW.
         InternalCPU   : boolean := true;
         -- Set this as true to include the experimental DAC code
-        IncludeAudio    : boolean := true
+        IncludeAudio  : boolean := true;
+        -- Set this as true to include JAFA Mode 7 support
+        IncludeMode7  : boolean := true
     );
     port (
         -- 16 MHz clock from Electron
@@ -151,12 +153,15 @@ end component qpi_flash;
 signal clock_input       : std_logic;
 -- Generated clocks:
 signal clock_16          : std_logic;
-signal clock_24          : std_logic;
+signal clock_24          : std_logic;  -- TODO remove, if clken_ttxt works
 signal clock_32          : std_logic;
 signal clock_33          : std_logic;
 signal clock_40          : std_logic;
 signal clock_96          : std_logic := '1';
 signal clock_div_96_24   : std_logic_vector(1 downto 0) := (others => '0');
+
+signal clken_ttxt_counter : std_logic_vector(3 downto 0) := (others => '0');
+signal clken_ttxt        : std_logic := '0';
 
 -- Divide clock_16 down to ~1 Hz to blink the caps LED
 signal blinky_div        : std_logic_vector(24 downto 0) := (others => '0');
@@ -254,6 +259,7 @@ signal empty_bank_enable : std_logic;
 
 signal flash_enable      : std_logic := '0';
 signal flash_bank        : std_logic_vector(7 downto 0) := x"00";  -- bits 23-16 of flash address
+signal flash_addr        : std_logic_vector(23 downto 0);
 signal flash_data_out    : std_logic_vector(7 downto 0) := x"FF";
 signal flash_ready       : std_logic;
 signal flash_reset       : std_logic := '0';
@@ -273,6 +279,16 @@ signal sdram_check_refresh : std_logic;
 signal sdram_low_bank_en   : std_logic;
 signal sdram_high_bank_en  : std_logic;
 signal sdram_refresh_counter : std_logic_vector(4 downto 0) := (others => '0');  -- kicked off after cpu_clken
+
+-- SAA5050 character ROM loader (copies from QPI flash to SAA5050 block RAM)
+signal char_rom_loaded   : std_logic := '0';  -- Holds system in reset until it transitions to '1'
+signal char_rom_state    : std_logic_vector(1 downto 0) := "00";
+signal char_rom_read     : std_logic := '0';  -- Read strobe to QPI controller
+signal char_rom_we       : std_logic := '0';  -- Write strobe to SAA5050 block RAM
+signal char_rom_start    : std_logic_vector(23 downto 0) := x"002000";  -- Char ROM lives in flash+8k (first 8k is MODE 7 ROM)
+signal char_rom_addr     : std_logic_vector(12 downto 0) := (others => '0');  -- "done" bit + 4k address counter
+
+
 
 begin
 
@@ -468,16 +484,19 @@ begin
     generic map (
         IncludeMMC       => true,
         Include32KRAM    => true,
-        IncludeVGA       => true,
-        IncludeJafaMode7 => false,  -- TODO get character ROM working
-        UseClockMux      => true
+        IncludeVGA       => false,
+        IncludeJafaMode7 => IncludeMode7,
+        UseClockMux      => true,
+        UseTTxtClock     => true
     )
     port map (
         clk_16M00 => clock_16,
-        clk_24M00 => clock_24,
+        --clk_24M00 => clock_24,
         clk_32M00 => clock_32,
         clk_33M33 => clock_33,
         clk_40M00 => clock_40,
+        clk_ttxt  => clock_96,
+        clken_ttxt_12M => clken_ttxt,
 
         -- CPU Interface
         addr      => ula_addr,  -- Updated on rising clk_out edge
@@ -526,7 +545,12 @@ begin
         -- Clock Generation
         cpu_clken_out  => cpu_clken,
         turbo          => turbo,
-        turbo_out      => turbo
+        turbo_out      => turbo,
+
+        -- SAA5050 character ROM loading
+        char_rom_we   => char_rom_we,
+        char_rom_addr => char_rom_addr(11 downto 0),
+        char_rom_data => flash_data_out
     );
 
     ROM_n <= rom_enable_n;
@@ -827,13 +851,17 @@ begin
     flash_enable <= '1' when addr(15 downto 14) = "10" and (rom_latch > 11) else '0';
     -- Right now this maps to the first 4 x 16kB = 64kB of flash.
 
+    flash_addr <= char_rom_start + char_rom_addr(11 downto 0)
+        when char_rom_read = '1'
+        else flash_bank & rom_latch(1 downto 0) & addr(13 downto 0);
+
     flash : qpi_flash
     port map (
         clk => clock_96,
         ready => flash_ready,
         reset => memory_reset_96 or flash_reset,
-        read => start_read_96 and flash_enable,  -- Read cycle trigger
-        addr => flash_bank & rom_latch(1 downto 0) & addr(13 downto 0),
+        read => char_rom_read or (start_read_96 and flash_enable),  -- Read cycle trigger
+        addr => flash_addr,
         data_out => flash_data_out,
         -- Passthrough: when active (passthrough = '1'), IO1/2/3 are inputs with
         -- a weak pullup, and nCE/SCK/IO0 are passed through (registered on clock_96).
@@ -849,6 +877,41 @@ begin
         flash_IO2 => flash_IO2,
         flash_IO3 => flash_IO3
     );
+
+    load_mode7_char_rom : if IncludeMode7 generate
+        -- On startup, load SAA5050 character ROM from QPI flash.
+        char_rom_loaded <= char_rom_addr(char_rom_addr'high);
+        process (clock_96)
+        begin
+            if rising_edge(clock_96) then
+                if char_rom_loaded = '0' then
+                    char_rom_read <= '0';
+                    char_rom_we <= '0';
+                    case char_rom_state is
+                        when "00" =>
+                            -- Start a new read when flash ready
+                            if flash_ready = '1' then
+                                -- Start a new read
+                                char_rom_read <= '1';
+                                char_rom_state <= "01";
+                            end if;
+                        when "01" =>
+                            -- Wait for data available then send it to the char rom
+                            if flash_ready = '1' then
+                                char_rom_we <= '1';
+                                char_rom_state <= "10";
+                            end if;
+                        when "10" =>
+                            -- Increment address for next read
+                            char_rom_addr <= char_rom_addr + 1;
+                            char_rom_state <= "00";
+                        when "11" =>
+                            -- Unused
+                    end case;
+                end if;
+            end if;
+        end process;
+    end generate;
 
 
 --------------------------------------------------------
@@ -884,7 +947,10 @@ begin
     end process;
 
     -- Reset drives the enable on an open collector buffer which pulls the 5V RESET line down
-    RST_n_out <= powerup_reset_n;
+    RST_n_out <= '1' when
+        powerup_reset_n = '1' and
+        (IncludeMode7 = false or char_rom_loaded = '1')  -- stay in reset until char rom loaded
+        else '0';
 
     reset_gen_96 : process(clock_96)
     begin
@@ -1025,6 +1091,16 @@ begin
                 clock_div_96_24 <= "00";
             else
                 clock_div_96_24 <= clock_div_96_24 + 1;
+            end if;
+
+            -- Generate a pulse on the 12MHz teletext clock enable
+            -- every 8 clock_96 cycles.
+            clken_ttxt <= '0';
+            if clken_ttxt_counter(clken_ttxt_counter'high) = '1' then
+                clken_ttxt <= '1';
+                clken_ttxt_counter <= "0001";
+            else
+                clken_ttxt_counter <= clken_ttxt_counter + 1;
             end if;
 
             -- Divide 96/833 to get serial clock

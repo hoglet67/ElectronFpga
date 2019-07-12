@@ -226,7 +226,7 @@ always @(posedge clk) begin
                     flash_SCK <= 1'b0;
                     output_IO[0] = shifter[39];
                     shifter <= {shifter[38:0], flash_IO1};
-                    shift_count <= shift_count - 1;
+                    shift_count <= shift_count - 7'd1;
                 end
             end
             `TXN_FINISH : begin
