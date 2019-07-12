@@ -67,6 +67,7 @@ set_global_assignment -name POWER_DEFAULT_INPUT_IO_TOGGLE_RATE "12.5 %"
 set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to flash_*
 set_instance_assignment -name FAST_INPUT_REGISTER ON -to flash_*
 set_instance_assignment -name FAST_OUTPUT_ENABLE_REGISTER ON -to flash_*
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to sdram_CLK
 
 set_location_assignment PIN_B3 -to addr[3]
 set_location_assignment PIN_A2 -to addr[11]
@@ -200,6 +201,7 @@ set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to flash_IO2
 set_global_assignment -name VERILOG_FILE ../src/altera/qpi_flash.v
 set_global_assignment -name VERILOG_FILE ../src/common/ROM/expansion_rom.v
 set_global_assignment -name VHDL_FILE ../src/altera/ElectronULA_max10.vhd
+set_global_assignment -name VHDL_FILE ../src/altera/sdram_simple.vhd
 set_global_assignment -name VHDL_FILE ../src/altera/pll1.vhd
 set_global_assignment -name VHDL_FILE ../src/altera/pll2.vhd
 set_global_assignment -name VHDL_FILE ../src/altera/i2s_intf.vhd

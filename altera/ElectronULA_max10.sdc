@@ -32,6 +32,9 @@ create_generated_clock \
     -divide_by 4 \
     [get_nets {clock_24}]
 
+# Clock output to SDRAM at 48MHz
+create_generated_clock -name ram_output_clock -source $clock_96 -divide_by 2 [get_pins sdram_CLK~reg0|q]
+
 # Clock muxes
 create_clock -period "16 MHz" -name clk_16M00_a [get_nets ula|clk_16M00_a]
 create_clock -period "16 MHz" -name clk_16M00_b [get_nets ula|clk_16M00_b]
@@ -140,12 +143,66 @@ set_input_delay -clock $clock_96 -max 8 [get_ports flash_IO*]
 
 # *** SDRAM at 96MHz ***
 
-# TODO
+# MT48LC16M16A2F4-6A:GTR: 167 MHz CL3, or 100 MHz CL2.
+
+# Access time at CL=3, f=166MHz (tCK(3) =  6ns): tAC(3) = 5.4 ns
+# Access time at CL=2, f=100MHz (tCK(2) = 10ns): tAC(2) = 7.5 ns
+
+# Right now we're just running at 48MHz, to make the timing easy.
+
+# sdram_CLK is clock_96 delayed a bit; set the acceptable delay window (0-3ns) here
+set sdram_clk_min_delay 0
+set sdram_clk_max_delay 3
+set clock_96_ns 10.416
+#set_output_delay -clock $clock_96 -max [expr $clock_96_ns - $sdram_clk_max_delay] [get_ports sdram_CLK]
+set_output_delay -clock $clock_96 -max 2 [get_ports sdram_CLK]
+set_output_delay -clock $clock_96 -min -$sdram_clk_min_delay [get_ports sdram_CLK]
+
+# Using -max 3 -min -5 results in 5.5ns of delay being added by the fitter.
+# OH.  set_output_delay -min -n results in the output being *delayed* that much to keep the previous data stable.
+# So if we want our outputs to change as soon as possible after the clock, we should set -min 0 -max [expr clk_ns - 1].
+
+# Address, control, data outputs to SDRAM
+set sdram_board_delay 1
+set sdram_setup_time [expr 1.5 + $sdram_board_delay]
+set sdram_hold_time 0.8
+set_output_delay -clock ram_output_clock -max $sdram_setup_time [get_ports sdram_CKE]
+set_output_delay -clock ram_output_clock -min -$sdram_hold_time [get_ports sdram_CKE] -add_delay
+set_output_delay -clock ram_output_clock -max $sdram_setup_time [get_ports sdram_nCS]
+set_output_delay -clock ram_output_clock -min -$sdram_hold_time [get_ports sdram_nCS] -add_delay
+set_output_delay -clock ram_output_clock -max $sdram_setup_time [get_ports sdram_nRAS]
+set_output_delay -clock ram_output_clock -min -$sdram_hold_time [get_ports sdram_nRAS] -add_delay
+set_output_delay -clock ram_output_clock -max $sdram_setup_time [get_ports sdram_nCAS]
+set_output_delay -clock ram_output_clock -min -$sdram_hold_time [get_ports sdram_nCAS] -add_delay
+set_output_delay -clock ram_output_clock -max $sdram_setup_time [get_ports sdram_nWE]
+set_output_delay -clock ram_output_clock -min -$sdram_hold_time [get_ports sdram_nWE] -add_delay
+set_output_delay -clock ram_output_clock -max $sdram_setup_time [get_ports sdram_BA[*]]
+set_output_delay -clock ram_output_clock -min -$sdram_hold_time [get_ports sdram_BA[*]] -add_delay
+set_output_delay -clock ram_output_clock -max $sdram_setup_time [get_ports sdram_A[*]]
+set_output_delay -clock ram_output_clock -min -$sdram_hold_time [get_ports sdram_A[*]] -add_delay
+set_output_delay -clock ram_output_clock -max $sdram_setup_time [get_ports sdram_DQ[*]]
+set_output_delay -clock ram_output_clock -min -$sdram_hold_time [get_ports sdram_DQ[*]] -add_delay
+set_output_delay -clock ram_output_clock -max $sdram_setup_time [get_ports sdram_UDQM]
+set_output_delay -clock ram_output_clock -min -$sdram_hold_time [get_ports sdram_UDQM] -add_delay
+set_output_delay -clock ram_output_clock -max $sdram_setup_time [get_ports sdram_LDQM]
+set_output_delay -clock ram_output_clock -min -$sdram_hold_time [get_ports sdram_LDQM] -add_delay
+
+# Clock-to-output and hold time for SDRAM data outputs.
+#set sdram_access_time 7.5
+# let's just pretend it comes through quickly; actually we have a multicycle path
+set sdram_access_time 2.5
+set sdram_data_hold_time 1.8
+set_input_delay -clock ram_output_clock -max [expr $sdram_access_time + $sdram_board_delay] [get_ports sdram_DQ[*]]
+set_input_delay -clock ram_output_clock -min $sdram_data_hold_time [get_ports sdram_DQ[*]] -add_delay
+
+# Multicycle path for 48 MHz operation
+#set_multicycle_path -from [get_clocks {ram_output_clock}] -to [get_clocks $clock_96] -setup -end 2
+
+# Multicycle path for 96 MHz operation if we switch to using a delayed PLL
+# set_multicycle_path -from [get_clocks {ram_output_clock}] -to [get_clocks $clock_96] -setup -end 2
 
 
-# *** Audio DAC at 16MHz ***
-
-# TODO
+# *** Audio DAC at 16MHz (62.5 ns) ***
 
 
 #**************************************************************

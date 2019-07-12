@@ -259,13 +259,20 @@ signal flash_ready       : std_logic;
 signal flash_reset       : std_logic := '0';
 signal flash_read        : std_logic;
 
-signal sdram_enable      : std_logic;
-signal sdram_data_out    : std_logic_vector(7 downto 0) := x"42";
-signal sdram_init        : std_logic := '1';  -- Power on reset for sdram
-signal sdram_reading     : std_logic;
-signal sdram_writing     : std_logic;
-signal sdram_refreshing  : std_logic;
+signal sdram_enable        : std_logic;         -- SDRAM selected by CPU
+signal sdram_clken         : std_logic := '0';  -- 48MHz clock enable
+signal sdram_address       : std_logic_vector(23 downto 0);
+signal sdram_ready         : std_logic;
+signal sdram_done          : std_logic;
+signal sdram_data_out      : std_logic_vector(15 downto 0) := x"8442";
+--signal sdram_init          : std_logic := '1';  -- Power on reset for sdram
+signal sdram_access        : std_logic := '0';
+signal sdram_writing       : std_logic;
+signal sdram_refreshing    : std_logic;
 signal sdram_check_refresh : std_logic;
+signal sdram_low_bank_en   : std_logic;
+signal sdram_high_bank_en  : std_logic;
+signal sdram_refresh_counter : std_logic_vector(4 downto 0) := (others => '0');  -- kicked off after cpu_clken
 
 begin
 
@@ -579,7 +586,8 @@ begin
     data <= ula_data_out   when RnW = '1' and ula_enable = '1' else
             x"FF"          when RnW = '1' and empty_bank_enable = '1' else
             flash_data_out when RnW = '1' and flash_enable = '1' else
-            sdram_data_out when RnW = '1' and sdram_enable = '1' else
+            sdram_data_out(15 downto 8) when RnW = '1' and sdram_enable = '1' and addr(0) = '1' else
+            sdram_data_out(7 downto 0) when RnW = '1' and sdram_enable = '1' and addr(0) = '0' else
             cpu_data_out   when RnW = '0' and InternalCPU else
             "ZZZZZZZZ";  -- ext CPU, RnW = '0' or boundary_scan = '1'
 
@@ -672,16 +680,65 @@ begin
 --------------------------------------------------------
 
     -- Sideways RAM
-    sdram_enable <= '0';  -- '1' when addr(15 downto 14) = "10" and (rom_latch = 6 or rom_latch = 7) else '0';
+    sdram_enable <= '1' when addr(15 downto 14) = "10" and (rom_latch < 4) else '0';
 
-    -- Disable SDRAM for now
-    sdram_CLK <= clock_96;
-    sdram_nCS <= '1';
-    sdram_nWE <= '1';
-    sdram_nCAS <= '1';
-    sdram_nRAS <= '1';
-    sdram_UDQM <= '1';
-    sdram_LDQM <= '1';
+    -- Clock it at 48 MHz, so I don't have to care too much about timing analysis
+    gen_sdram_clk : process (clock_96)
+    begin
+        if rising_edge(clock_96) then
+            -- Signals from the controller update on cycles where sdram_clken = '1',
+            -- i.e. we should output a rising clock edge then.
+            sdram_clken <= not sdram_clken;
+            sdram_CLK <= sdram_clken;
+            if (start_write_96 = '1' or start_read_96 = '1') and sdram_enable = '1' then
+                -- Set flags that need to stick around until a cycle where the SDRAM clock is enabled
+                sdram_access <= '1';
+                sdram_writing <= RnW;
+                sdram_address <= "0000000" & rom_latch(3 downto 0) & addr(13 downto 1);
+                sdram_high_bank_en <= not addr(0);
+                sdram_low_bank_en <= addr(0);
+            end if;
+            if sdram_clken = '1' then
+                -- Reset SDRAM trigger because it will have been seen on this cycle
+                sdram_access <= '0';
+                sdram_refreshing <= '0';
+            end if;
+
+            -- Generate refresh signal
+            if sdram_refresh_counter = 24 then
+                sdram_refreshing <= '1';
+            end if;
+        end if;
+    end process;
+
+    sdram_controller : entity work.sdram_simple PORT MAP (
+        -- Host side
+        clk_100m0_i => clock_96,
+        clk_en      => sdram_clken,
+        reset_i     => memory_reset_96,
+        refresh_i   => sdram_refreshing,
+        rw_i        => sdram_access,
+        we_i        => sdram_writing,
+        addr_i      => sdram_address,
+        data_i      => data & data,
+        ub_i        => sdram_high_bank_en,
+        lb_i        => sdram_low_bank_en,
+        ready_o     => sdram_ready,
+        done_o      => sdram_done,
+        data_o      => sdram_data_out,
+
+        -- SDRAM side
+        sdCke_o     => sdram_CKE,
+        sdCe_bo     => sdram_nCS,
+        sdRas_bo    => sdram_nRAS,
+        sdCas_bo    => sdram_nCAS,
+        sdWe_bo     => sdram_nWE,
+        sdBs_o      => sdram_BA,
+        sdAddr_o    => sdram_A,
+        sdData_io   => sdram_DQ,
+        sdDqmh_o    => sdram_UDQM,
+        sdDqml_o    => sdram_LDQM
+    );
 
     -- TODO move all of this into ula_sdram.v
     -- TODO start sdram read when start_read_96 = '1' and ram is selected
@@ -710,50 +767,50 @@ begin
     -- 8: AUTO REFRESH -- 
     -- 9: nCS=1
 
-    sdram_loop : process(clock_96)
-    begin
-        if rising_edge(clock_96) then
-            sdram_check_refresh <= '0';
-
-            if sdram_init = '1' then
-                if memory_reset_96 = '0' then
-                    -- We're out of reset; start the SDRAM init process
-                    sdram_CKE <= '1';
-                end if;
-            elsif sdram_reading = '1' then
-            elsif sdram_writing = '1' then
-            elsif sdram_refreshing = '1' then
-            end if;
-
-            if start_write_96 = '1' then
-                if sdram_enable = '1' then
-                    sdram_writing <= '1';
-                else
-                    sdram_check_refresh <= '1';
-                end if;
-            elsif start_read_96 = '1' then
-                if sdram_enable = '1' then
-                    sdram_reading <= '1';
-                else
-                    sdram_check_refresh <= '1';
-                end if;
-            end if;
-
-            if sdram_check_refresh = '1' then
-                -- TODO check sdram refresh timer and kick off a refresh if so
-            end if;
-
-            -- reset everything if we're just powering up
-            if memory_reset_96 = '1' then
-                sdram_CKE <= '0';
-                sdram_init <= '1';
-                sdram_reading <= '0';
-                sdram_writing <= '0';
-                sdram_refreshing <= '0';
-                sdram_check_refresh <= '0';
-            end if;
-        end if;
-    end process;
+--    sdram_loop : process(clock_96)
+--    begin
+--        if rising_edge(clock_96) then
+--            sdram_check_refresh <= '0';
+--
+--            if sdram_init = '1' then
+--                if memory_reset_96 = '0' then
+--                    -- We're out of reset; start the SDRAM init process
+--                    sdram_CKE <= '1';
+--                end if;
+--            elsif sdram_reading = '1' then
+--            elsif sdram_writing = '1' then
+--            elsif sdram_refreshing = '1' then
+--            end if;
+--
+--            if start_write_96 = '1' then
+--                if sdram_enable = '1' then
+--                    sdram_writing <= '1';
+--                else
+--                    sdram_check_refresh <= '1';
+--                end if;
+--            elsif start_read_96 = '1' then
+--                if sdram_enable = '1' then
+--                    sdram_reading <= '1';
+--                else
+--                    sdram_check_refresh <= '1';
+--                end if;
+--            end if;
+--
+--            if sdram_check_refresh = '1' then
+--                -- TODO check sdram refresh timer and kick off a refresh if so
+--            end if;
+--
+--            -- reset everything if we're just powering up
+--            if memory_reset_96 = '1' then
+--                sdram_CKE <= '0';
+--                sdram_init <= '1';
+--                sdram_reading <= '0';
+--                sdram_writing <= '0';
+--                sdram_refreshing <= '0';
+--                sdram_check_refresh <= '0';
+--            end if;
+--        end if;
+--    end process;
 
 --------------------------------------------------------
 -- Paged ROM
@@ -766,7 +823,7 @@ begin
     ) else '0';
 
     -- Provide ROMs using the QPI flash chip
-    flash_enable <= '1' when addr(15 downto 14) = "10" and rom_latch < 4 else '0';
+    flash_enable <= '1' when addr(15 downto 14) = "10" and (rom_latch > 11) else '0';
     -- Right now this maps to the first 4 x 16kB = 64kB of flash.
 
     flash : qpi_flash
@@ -922,6 +979,9 @@ begin
             -- start_read_96: high for 1/96 us when it's safe to sample addr for a memory (sdram/flash) read.
             start_write_96 <= '0';
             start_read_96 <= '0';
+            if sdram_refresh_counter /= 31 then
+                sdram_refresh_counter <= sdram_refresh_counter + 1;
+            end if;
             If InternalCPU then
                 if cpu_clken_96_sync(2) = '1' and cpu_clken_96_sync(1) = '0' then
                     -- falling edge of cpu_clken_16_sync; T65 clock should be all done by now
@@ -930,6 +990,7 @@ begin
                     else
                         start_read_96 <= '1';
                     end if;
+                    sdram_refresh_counter <= (others => '0');
                 end if;
             elsif cpu_clken_96_sync(2) = '1' and cpu_clken_96_sync(1) = '0' then
                 -- falling edge of cpu_clken
