@@ -27,7 +27,8 @@ entity ElectronULA is
         IncludeMMC       : boolean := true;
         Include32KRAM    : boolean := true;
         IncludeVGA       : boolean := true;
-        IncludeJafaMode7 : boolean := false
+        IncludeJafaMode7 : boolean := false;
+        UseClockMux      : boolean := false  -- false for Xilinx, true for Altera
     );
     port (
         clk_16M00 : in  std_logic;
@@ -329,65 +330,76 @@ begin
     -- mode 10 - SVGA  @ 50Hz
     -- mode 11 - SVGA  @ 60Hz
 
-    -- A simple clock mux causes lots of warnings from the Xilinx tool
-    --  clk_video    <= clk_40M00 when mode = "11" else
-    --                  clk_33M33 when mode = "10" else
-    --                  clk_16M00;
-    -- Instead, we regenerate the clock using edge triggered flip flops
+    gen_clk_mux : if UseClockMux generate
 
-    process(clk_16M00)
-    begin
-        if rising_edge(clk_16M00) then
-            clk_16M00_a <= not clk_16M00_a;
-        end if;
-    end process;
+        -- A simple clock mux causes lots of warnings from the Xilinx tool,
+        -- but is OK with Quartus.
 
-    process(clk_16M00)
-    begin
-        if falling_edge(clk_16M00) then
-            clk_16M00_b <= not clk_16M00_b;
-        end if;
-    end process;
+        clk_video    <= clk_40M00 when mode = "11" else
+                        clk_33M33 when mode = "10" else
+                        clk_16M00;
 
-    clk_16M00_c <= clk_16M00_a xor clk_16M00_b;
-
-    process(clk_33M33)
-    begin
-        if rising_edge(clk_33M33) then
-            clk_33M33_a <= not clk_33M33_a;
-        end if;
-    end process;
-
-    process(clk_33M33)
-    begin
-        if falling_edge(clk_33M33) then
-            clk_33M33_b <= not clk_33M33_b;
-        end if;
-    end process;
-
-    clk_33M33_c <= clk_33M33_a xor clk_33M33_b;
-
-    process(clk_40M00)
-    begin
-        if rising_edge(clk_40M00) then
-            clk_40M00_a <= not clk_40M00_a;
-        end if;
-    end process;
-
-    process(clk_40M00)
-    begin
-        if falling_edge(clk_40M00) then
-            clk_40M00_b <= not clk_40M00_b;
-        end if;
-    end process;
-
-    clk_40M00_c <= clk_40M00_a xor clk_40M00_b;
+    end generate;
 
 
-    clk_video    <= clk_40M00_c when mode = "11" and IncludeVGA else
-                    clk_33M33_c when mode = "10" and IncludeVGA else
-                    clk_16M00_c;
+    gen_clk_with_flops : if not UseClockMux generate
 
+        -- Regenerate the clock using edge triggered flip flops on Xilinx.
+
+        process(clk_16M00)
+        begin
+            if rising_edge(clk_16M00) then
+                clk_16M00_a <= not clk_16M00_a;
+            end if;
+        end process;
+
+        process(clk_16M00)
+        begin
+            if falling_edge(clk_16M00) then
+                clk_16M00_b <= not clk_16M00_b;
+            end if;
+        end process;
+
+        clk_16M00_c <= clk_16M00_a xor clk_16M00_b;
+
+        process(clk_33M33)
+        begin
+            if rising_edge(clk_33M33) then
+                clk_33M33_a <= not clk_33M33_a;
+            end if;
+        end process;
+
+        process(clk_33M33)
+        begin
+            if falling_edge(clk_33M33) then
+                clk_33M33_b <= not clk_33M33_b;
+            end if;
+        end process;
+
+        clk_33M33_c <= clk_33M33_a xor clk_33M33_b;
+
+        process(clk_40M00)
+        begin
+            if rising_edge(clk_40M00) then
+                clk_40M00_a <= not clk_40M00_a;
+            end if;
+        end process;
+
+        process(clk_40M00)
+        begin
+            if falling_edge(clk_40M00) then
+                clk_40M00_b <= not clk_40M00_b;
+            end if;
+        end process;
+
+        clk_40M00_c <= clk_40M00_a xor clk_40M00_b;
+
+
+        clk_video    <= clk_40M00_c when mode = "11" and IncludeVGA else
+                        clk_33M33_c when mode = "10" and IncludeVGA else
+                        clk_16M00_c;
+
+    end generate;
 
     hsync_start  <= std_logic_vector(to_unsigned(759, 11)) when mode = "11" and IncludeVGA else
                     std_logic_vector(to_unsigned(759, 11)) when mode = "10" and IncludeVGA else

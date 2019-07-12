@@ -36,9 +36,9 @@ create_generated_clock \
 create_generated_clock -name ram_output_clock -source $clock_96 -divide_by 2 [get_pins sdram_CLK~reg0|q]
 
 # Clock muxes
-create_clock -period "16 MHz" -name clk_16M00_a [get_nets ula|clk_16M00_a]
-create_clock -period "16 MHz" -name clk_16M00_b [get_nets ula|clk_16M00_b]
-create_clock -period "16 MHz" -name clk_16M00_c [get_nets ula|clk_16M00_c]
+#create_clock -period "16 MHz" -name clk_16M00_a [get_nets ula|clk_16M00_a]
+#create_clock -period "16 MHz" -name clk_16M00_b [get_nets ula|clk_16M00_b]
+#create_clock -period "16 MHz" -name clk_16M00_c [get_nets ula|clk_16M00_c]
 
 # Include this if building with IncludeICEDebugger
 # create_clock -period "16 MHz" -name clock_avr {electron_core:bbc_micro|clock_avr}

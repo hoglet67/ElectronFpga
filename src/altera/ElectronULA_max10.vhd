@@ -469,7 +469,8 @@ begin
         IncludeMMC       => true,
         Include32KRAM    => true,
         IncludeVGA       => true,
-        IncludeJafaMode7 => false  -- TODO get character ROM working
+        IncludeJafaMode7 => false,  -- TODO get character ROM working
+        UseClockMux      => true
     )
     port map (
         clk_16M00 => clock_16,
