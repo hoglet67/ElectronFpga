@@ -255,6 +255,16 @@ signal mcu_flash_spi_clocking : std_logic := '0';  -- '0' during first clock cyc
 signal boundary_scan     : std_logic := '0';
 signal debug_boundary_vector : std_logic_vector(47 downto 0);
 
+-- USB serial port on FCA1 (status), FCA0 (data)
+signal usb_serial_enable : std_logic := '0';
+signal usb_serial_data   : std_logic_vector(7 downto 0);
+signal usb_elk_rx_reading : std_logic := '0';
+signal usb_elk_rx_empty  : std_logic := '0';
+signal usb_elk_rx_byte   : std_logic_vector(7 downto 0);
+signal usb_elk_tx_full   : std_logic := '0';
+signal usb_elk_tx_byte   : std_logic_vector(7 downto 0);
+signal usb_elk_remote_has_byte : std_logic := '0';
+
 signal empty_bank_enable : std_logic;
 
 signal flash_enable      : std_logic := '0';
@@ -293,7 +303,7 @@ signal char_rom_addr     : std_logic_vector(12 downto 0) := (others => '0');  --
 begin
 
 --------------------------------------------------------
--- Debugging
+-- Debug SPI port + USB serial port
 --------------------------------------------------------
 
     -- SPI interface with mcu
@@ -383,6 +393,11 @@ begin
                                             -- data &        -- FF
                                             RnW & '0' & powerup_reset_n & RST_n_in & powerup_reset_n & IRQ_n_in & ula_irq_n & NMI_n_in &  -- BF
                                             kbd & '1' & '1' & '1' & '1'; -- FF
+                                    when x"07" =>
+                                        -- USB serial port transaction
+                                        -- Bit 0 set if we have buffer space to receive a byte
+                                        -- Bit 1 set if we have a byte to send to the MCU
+                                        mcu_shifter <= "000000" & usb_elk_tx_full & usb_elk_rx_empty;
                                     when others =>
                                 end case;
                             when x"01" =>  -- configure passthrough
@@ -409,7 +424,7 @@ begin
                             --        mcu_flash_qpi_txn <= '1';  -- Write now
                             --    end if;
                             --    -- Result reads out during the next command byte.
-                            when x"04" =>  -- USB serial port; TODO implement
+                            when x"04" =>  -- Reserved
                             when x"05" =>  -- Boundary scan
                                 -- Copy in the next byte
                                 mcu_shifter <= debug_boundary_vector(47 downto 40);
@@ -417,6 +432,21 @@ begin
                                 debug_boundary_vector <= debug_boundary_vector(39 downto 0) & x"00";
                             when x"06" =>  -- Reset flash (06 00)
                                 flash_reset <= '1';
+                            when x"07" =>  -- USB serial port byte 1 of 2 (status)
+                                -- mcu_shifter_byte contains remote status
+                                -- Remote has buffer space if mcu_shifter_byte(0) is set
+                                if usb_elk_tx_full = '1' and mcu_shifter_byte(0) = '1' then
+                                    mcu_shifter <= usb_elk_tx_byte;
+                                    usb_elk_tx_full <= '0';
+                                end if;
+                                -- Remote has a byte for us if mcu_shifter_byte(1) is set
+                                usb_elk_remote_has_byte <= mcu_shifter_byte(1);
+                                mcu_state <= x"08";
+                            when x"08" =>  -- USB serial port byte 2 of 2 (data)
+                                if usb_elk_rx_empty = '1' and usb_elk_remote_has_byte = '1' then
+                                    usb_elk_rx_byte <= mcu_shifter_byte;
+                                    usb_elk_rx_empty <= '0';
+                                end if;
                             when others =>
                         end case;
                     end if;
@@ -451,15 +481,41 @@ begin
             if mcu_flash_spi_clocking = '1' then
                 mcu_MISO_int <= flash_IO1;
             end if;
+
+            -- USB serial port: CPU interface
+            if cpu_clken_96_sync(2) = '1' and cpu_clken_96_sync(1) = '0' then
+                -- falling edge of cpu_clken; act on memory requests for usb serial port
+                if usb_serial_enable = '1' and addr(0) = '0' then
+                    -- Reset usb_elk_rx_empty if the CPU read the received byte last cycle
+                    if usb_elk_rx_reading = '1' then
+                        usb_elk_rx_reading <= '0';
+                        usb_elk_rx_empty <= '1';
+                    end if;
+                    if RnW = '1' then
+                        if usb_elk_rx_empty = '0' then
+                            -- Reading serial data; flag this so we can reset usb_elk_rx_empty next cycle
+                            usb_elk_rx_reading <= '1';
+                        end if;
+                    else
+                        -- Writing serial data
+                        if usb_elk_tx_full = '0' then
+                            usb_elk_tx_byte <= data_in;
+                            usb_elk_tx_full <= '1';
+                        end if;
+                    end if;
+                end if;
+            end if;
+
         end if;
     end process;
+
     mcu_shifter_byte <= mcu_shifter(6 downto 0) & mcu_MOSI_sync(2);
     mcu_MISO <= mcu_MISO_int;
 
-    --flash_IO3 <= mcu_shifter(3) if mcu_flash_qpi = '1' and mcu_flash_qpi_rnw = '0' else 'Z';
-    --flash_IO2 <= mcu_shifter(2) if mcu_flash_qpi = '1' and mcu_flash_qpi_rnw = '0' else 'Z';
-    --flash_IO1 <= mcu_shifter(1) if mcu_flash_qpi = '1' and mcu_flash_qpi_rnw = '0' else 'Z';
-    --flash_IO0 <= mcu_shifter(0) if mcu_flash_qpi = '1' and mcu_flash_qpi_rnw = '0' else 'Z';
+    -- USB serial port: CPU interface
+    usb_serial_enable <= '1' when addr = x"FCA0" or addr = x"FCA1" else '0';
+    -- Bit 1 set if we can send a byte (!tx_full); bit 0 set if we have received a byte (!rx_empty)
+    usb_serial_data <= "000000" & (not usb_elk_tx_full) & (not usb_elk_rx_empty) when addr(0) = '1' else usb_elk_rx_byte;
 
     -- DEBUG I/O
     mcu_debug_RXD <= mcu_debug_TXD;  -- loopback serial for MCU debugging
@@ -585,6 +641,7 @@ begin
         or flash_enable = '1'    -- Output from flash
         or sdram_enable = '1' -- Output from SDRAM
         or ula_enable = '1'   -- Output from ULA
+        or usb_serial_enable = '1'  -- Output from USB serial port
     ) else '0';
 
     -- '0' to enable data bus buffer
@@ -613,6 +670,7 @@ begin
             flash_data_out when RnW = '1' and flash_enable = '1' else
             sdram_data_out(15 downto 8) when RnW = '1' and sdram_enable = '1' and addr(0) = '1' else
             sdram_data_out(7 downto 0) when RnW = '1' and sdram_enable = '1' and addr(0) = '0' else
+            usb_serial_data when RnW = '1' and usb_serial_enable = '1' else
             cpu_data_out   when RnW = '0' and InternalCPU else
             "ZZZZZZZZ";  -- ext CPU, RnW = '0' or boundary_scan = '1'
 

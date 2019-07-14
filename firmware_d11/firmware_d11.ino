@@ -93,6 +93,8 @@ void setup() {
   setup_pin(FPGA_SCK_PIN,  PER_SERCOM_ALT);
   setup_pin(FPGA_MISO_PIN, PER_SERCOM_ALT);
   // 1MHz for debugging so I can easily catch it on a logic analyzer
+  // fpga_spi.beginTransaction(SPISettings(1000000L, MSBFIRST, SPI_MODE0));
+  // 12MHz doesn't work yet, so 8 will have to do...
   fpga_spi.beginTransaction(SPISettings(8000000L, MSBFIRST, SPI_MODE0));
 
   // Serial port (TBD)
@@ -215,21 +217,70 @@ void erase_sector(uint32_t addr) {
   flash_end_spi_after_write();
 }
 
+boolean online_waiting = false;
 boolean online = false;
+long when_online = 0;
 boolean flash_detected = false;
-
 uint32_t page_buf_size = 256;
 uint8_t page_buf[256];
 
-void loop() {
-  if (!Serial.dtr()) {
-    online = false;
-    return;
+void loop_serial_forwarder() {
+  if (!online) {
+    online = true;
+    Serial.println("Serial port mode");
   }
 
+  int debug = Serial.available();
+
+  start_spi(7);  // Select fast serial port
+
+  // First byte is a status byte
+  uint8_t my_status =
+    // bit 1 = 1 if we have a byte to send
+    (Serial.available() ? 0x02 : 0x00)
+    // bit 0 = 1 if we have buffer space
+    | (Serial.availableForWrite() ? 0x01 : 0x00);
+
+  uint8_t fpga_status = fpga_spi_transfer(my_status);
+  // bit 0 of fpga_status = 1 if the fpga has buffer space
+  // bit 1 of fpga_status = 1 if the fpga has a byte to send
+
+  uint8_t my_data = 0;
+  if ((fpga_status & 0x01) && (fpga_status & 0x02)) {
+    // If the FPGA told us it has buffer space,
+    // and we told it that we have a byte to send,
+    // then send a byte.
+    my_data = (uint8_t)Serial.read();
+  }
+
+  uint8_t fpga_data = fpga_spi_transfer(my_data);
+  if ((fpga_status & 0x02) && (my_status & 0x01)) {
+    // If the FPGA told us it has a byte to send,
+    // and we told it we have buffer space, then
+    // we just received a byte.
+    Serial.write(fpga_data);
+  }
+
+  // Close transfer
+  end_spi();
+
+  if (debug) {
+    Serial.print("my status ");
+    Serial.print(my_status, HEX);
+    Serial.print(" fpga status ");
+    Serial.print(fpga_status, HEX);
+    Serial.print(" fpga data ");
+    Serial.println(fpga_data, HEX);
+    delay(500);
+  }
+}
+
+void loop_command_interface() {
   if (!online) {
     // New connection
     online = true;
+
+    Serial.println(Serial.baud());
 
     start_spi(5);
     Serial.print("FPGA: ");
@@ -468,6 +519,37 @@ void loop() {
         Serial.println("OK");
         exit_passthrough();
       }
+    }
+  }
+}
+
+void loop() {
+  // Reset everything if we have no serial connection
+  int dtr = Serial.dtr();
+  if (!dtr) {
+    online = false;
+    online_waiting = false;
+    return;
+  }
+
+  // Just went online; delay a tiny bit to allow remote to set baud
+  if (!online && !online_waiting) {
+    online_waiting = true;
+    when_online = millis();
+  }
+
+  // Exit wait state if it's been long enough
+  if (online_waiting && (millis() - when_online) > 100) {
+    online_waiting = false;
+  }
+
+  // Online now -- handle input
+  if (!online_waiting) {
+    int baud = Serial.baud();
+    if (baud == 115200) {
+      loop_serial_forwarder();
+    } else {
+      loop_command_interface();
     }
   }
 }
