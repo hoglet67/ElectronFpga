@@ -1,14 +1,10 @@
-#**************************************************************
-# Intel Max 10 SDC settings
-# Users are recommended to modify this file to match users logic.
-#**************************************************************
+### Timing constraints for the ElectronULA_max10 project
 
 # https://fpgawiki.intel.com/wiki/Timing_Constraints is helpful to understand
 # the directives in this file.
 
-#**************************************************************
-# Create Clock
-#**************************************************************
+
+### CREATE CLOCKS ###
 
 # External clock inputs
 create_clock -period "16 MHz" -name clk_in [get_ports clk_in]
@@ -23,39 +19,18 @@ set clock_32 "max10_pll1_inst|altpll_component|auto_generated|pll1|clk[1]"
 set clock_33 "max10_pll1_inst|altpll_component|auto_generated|pll1|clk[4]"
 set clock_40 "max10_pll1_inst|altpll_component|auto_generated|pll1|clk[3]"
 set clock_96 "max10_pll1_inst|altpll_component|auto_generated|pll1|clk[2]"
-#set clock_24 "clock_24"
-
-# We divide clock_96 down with a counter
-#create_generated_clock \
-#    -name clock_24 \
-#    -source [get_clocks $clock_96] \
-#    -divide_by 4 \
-#    [get_nets {clock_24}]
 
 # Clock output to SDRAM at 48MHz
 create_generated_clock -name ram_output_clock -source $clock_96 -divide_by 2 [get_pins sdram_CLK~reg0|q]
 
-# Clock muxes
-#create_clock -period "16 MHz" -name clk_16M00_a [get_nets ula|clk_16M00_a]
-#create_clock -period "16 MHz" -name clk_16M00_b [get_nets ula|clk_16M00_b]
-#create_clock -period "16 MHz" -name clk_16M00_c [get_nets ula|clk_16M00_c]
-
 # Include this if building with IncludeICEDebugger
 # create_clock -period "16 MHz" -name clock_avr {electron_core:bbc_micro|clock_avr}
 
-#**************************************************************
-# Set Clock Latency
-#**************************************************************
-
-#**************************************************************
-# Set Clock Uncertainty
-#**************************************************************
+# Allow for clock jitter etc
 derive_clock_uncertainty
 
-#**************************************************************
-# Set Input / Output Delay
-#**************************************************************
-# Board Delay (Data) + Propagation Delay - Board Delay (Clock)
+
+### I/O TIMING ###
 
 # set_input_delay is easy: after a clock, the previous data value on the pin
 # is stable for -min, and the next data value is stable after -max.  So
@@ -79,6 +54,9 @@ derive_clock_uncertainty
 # clock, which isn't true in our case: We also generate flash_SCK and
 # sdram_CLK, and have to constrain them as well.
 
+
+# *** QPI flash at 96MHz ***
+
 # We're running the flash clock at half the system clock, so we're quite
 # tolerant of delays.  If we can constrain the forwarded clock and all the
 # data signals to at least be close enough to each other, we'll be OK.
@@ -86,8 +64,6 @@ derive_clock_uncertainty
 # particular window -- for example -min 3 -max -5, for 8ns stable time and
 # a clock-to-output window of 3ns-5.52ns.
 
-
-# *** QPI flash at 96MHz ***
 # W25Q128JV timing parameters:
 
 # Output from FPGA: Flash samples inputs on rising flash_SCK, and needs 3ns
@@ -211,51 +187,142 @@ set_input_delay -clock ram_output_clock -min $sdram_data_hold_time [get_ports sd
 
 # *** Audio DAC at 16MHz (62.5 ns) ***
 
+# Clock outputs to DAC should be quick enough; let's say they have to be within 10ns of clock_16.
 
-#**************************************************************
-# Set Clock Groups
-#**************************************************************
+# In this case I think we want to do the opposite to a normal constraint; -max
+# 10 -min 10 would specify that we want to set up our outputs 10 ns before
+# clock_16 and hold them for 10 ns.  We actually want to set up our outputs
+# sometime around clock_16, so we specify -10ns setup time (-max -10) and
+# 52.5ns hold (-min -52.5).  This results in the fitter adding ~98.5ns of
+# delay on dac_lrclk, dacdat, and bclk though, so something is wrong with my reasoning!
+
+set_output_delay -clock $clock_16 -max 0 [get_ports dac_mclk]
+set_output_delay -clock $clock_16 -min 0 [get_ports dac_mclk] -add_delay
+set_output_delay -clock $clock_16 -max 0 [get_ports dac_bclk]
+set_output_delay -clock $clock_16 -min 0 [get_ports dac_bclk] -add_delay
+
+# Signal outputs can be sloppier; nmute, lrclk, and dacdat have lots of wiggle room, so let's say
+# they can change anywhere within 20ns of the clock.
+set_output_delay -clock $clock_16 -max 0 [get_ports dac_nmute]
+set_output_delay -clock $clock_16 -min 0 [get_ports dac_nmute] -add_delay
+set_output_delay -clock $clock_16 -max 0 [get_ports dac_lrclk]
+set_output_delay -clock $clock_16 -min 0 [get_ports dac_lrclk] -add_delay
+set_output_delay -clock $clock_16 -max 0 [get_ports dac_dacdat]
+set_output_delay -clock $clock_16 -min 0 [get_ports dac_dacdat] -add_delay
+
+
+# *** SPI with MCU is half rate ***
+set_output_delay -clock $clock_96 -min 0 [get_ports mcu_MISO]
+set_output_delay -clock $clock_96 -max 0 [get_ports mcu_MISO]
+set_input_delay  -clock $clock_96 -min 0 [get_ports mcu_MOSI]
+set_input_delay  -clock $clock_96 -max 0 [get_ports mcu_MOSI]
+set_input_delay  -clock $clock_96 -min 0 [get_ports mcu_SCK]
+set_input_delay  -clock $clock_96 -max 0 [get_ports mcu_SCK]
+set_input_delay  -clock $clock_96 -min 0 [get_ports mcu_SS]
+set_input_delay  -clock $clock_96 -max 0 [get_ports mcu_SS]
+
+
+# *** MCU serial port
+set_output_delay -clock $clock_96 -min 0 [get_ports mcu_debug_RXD]
+set_output_delay -clock $clock_96 -max 0 [get_ports mcu_debug_RXD]
+set_input_delay  -clock $clock_96 -min 0 [get_ports mcu_debug_TXD]
+set_input_delay  -clock $clock_96 -max 0 [get_ports mcu_debug_TXD]
+
+
+# *** External serial port
+set_output_delay -clock $clock_96 -min 0 [get_ports serial_TXD]
+set_output_delay -clock $clock_96 -max 0 [get_ports serial_TXD]
+# TODO swap the following around when we stop using this as a debug output
+set_output_delay -clock $clock_96 -min 0 [get_ports serial_RXD]
+set_output_delay -clock $clock_96 -max 0 [get_ports serial_RXD]
+#set_input_delay  -clock $clock_96 -min 0 [get_ports serial_RXD]
+#set_input_delay  -clock $clock_96 -max 0 [get_ports serial_RXD]
+# TODO remove these when we're using this as a serial port
+set_false_path -from * -to [get_ports serial_*XD]
+
+
+# *** Everything else is slow ***
+set_output_delay -clock $clock_16 -min 0 [get_ports clk_out]
+set_output_delay -clock $clock_16 -max 0 [get_ports clk_out]
+
+set_output_delay -clock $clock_16 -min 0 [get_ports red]
+set_output_delay -clock $clock_16 -max 0 [get_ports red]
+set_output_delay -clock $clock_16 -min 0 [get_ports green]
+set_output_delay -clock $clock_16 -max 0 [get_ports green]
+set_output_delay -clock $clock_16 -min 0 [get_ports blue]
+set_output_delay -clock $clock_16 -max 0 [get_ports blue]
+set_output_delay -clock $clock_16 -min 0 [get_ports csync]
+set_output_delay -clock $clock_16 -max 0 [get_ports csync]
+
+set_input_delay  -clock $clock_16 -min 0 [get_ports sd_DAT0_MISO]
+set_input_delay  -clock $clock_16 -max 0 [get_ports sd_DAT0_MISO]
+set_output_delay -clock $clock_16 -min 0 [get_ports sd_CLK_SCK]
+set_output_delay -clock $clock_16 -max 0 [get_ports sd_CLK_SCK]
+set_output_delay -clock $clock_16 -min 0 [get_ports sd_CMD_MOSI]
+set_output_delay -clock $clock_16 -max 0 [get_ports sd_CMD_MOSI]
+
+set_input_delay  -clock $clock_16 -min 0 [get_ports IRQ_n_in]
+set_input_delay  -clock $clock_16 -max 0 [get_ports IRQ_n_in]
+set_output_delay -clock $clock_16 -min 0 [get_ports IRQ_n_out]
+set_output_delay -clock $clock_16 -max 0 [get_ports IRQ_n_out]
+
+set_output_delay -clock $clock_16 -min 0 [get_ports ROM_n]
+set_output_delay -clock $clock_16 -max 0 [get_ports ROM_n]
+
+set_input_delay  -clock $clock_16 -min 0 [get_ports NMI_n_in]
+set_input_delay  -clock $clock_16 -max 0 [get_ports NMI_n_in]
+
+set_input_delay  -clock $clock_16 -min 0 [get_ports RST_n_in]
+set_input_delay  -clock $clock_16 -max 0 [get_ports RST_n_in]
+set_output_delay -clock $clock_16 -min 0 [get_ports RST_n_out]
+set_output_delay -clock $clock_16 -max 0 [get_ports RST_n_out]
+
+set_output_delay -clock $clock_16 -min 0 [get_ports RnW_out]
+set_output_delay -clock $clock_16 -max 0 [get_ports RnW_out]
+
+set_output_delay -clock $clock_16 -min 0 [get_ports addr[*]]
+set_output_delay -clock $clock_16 -max 0 [get_ports addr[*]]
+
+set_input_delay  -clock $clock_16 -min 0 [get_ports casIn]
+set_input_delay  -clock $clock_16 -max 0 [get_ports casIn]
+set_output_delay -clock $clock_16 -min 0 [get_ports casOut]
+set_output_delay -clock $clock_16 -max 0 [get_ports casOut]
+set_output_delay -clock $clock_16 -min 0 [get_ports casMO]
+set_output_delay -clock $clock_16 -max 0 [get_ports casMO]
+
+set_input_delay  -clock $clock_16 -min 0 [get_ports data[*]]
+set_input_delay  -clock $clock_16 -max 0 [get_ports data[*]]
+set_output_delay -clock $clock_16 -min 0 [get_ports data[*]]
+set_output_delay -clock $clock_16 -max 0 [get_ports data[*]]
+set_output_delay -clock $clock_16 -min 0 [get_ports D_buf_DIR]
+set_output_delay -clock $clock_16 -max 0 [get_ports D_buf_DIR]
+
+set_output_delay -clock $clock_16 -min 0 [get_ports caps]
+set_output_delay -clock $clock_16 -max 0 [get_ports caps]
+set_input_delay  -clock $clock_16 -min 0 [get_ports kbd[*]]
+set_input_delay  -clock $clock_16 -max 0 [get_ports kbd[*]]
+
+# data[*] is a slow external bus, so output from clock_96 can take two cycles
+#set_multicycle_path -from [get_clocks $clock_96] -to [get_ports data[*]] -setup -end 2
+
+# General multicycle to say that anything coming from clock_96 to clock_16
+# will be ready one clock_96 cycle into the clock_16 period and will be valid
+# until the end of the clock_16 period.
+
+# See http://www.ee.bgu.ac.il/~digivlsi/slides/Multicycles_6_2.pdf Figure 0-12
+# for an explanation of what's happening here.  We could possibly also use 6
+# -setup / 5 -hold.
+
+set_multicycle_path 5 -setup -start -from [get_clocks $clock_96] -to [get_clocks $clock_16]
+set_multicycle_path 4 -hold -start -from [get_clocks $clock_96] -to [get_clocks $clock_16]
+
+
+### ASYNCHRONOUS CLOCKS ###
 
 set_clock_groups -asynchronous -group $clock_16 -group $clock_32
 set_clock_groups -asynchronous -group $clock_32 -group $clock_16
-#set_clock_groups -asynchronous -group $clock_16 -group $clock_24
-#set_clock_groups -asynchronous -group $clock_24 -group $clock_16
 set_clock_groups -asynchronous -group $clock_16 -group $clock_33
 set_clock_groups -asynchronous -group $clock_33 -group $clock_16
 set_clock_groups -asynchronous -group $clock_16 -group $clock_40
 set_clock_groups -asynchronous -group $clock_40 -group $clock_16
-
-#**************************************************************
-# Set False Path
-#**************************************************************
-
-
-
-#**************************************************************
-# Set Multicycle Path
-#**************************************************************
-
-
-
-#**************************************************************
-# Set Maximum Delay
-#**************************************************************
-
-
-
-#**************************************************************
-# Set Minimum Delay
-#**************************************************************
-
-
-
-#**************************************************************
-# Set Input Transition
-#**************************************************************
-
-
-
-#**************************************************************
-# Set Load
-#**************************************************************
 
