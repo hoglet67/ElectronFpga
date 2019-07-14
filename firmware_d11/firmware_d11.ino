@@ -227,10 +227,10 @@ uint8_t page_buf[256];
 void loop_serial_forwarder() {
   if (!online) {
     online = true;
-    Serial.println("Serial port mode");
+    // Serial.println("Serial port mode");
   }
 
-  int debug = Serial.available();
+  // int debug = Serial.available();
 
   start_spi(7);  // Select fast serial port
 
@@ -246,7 +246,7 @@ void loop_serial_forwarder() {
   // bit 1 of fpga_status = 1 if the fpga has a byte to send
 
   uint8_t my_data = 0;
-  if ((fpga_status & 0x01) && (fpga_status & 0x02)) {
+  if ((fpga_status & 0x01) && (my_status & 0x02)) {
     // If the FPGA told us it has buffer space,
     // and we told it that we have a byte to send,
     // then send a byte.
@@ -264,15 +264,15 @@ void loop_serial_forwarder() {
   // Close transfer
   end_spi();
 
-  if (debug) {
-    Serial.print("my status ");
-    Serial.print(my_status, HEX);
-    Serial.print(" fpga status ");
-    Serial.print(fpga_status, HEX);
-    Serial.print(" fpga data ");
-    Serial.println(fpga_data, HEX);
-    delay(500);
-  }
+  // if (debug) {
+  //   Serial.print("my status ");
+  //   Serial.print(my_status, HEX);
+  //   Serial.print(" fpga status ");
+  //   Serial.print(fpga_status, HEX);
+  //   Serial.print(" fpga data ");
+  //   Serial.println(fpga_data, HEX);
+  //   delay(500);
+  // }
 }
 
 void loop_command_interface() {
