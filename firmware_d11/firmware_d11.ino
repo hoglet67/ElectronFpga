@@ -258,6 +258,7 @@ void loop_serial_forwarder() {
     // If the FPGA told us it has a byte to send,
     // and we told it we have buffer space, then
     // we just received a byte.
+    // Serial.print(fpga_data, HEX); Serial.print(" ");
     Serial.write(fpga_data);
   }
 

@@ -264,6 +264,8 @@ signal usb_elk_rx_byte   : std_logic_vector(7 downto 0);
 signal usb_elk_tx_full   : std_logic := '0';
 signal usb_elk_tx_byte   : std_logic_vector(7 downto 0);
 signal usb_elk_remote_has_byte : std_logic := '0';
+signal usb_elk_tx_full_sent : std_logic := '0';
+signal usb_elk_rx_empty_sent : std_logic := '0';
 
 signal empty_bank_enable : std_logic;
 
@@ -397,7 +399,9 @@ begin
                                         -- USB serial port transaction
                                         -- Bit 0 set if we have buffer space to receive a byte
                                         -- Bit 1 set if we have a byte to send to the MCU
-                                        mcu_shifter <= "000000" & usb_elk_tx_full & usb_elk_rx_empty;
+                                        mcu_shifter <= "000000" & usb_elk_tx_full & (usb_elk_rx_empty and not usb_elk_rx_reading);
+                                        usb_elk_tx_full_sent <= usb_elk_tx_full;
+                                        usb_elk_rx_empty_sent <= usb_elk_rx_empty and not usb_elk_rx_reading;
                                     when others =>
                                 end case;
                             when x"01" =>  -- configure passthrough
@@ -424,7 +428,7 @@ begin
                             --        mcu_flash_qpi_txn <= '1';  -- Write now
                             --    end if;
                             --    -- Result reads out during the next command byte.
-                            when x"04" =>  -- Reserved
+                            when x"04" =>  -- NOP state; we end up here after a serial port transaction
                             when x"05" =>  -- Boundary scan
                                 -- Copy in the next byte
                                 mcu_shifter <= debug_boundary_vector(47 downto 40);
@@ -435,7 +439,7 @@ begin
                             when x"07" =>  -- USB serial port byte 1 of 2 (status)
                                 -- mcu_shifter_byte contains remote status
                                 -- Remote has buffer space if mcu_shifter_byte(0) is set
-                                if usb_elk_tx_full = '1' and mcu_shifter_byte(0) = '1' then
+                                if usb_elk_tx_full_sent = '1' and mcu_shifter_byte(0) = '1' then
                                     mcu_shifter <= usb_elk_tx_byte;
                                     usb_elk_tx_full <= '0';
                                 end if;
@@ -443,10 +447,11 @@ begin
                                 usb_elk_remote_has_byte <= mcu_shifter_byte(1);
                                 mcu_state <= x"08";
                             when x"08" =>  -- USB serial port byte 2 of 2 (data)
-                                if usb_elk_rx_empty = '1' and usb_elk_remote_has_byte = '1' then
+                                if usb_elk_rx_empty_sent = '1' and usb_elk_remote_has_byte = '1' then
                                     usb_elk_rx_byte <= mcu_shifter_byte;
                                     usb_elk_rx_empty <= '0';
                                 end if;
+                                mcu_state <= x"04";
                             when others =>
                         end case;
                     end if;
@@ -483,27 +488,26 @@ begin
             end if;
 
             -- USB serial port: CPU interface
-            if cpu_clken_96_sync(2) = '1' and cpu_clken_96_sync(1) = '0' then
-                -- falling edge of cpu_clken; act on memory requests for usb serial port
-                if usb_serial_enable = '1' and addr(0) = '0' then
-                    -- Reset usb_elk_rx_empty if the CPU read the received byte last cycle
-                    if usb_elk_rx_reading = '1' then
-                        usb_elk_rx_reading <= '0';
+            if usb_serial_enable = '1' and addr(0) = '0' then
+                if start_read_96 = '1' then
+                    if usb_elk_rx_empty = '0' then
+                        -- Flag that we're reading from the serial port to keep data
+                        -- stable for the next clock
+                        usb_elk_rx_reading <= '1';
                         usb_elk_rx_empty <= '1';
                     end if;
-                    if RnW = '1' then
-                        if usb_elk_rx_empty = '0' then
-                            -- Reading serial data; flag this so we can reset usb_elk_rx_empty next cycle
-                            usb_elk_rx_reading <= '1';
-                        end if;
-                    else
-                        -- Writing serial data
-                        if usb_elk_tx_full = '0' then
-                            usb_elk_tx_byte <= data_in;
-                            usb_elk_tx_full <= '1';
-                        end if;
+                end if;
+                if start_write_96 = '1' then
+                    -- Writing serial data
+                    if usb_elk_tx_full = '0' then
+                        usb_elk_tx_byte <= data_in;
+                        usb_elk_tx_full <= '1';
                     end if;
                 end if;
+            end if;
+            -- Clear the "CPU reading; don't overwrite data" flag
+            if start_read_96 = '1' and usb_elk_rx_reading = '1' then
+                usb_elk_rx_reading <= '0';
             end if;
 
         end if;
