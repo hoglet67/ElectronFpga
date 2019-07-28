@@ -24,13 +24,13 @@ def guess_port():
             return matches[0]
 
 class Port:
-    def __init__(self):
+    def __init__(self, baud=9600):
         port = guess_port()
         if not port:
             raise Exception("Could not guess serial port")
 
         print("Opening port %s" % port)
-        self.ser = serial.Serial(port, timeout=0)
+        self.ser = serial.Serial(port, timeout=0, baudrate=baud)
         print("Serial port opened: %s" % repr(self.ser))
 
     def __enter__(self):

@@ -41,43 +41,11 @@ def read_until(ser, match):
                 time.sleep(0.1)
     return resp
 
-def upload(rom):
+def download():
     with mcu_port.Port() as ser:
         print("\n* Port open.  Giving it a kick, and waiting for OK.")
         ser.write("\n")
         r = read_until(ser, "OK")
-
-        print("\n* Start programming process")
-        ser.write("P")  # program chip
-
-        input_buf = ''
-        done = 0
-        while not done:
-            input_buf += read_until(ser, "\n")
-            while input_buf.find("\n") != -1:
-                p = input_buf.find("\n") + 1
-                line, input_buf = input_buf[:p], input_buf[p:]
-                line = line.strip()
-                print("parse",repr(line))
-                if line == "OK":
-                    print("All done!")
-                    done = 1
-                    break
-                m = re.search(r"^(\d+)\+(\d+)$", line)
-                if not m: continue
-
-                start, size = int(m.group(1)), int(m.group(2))
-                print("* Sending data from %d-%d" % (start, start+size))
-                blk = rom[start:start+size]
-                print(`blk[:64]`)
-                assert len(blk) == size, "Remote requested %d+%d but we only have up to %d" % (start, size, len(rom))
-                while len(blk):
-                    n = ser.write(blk[:usb_block_size])
-                    if n:
-                        blk = blk[n:]
-                        print("wrote %d bytes" % n)
-                    else:
-                        time.sleep(0.01)
 
         ser.write("R")
         resp = ''
@@ -89,16 +57,13 @@ def upload(rom):
                 p = resp.find("DATA:")
                 if p != -1 and len(resp) >= p+5 + 64*1024:
                     print("got 64k")
-                    open("readback.rom", "wb").write(resp[p+5:p+5+64*1024])
+                    open("download.rom", "wb").write(resp[p+5:p+5+64*1024])
                     break
             time.sleep(0.1)
 
+        ser.write("x")
+        time.sleep(0.5)
+        print(ser.read(1024))
+
 if __name__ == '__main__':
-    data = open(sys.argv[1], 'rb').read()
-    if len(data) < 64*1024:
-        data += '\xff' * (64*1024 - len(data))
-    upload(data)
-    if data == open("readback.rom").read():
-        print("verified")
-    else:
-        raise Exception("verification failed")
+    download()
