@@ -56,13 +56,13 @@
 // <o> idVender <0x0000-0xFFFF>
 // <id> usb_cdcd_acm_idvender
 #ifndef CONF_USB_CDCD_ACM_IDVENDER
-#define CONF_USB_CDCD_ACM_IDVENDER 0x3eb
+#define CONF_USB_CDCD_ACM_IDVENDER 0x1209
 #endif
 
 // <o> idProduct <0x0000-0xFFFF>
 // <id> usb_cdcd_acm_idproduct
 #ifndef CONF_USB_CDCD_ACM_IDPRODUCT
-#define CONF_USB_CDCD_ACM_IDPRODUCT 0x2404
+#define CONF_USB_CDCD_ACM_IDPRODUCT 0xFE05
 #endif
 
 // <o> bcdDevice <0x0000-0xFFFF>
@@ -84,7 +84,7 @@
 // <s> Unicode string of iManufact
 // <id> usb_cdcd_acm_imanufact_str
 #ifndef CONF_USB_CDCD_ACM_IMANUFACT_STR
-#define CONF_USB_CDCD_ACM_IMANUFACT_STR "Atmel"
+#define CONF_USB_CDCD_ACM_IMANUFACT_STR "Stardot"
 #endif
 
 #ifndef CONF_USB_CDCD_ACM_IMANUFACT_STR_DESC
@@ -107,7 +107,7 @@
 // <s> Unicode string of iProduct
 // <id> usb_cdcd_acm_iproduct_str
 #ifndef CONF_USB_CDCD_ACM_IPRODUCT_STR
-#define CONF_USB_CDCD_ACM_IPRODUCT_STR "CDC ACM Serial Bridge Demo"
+#define CONF_USB_CDCD_ACM_IPRODUCT_STR "Ultimate Electron Upgrade"
 #endif
 
 #ifndef CONF_USB_CDCD_ACM_IPRODUCT_STR_DESC
@@ -131,7 +131,7 @@
 // <s> Unicode string of iSerialNum
 // <id> usb_cdcd_acm_iserialnum_str
 #ifndef CONF_USB_CDCD_ACM_ISERIALNUM_STR
-#define CONF_USB_CDCD_ACM_ISERIALNUM_STR "123456789ABCDEF"
+#define CONF_USB_CDCD_ACM_ISERIALNUM_STR "42"
 #endif
 
 #ifndef CONF_USB_CDCD_ACM_ISERIALNUM_STR_DESC
