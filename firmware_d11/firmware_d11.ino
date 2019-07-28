@@ -33,7 +33,7 @@
 /*
  * FPGA serial port
  *
- * TXD = PA14 sercom2.0
+ * TXD = PA14 sercom2.0  **** D11C doesn't have SERCOM2!
  * RXD = PA15 sercom2.1
  */
 #define TXD_PIN 14
@@ -98,9 +98,9 @@ void setup() {
   fpga_spi.beginTransaction(SPISettings(8000000L, MSBFIRST, SPI_MODE0));
 
   // Serial port (TBD)
-  pinMode(TXD_PIN, OUTPUT);
-  digitalWrite(TXD_PIN, HIGH);
-  pinMode(RXD_PIN, INPUT);
+  // pinMode(TXD_PIN, OUTPUT);
+  // digitalWrite(TXD_PIN, HIGH);
+  // pinMode(RXD_PIN, INPUT);
 }
 
 uint8_t debug_transfer(uint8_t b) {
@@ -407,14 +407,20 @@ void loop_command_interface() {
           flash_start_spi(0x03);  // Read data
           flash_send_24bit_addr(sector);
           for (int offset = 0; offset < page_buf_size; ++offset) {
-            if (!Serial.dtr()) break;
             page_buf[offset] = fpga_spi_transfer(0);
           }
           end_spi();
+          if (!Serial.dtr()) break;
           for (int offset = 0; offset < page_buf_size; ++offset) {
-            Serial.write(page_buf[offset]);
+            // Serial.write(page_buf[offset]);
             checksum += page_buf[offset];
           }
+          // TODO speed up serial write by writing entire page_buf at once;
+          // otherwise this sends one byte per usb transaction.  USB code
+          // will automatically split into 63-byte packets, so ideal
+          // page_buf_size is probably 252.  However the following results in
+          // bad data being read on the host side:
+          Serial.write(page_buf, page_buf_size);
         }
         Serial.println();
         Serial.print(addr);
@@ -425,6 +431,7 @@ void loop_command_interface() {
       }
 
       case 'e': {
+        break;  // Easy to accidentally mess up the first ROM with this
         // Erase first sector
         enter_passthrough();
         Serial.println("Erasing first sector");
@@ -435,6 +442,7 @@ void loop_command_interface() {
       }
 
       case 'p': {
+        break;  // Easy to accidentally mess up the first ROM with this
         Serial.println("Programming something");
         enter_passthrough();
         flash_write_enable();
@@ -464,8 +472,9 @@ void loop_command_interface() {
             if (!Serial.dtr()) goto programming_error;
 
             Serial.println("SEND:");
-            Serial.print(addr);
-            Serial.println("+256");
+            Serial.print(addr, HEX);
+            Serial.print("+");
+            Serial.println(256, HEX);
             uint32_t page_checksum = 0;
             for (int a = 0; a < 256; ++a) {
               while (!Serial.available()) {

@@ -2,6 +2,7 @@
 
 PROJECT = firmware_d11
 TARGET = $(PROJECT).MattairTech_Arduino.samd.d11c14a
+HERE = $(shell pwd)
 
 default: all
 
@@ -17,7 +18,7 @@ upload: $(TARGET).bin
 	JLinkExe -device atsamd11c14 -if swd -speed 4000 -CommanderScript upload.jlink
 
 clean:
-	rm -vf $(TARGET).bin $(TARGET).elf
+	rm -vrf $(TARGET).bin $(TARGET).elf build_d11
 
 $(TARGET).bin: firmware_d11.ino
-	(cd ..; arduino-cli compile --verbose --fqbn MattairTech_Arduino:samd:d11c14a:float=both,config=enabled,clock=internal,timer=timer_732Hz,bootloader=0kb,serial=no_uart,usb=cdc firmware_d11)
+	(cd ..; arduino-cli compile --build-path $(HERE)/build_d11 --build-cache-path $(HERE)/build_d11/build-cache --verbose --fqbn MattairTech_Arduino:samd:d11c14a:float=both,config=enabled,clock=internal,timer=timer_732Hz,bootloader=0kb,serial=no_uart,usb=cdc firmware_d11)
