@@ -26,9 +26,9 @@ import time
 
 import mcu_port
 
-# Anything over 127 claims to be written but doesn't seem to make it to the other end.
-# TODO trace this with tcpdump and see what's going on.
-usb_block_size = 1024
+# Arduino USB serial ports seem to crash out if you send more than 63 (or sometimes 127)
+# bytes at a time.  The ASF version works fine with full blocks.
+usb_block_size = 1024 * 1024
 
 def read_until(ser, match):
     resp = ''
@@ -51,6 +51,8 @@ def upload(rom):
 
         print("\n* Start programming process")
         ser.write("P")  # program chip
+
+        program_start_time = time.time()
 
         input_buf = ''
         done = 0
@@ -81,6 +83,8 @@ def upload(rom):
                     else:
                         time.sleep(0.01)
 
+        program_end_time = time.time()
+
         ser.write("R")
         resp = ''
         while True:
@@ -95,9 +99,16 @@ def upload(rom):
                     break
             time.sleep(0.1)
 
+        readback_end_time = time.time()
+
         ser.write("x")
         time.sleep(0.5)
         print(ser.read(1024))
+
+        print("programming took %.1f s; readback took %.1f s" % (
+            program_end_time - program_start_time,
+            readback_end_time - program_end_time,
+        ))
 
 if __name__ == '__main__':
     data = open(sys.argv[1], 'rb').read()

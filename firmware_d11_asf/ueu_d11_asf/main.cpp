@@ -637,14 +637,14 @@ void loop_command_interface() {
           erase_sector(sector);
         }
         for (uint32_t sector = 0L; sector < 65536L; sector += 4096L) {
+          serial_println("SEND:");
+          serial_print_hex(sector);
+          serial_print("+");
+          serial_print_hex(4096);
+          serial_println();
           for (uint32_t addr = sector; addr < sector + 4096L; addr += 256L) {
             if (!serial_dtr()) goto programming_error;
 
-            serial_println("SEND:");
-            serial_print_hex(addr);
-            serial_print("+");
-            serial_print_hex(256);
-            serial_println();
             uint32_t page_checksum = 0;
             for (int a = 0; a < 256; ++a) {
               while (!serial_available()) {
