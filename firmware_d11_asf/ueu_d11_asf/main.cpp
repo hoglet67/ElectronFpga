@@ -386,8 +386,179 @@ bool online_waiting = false;
 bool online = false;
 long when_online = 0;
 bool flash_detected = false;
-uint32_t page_buf_size = 256;
-uint8_t page_buf[256];
+const int page_buf_size = 256;
+uint8_t page_buf[page_buf_size];
+
+#define SECTOR_SIZE 4096L
+
+// Read a line from the serial port into page_buf.
+// Returns number of chars read on success, < 0 on failure
+int read_line_to_page_buf() {
+    int len = 0;
+
+    while (1) {
+        if (!serial_dtr()) {
+            serial_println("ERR lost comms");
+            return -1;
+        }
+        if (!serial_available()) {
+            continue;
+        }
+
+        uint8_t c = serial_read();
+        if (c == '\n') {
+            break;
+        }
+        page_buf[len++] = c;
+
+        if (len > page_buf_size-2) {
+            serial_println("ERR ran out of page buffer room");
+            return -2;
+        }
+    }
+
+    // strip off \r if we ended up with one
+    while (len && page_buf[len-1] == '\r') --len;
+
+    // terminate string
+    page_buf[len] = 0;
+
+    // success!
+    return len;
+}
+
+// Request 4096 byte blocks from the serial port, and erase/program flash as appropriate.
+void program_range(uint32_t start_addr, uint32_t end_addr) {
+    for (uint32_t sector = start_addr; sector < end_addr; sector += SECTOR_SIZE) {
+      if (!serial_dtr()) goto programming_error;
+
+      // Request data first
+      serial_println("SEND:");
+      serial_print_hex(sector);
+      serial_print("+");
+      serial_print_hex(SECTOR_SIZE);
+      serial_println();
+
+      // Then erase the sector
+      serial_print("Erase at ");
+      serial_print_hex(sector);
+      serial_println();
+      erase_sector(sector);
+
+      // Now program all the 256 byte blocks inside the sector
+      for (uint32_t addr = sector; addr < sector + SECTOR_SIZE; addr += 256L) {
+        if (!serial_dtr()) goto programming_error;
+
+        uint32_t page_checksum = 0;
+        for (int a = 0; a < 256; ++a) {
+          while (!serial_available()) {
+            if (!serial_dtr()) goto programming_error;
+          }
+          page_buf[a] = serial_read();
+          page_checksum += (uint32_t)page_buf[a];
+        }
+        serial_print("Checksum ");
+        serial_print_hex(page_checksum);
+        serial_println();
+
+        serial_print("Program page at ");
+        serial_print_hex(addr);
+        serial_println();
+
+        flash_write_enable();
+
+        flash_start_spi(0x02);  // Page program
+        flash_send_24bit_addr(addr);
+        // program 256 bytes
+        for (int a = 0; a < 256; ++a) {
+          fpga_spi_transfer(page_buf[a]);
+        }
+        flash_end_spi_after_write();
+
+        serial_print("Programmed 256 bytes at ");
+        serial_print_hex(addr);
+        serial_println();
+
+        // Verify
+        flash_start_spi(0x03);  // Read data
+        flash_send_24bit_addr(addr);
+        bool mismatch = false;
+        for (int a = 0; a < 256; ++a) {
+          uint8_t b = fpga_spi_transfer(0);
+          if (b != page_buf[a]) {
+            serial_print("Mismatch at ");
+            serial_print_hex(addr + a);
+            serial_println();
+            mismatch = true;
+          }
+        }
+        end_spi();
+        if (mismatch) {
+          serial_println("ERR mismatch");
+          return;
+        }
+      }
+    }
+
+    serial_println("Finished programming");
+    serial_println("OK");
+    return;
+
+programming_error:
+    serial_println("ERR lost serial comms during programming");
+}
+
+int read_start_and_range(uint32_t *_start_addr, uint32_t *_end_addr) {
+    if (read_line_to_page_buf() < 0) {
+        serial_println("ERR failed to read line");
+        return -1;
+    }
+
+    uint32_t start_addr = 0, range = 0;
+    int i;
+    for (i = 0; page_buf[i] >= '0' && page_buf[i] <= '9'; ++i) {
+        start_addr = (start_addr * 10) + (page_buf[i] - '0');
+    }
+    if (page_buf[i] != '+') {
+        serial_println("ERR Expected +");
+        return -1;
+    }
+    for (++i; page_buf[i] >= '0' && page_buf[i] <= '9'; ++i) {
+        range = (range * 10) + (page_buf[i] - '0');
+    }
+    if (page_buf[i]) {
+        serial_print("ERR Expected EOL, got ");
+        serial_print_hex(page_buf[i]);
+        serial_println();
+        return -1;
+    }
+
+    uint32_t end_addr = start_addr + range;
+
+    // Verify page alignment
+    if (start_addr & (SECTOR_SIZE - 1)) {
+        serial_println("ERR start addr must be sector-aligned");
+        return -1;
+    }
+    if (end_addr & (SECTOR_SIZE - 1)) {
+        serial_println("ERR length must be a multiple of the sector size");
+        return -1;
+    }
+    if (end_addr > 16L * 1024L * 1024L) {
+        serial_println("ERR start+length > flash size");
+        return -1;
+    }
+
+    serial_print("from ");
+    serial_print_hex(start_addr);
+    serial_print(" to ");
+    serial_print_hex(end_addr);
+    serial_println();
+
+    *_start_addr = start_addr;
+    *_end_addr = end_addr;
+	return 0;
+}
 
 void loop_serial_forwarder() {
   if (!online) {
@@ -540,25 +711,30 @@ void loop_command_interface() {
       }
 
       case 'r': {
-        // Read some data.  03h instruction is good up to 50 MHz, so we can use that here.
+        serial_println("read range: enter start+len<CR>");
+
+        uint32_t start_addr, end_addr;
+        if (read_start_and_range(&start_addr, &end_addr) < 0) break;
+
         enter_passthrough();
-        serial_println("Reading data:");
-        flash_start_spi(0x03);  // Read data
-        flash_send_24bit_addr(0);
-        uint32_t addr;
+        serial_print("DATA:");
         uint32_t checksum = 0;
-        for (addr = 0; addr < 65536; ++addr) {
-          if (!serial_dtr()) break;
-          uint8_t b = fpga_spi_transfer(0);
-          if (addr < 512) {
-            serial_print(" ");
-            serial_print_hex(b);
+
+        for (uint32_t sector = start_addr; sector < end_addr; sector += page_buf_size) {
+          flash_start_spi(0x03);  // Read data
+          flash_send_24bit_addr(sector);
+          for (uint32_t offset = 0; offset < page_buf_size; ++offset) {
+            page_buf[offset] = fpga_spi_transfer(0);
           }
-          checksum += b;
+          end_spi();
+          if (!serial_dtr()) break;
+          for (uint32_t offset = 0; offset < page_buf_size; ++offset) {
+            checksum += page_buf[offset];
+          }
+          serial_write(page_buf, page_buf_size);
         }
         serial_println();
-        end_spi();
-        serial_print_hex(addr);
+        serial_print_hex(end_addr - start_addr);
         serial_print(" bytes read; checksum ");
         serial_print_hex(checksum); serial_println();
         exit_passthrough();
@@ -611,18 +787,13 @@ void loop_command_interface() {
       }
 
       case 'p': {
-        break;  // Easy to accidentally mess up the first ROM with this
-        serial_println("Programming something");
+        serial_println("program range: enter start+len<CR>");
+
+        uint32_t start_addr, end_addr;
+        if (read_start_and_range(&start_addr, &end_addr) < 0) break;
+
         enter_passthrough();
-        flash_write_enable();
-        flash_start_spi(0x02);  // Page program
-        flash_send_24bit_addr(0);
-        // program 256 bytes
-        for (int a = 0; a < 256; ++a) {
-          fpga_spi_transfer((uint8_t)a);
-        }
-        flash_end_spi_after_write();
-        serial_println("Programmed 256 bytes at 0");
+        program_range(start_addr, end_addr);
         exit_passthrough();
         break;
       }
@@ -630,75 +801,7 @@ void loop_command_interface() {
       case 'P': {
         serial_println("Program 64kB from serial port");
         enter_passthrough();
-        for (uint32_t sector = 0L; sector < 65536L; sector += 4096L) {
-          if (!serial_dtr()) goto programming_error;
-          serial_print("Erase at ");
-          serial_print_hex(sector); serial_println();
-          erase_sector(sector);
-        }
-        for (uint32_t sector = 0L; sector < 65536L; sector += 4096L) {
-          serial_println("SEND:");
-          serial_print_hex(sector);
-          serial_print("+");
-          serial_print_hex(4096);
-          serial_println();
-          for (uint32_t addr = sector; addr < sector + 4096L; addr += 256L) {
-            if (!serial_dtr()) goto programming_error;
-
-            uint32_t page_checksum = 0;
-            for (int a = 0; a < 256; ++a) {
-              while (!serial_available()) {
-                if (!serial_dtr()) goto programming_error;
-              }
-              page_buf[a] = serial_read();
-              page_checksum += (uint32_t)page_buf[a];
-            }
-            serial_print("Checksum ");
-            serial_print_hex(page_checksum); serial_println();
-
-            serial_print("Program page at ");
-            serial_print_hex(addr); serial_println();
-
-            flash_write_enable();
-
-            flash_start_spi(0x02);  // Page program
-            flash_send_24bit_addr(addr);
-            // program 256 bytes
-            for (int a = 0; a < 256; ++a) {
-              fpga_spi_transfer(page_buf[a]);
-            }
-            flash_end_spi_after_write();
-
-            serial_print("Programmed 256 bytes at ");
-            serial_print_hex(addr);
-            serial_println();
-
-            // Verify
-            flash_start_spi(0x03);  // Read data
-            flash_send_24bit_addr(addr);
-            bool mismatch = false;
-            for (int a = 0; a < 256; ++a) {
-              uint8_t b = fpga_spi_transfer(0);
-              if (b != page_buf[a]) {
-                serial_print("Mismatch at ");
-                serial_print_hex(addr + a);
-                serial_println();
-                mismatch = true;
-              }
-            }
-            end_spi();
-            if (mismatch) {
-              serial_println("ERROR - mismatch");
-              goto programming_finished;
-            }
-          }
-        }
-        goto programming_finished;
-        programming_error:
-        serial_println("ERROR - lost serial comms during programming");
-        programming_finished:
-        serial_println("Finished programming");
-        serial_println("OK");
+        program_range(0, 64*1024L);
         exit_passthrough();
       }
     }

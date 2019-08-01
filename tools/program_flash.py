@@ -30,6 +30,9 @@ import mcu_port
 # bytes at a time.  The ASF version works fine with full blocks.
 usb_block_size = 1024 * 1024
 
+# Flash sector size
+sector_size = 4096
+
 def read_until(ser, match):
     resp = ''
     while True:
@@ -43,14 +46,19 @@ def read_until(ser, match):
                 time.sleep(0.1)
     return resp
 
-def upload(rom):
+def upload(rom, start_addr, length):
+    assert not (start_addr % sector_size), "start_addr must be a multiple of %s" % sector_size
+    assert not (length % sector_size), "length must be a multiple of %s" % sector_size
+
     with mcu_port.Port() as ser:
         print("\n* Port open.  Giving it a kick, and waiting for OK.")
         ser.write("\n")
         r = read_until(ser, "OK")
 
         print("\n* Start programming process")
-        ser.write("P")  # program chip
+        cmd = "p%d+%d\n" % (start_addr, length)
+        print("programming command: %s" % cmd)
+        ser.write(cmd)  # program chip
 
         program_start_time = time.time()
 
@@ -71,9 +79,9 @@ def upload(rom):
                 if not m: continue
 
                 start, size = int(m.group(1), 16), int(m.group(2), 16)
-                print("* Sending data from %d-%d" % (start, start+size))
-                blk = rom[start:start+size]
-                print(`blk[:64]`)
+                print("* Sending data from %d-%d (%d-%d in our buffer)" % (start, start+size, start-start_addr, start-start_addr+size))
+                blk = rom[start-start_addr:start-start_addr+size]
+                print("First 64 bytes: %s" % `blk[:64]`)
                 assert len(blk) == size, "Remote requested %d+%d but we only have up to %d" % (start, size, len(rom))
                 while len(blk):
                     n = ser.write(blk[:usb_block_size])
@@ -85,7 +93,10 @@ def upload(rom):
 
         program_end_time = time.time()
 
-        ser.write("R")
+        print("read back")
+        cmd = "r%d+%d\n" % (start_addr, length)
+        print("command: %s" % cmd)
+        ser.write(cmd)  # program chip
         resp = ''
         while True:
             r = ser.read(1024)
@@ -93,9 +104,9 @@ def upload(rom):
                 resp += r
                 print(repr(r))
                 p = resp.find("DATA:")
-                if p != -1 and len(resp) >= p+5 + 64*1024:
-                    print("got 64k")
-                    open("readback.rom", "wb").write(resp[p+5:p+5+64*1024])
+                if p != -1 and len(resp) >= p+5 + length:
+                    print("got %d bytes" % length)
+                    open("readback.rom", "wb").write(resp[p+5:p+5+length])
                     break
             time.sleep(0.1)
 
@@ -111,10 +122,19 @@ def upload(rom):
         ))
 
 if __name__ == '__main__':
-    data = open(sys.argv[1], 'rb').read()
-    if len(data) < 64*1024:
-        data += '\xff' * (64*1024 - len(data))
-    upload(data)
+    filename, start_addr, length = sys.argv[1:]
+    start_addr = int(start_addr)
+    length = int(length)
+
+    data = open(filename, 'rb').read()
+    assert len(data) <= length, "file %s is %d bytes long and we only want to program %d" % (filename, len(data), length)
+    if len(data) < length:
+        pad = length - len(data)
+        print("padding data with %d FF bytes" % pad)
+        data += '\xff' * pad
+
+    upload(data, start_addr, len(data))
+
     if data == open("readback.rom").read():
         print("verified")
     else:
