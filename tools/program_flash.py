@@ -46,7 +46,7 @@ def read_until(ser, match):
                 time.sleep(0.1)
     return resp
 
-def upload(rom, start_addr, length):
+def upload(rom, start_addr, length, program=True, verify=True):
     assert not (start_addr % sector_size), "start_addr must be a multiple of %s" % sector_size
     assert not (length % sector_size), "length must be a multiple of %s" % sector_size
 
@@ -55,60 +55,62 @@ def upload(rom, start_addr, length):
         ser.write("\n")
         r = read_until(ser, "OK")
 
-        print("\n* Start programming process")
-        cmd = "p%d+%d\n" % (start_addr, length)
-        print("programming command: %s" % cmd)
-        ser.write(cmd)  # program chip
-
         program_start_time = time.time()
 
-        input_buf = ''
-        done = 0
-        while not done:
-            input_buf += read_until(ser, "\n")
-            while input_buf.find("\n") != -1:
-                p = input_buf.find("\n") + 1
-                line, input_buf = input_buf[:p], input_buf[p:]
-                line = line.strip()
-                print("parse",repr(line))
-                if line == "OK":
-                    print("All done!")
-                    done = 1
-                    break
-                m = re.search(r"^([0-9a-f]+)\+([0-9a-f]+)$", line)
-                if not m: continue
+        if program:
+            print("\n* Start programming process")
+            cmd = "p%d+%d\n" % (start_addr, length)
+            print("programming command: %s" % cmd)
+            ser.write(cmd)  # program chip
 
-                start, size = int(m.group(1), 16), int(m.group(2), 16)
-                print("* Sending data from %d-%d (%d-%d in our buffer)" % (start, start+size, start-start_addr, start-start_addr+size))
-                blk = rom[start-start_addr:start-start_addr+size]
-                print("First 64 bytes: %s" % `blk[:64]`)
-                assert len(blk) == size, "Remote requested %d+%d but we only have up to %d" % (start, size, len(rom))
-                while len(blk):
-                    n = ser.write(blk[:usb_block_size])
-                    if n:
-                        blk = blk[n:]
-                        print("wrote %d bytes" % n)
-                    else:
-                        time.sleep(0.01)
+            input_buf = ''
+            done = 0
+            while not done:
+                input_buf += read_until(ser, "\n")
+                while input_buf.find("\n") != -1:
+                    p = input_buf.find("\n") + 1
+                    line, input_buf = input_buf[:p], input_buf[p:]
+                    line = line.strip()
+                    print("parse",repr(line))
+                    if line == "OK":
+                        print("All done!")
+                        done = 1
+                        break
+                    m = re.search(r"^([0-9a-f]+)\+([0-9a-f]+)$", line)
+                    if not m: continue
+
+                    start, size = int(m.group(1), 16), int(m.group(2), 16)
+                    print("* Sending data from %d-%d (%d-%d in our buffer)" % (start, start+size, start-start_addr, start-start_addr+size))
+                    blk = rom[start-start_addr:start-start_addr+size]
+                    print("First 64 bytes: %s" % `blk[:64]`)
+                    assert len(blk) == size, "Remote requested %d+%d but we only have up to %d" % (start, size, len(rom))
+                    while len(blk):
+                        n = ser.write(blk[:usb_block_size])
+                        if n:
+                            blk = blk[n:]
+                            print("wrote %d bytes" % n)
+                        else:
+                            time.sleep(0.01)
 
         program_end_time = time.time()
 
-        print("read back")
-        cmd = "r%d+%d\n" % (start_addr, length)
-        print("command: %s" % cmd)
-        ser.write(cmd)  # program chip
-        resp = ''
-        while True:
-            r = ser.read(1024)
-            if r:
-                resp += r
-                print(repr(r))
-                p = resp.find("DATA:")
-                if p != -1 and len(resp) >= p+5 + length:
-                    print("got %d bytes" % length)
-                    open("readback.rom", "wb").write(resp[p+5:p+5+length])
-                    break
-            time.sleep(0.1)
+        if verify:
+            print("read back")
+            cmd = "r%d+%d\n" % (start_addr, length)
+            print("command: %s" % cmd)
+            ser.write(cmd)  # program chip
+            resp = ''
+            while True:
+                r = ser.read(1024)
+                if r:
+                    resp += r
+                    print(repr(r))
+                    p = resp.find("DATA:")
+                    if p != -1 and len(resp) >= p+5 + length:
+                        print("got %d bytes" % length)
+                        open("readback.rom", "wb").write(resp[p+5:p+5+length])
+                        break
+                time.sleep(0.1)
 
         readback_end_time = time.time()
 
@@ -133,7 +135,7 @@ if __name__ == '__main__':
         print("padding data with %d FF bytes" % pad)
         data += '\xff' * pad
 
-    upload(data, start_addr, len(data))
+    upload(data, start_addr, len(data), program=True, verify=True)
 
     if data == open("readback.rom").read():
         print("verified")

@@ -19,7 +19,9 @@ entity ElectronULA_max10 is
         -- Set this as true to include the experimental DAC code
         IncludeAudio  : boolean := true;
         -- Set this as true to include JAFA Mode 7 support
-        IncludeMode7  : boolean := true
+        IncludeMode7  : boolean := true;
+        -- Set this as true to include Mega Games Cartridge emulation
+        IncludeMGC    : boolean := true
     );
     port (
         -- 16 MHz clock from Electron
@@ -300,6 +302,11 @@ signal char_rom_we       : std_logic := '0';  -- Write strobe to SAA5050 block R
 signal char_rom_start    : std_logic_vector(23 downto 0) := x"002000";  -- Char ROM lives in flash+8k (first 8k is MODE 7 ROM)
 signal char_rom_addr     : std_logic_vector(12 downto 0) := (others => '0');  -- "done" bit + 4k address counter
 
+-- MGC registers
+signal mgc_bank           : std_logic_vector(6 downto 0) := (others => '0');  -- Low seven bits of the bank ID
+signal mgc_high_bank      : std_logic := '0';  -- High bit of the bank ID if mgc_use_both_banks==1
+signal mgc_use_both_banks : std_logic := '0';  -- 0 to use two banks, 1 to use one
+signal mgc_flash_addr     : std_logic_vector(23 downto 0);
 
 
 begin
@@ -767,7 +774,7 @@ begin
 --------------------------------------------------------
 
     -- Sideways RAM
-    sdram_enable <= '1' when addr(15 downto 14) = "10" and (rom_latch < 4) else '0';
+    sdram_enable <= '1' when addr(15 downto 14) = "10" and (rom_latch > 11) else '0';
 
     -- Clock it at 48 MHz, so I don't have to care too much about timing analysis
     gen_sdram_clk : process (clock_96)
@@ -910,14 +917,17 @@ begin
     ) else '0';
 
     -- Provide ROMs using the QPI flash chip
-    flash_enable <= '1' when addr(15 downto 14) = "10" and (rom_latch > 11) else '0';
+    flash_enable <= '1' when addr(15 downto 14) = "10" and (rom_latch < 8) else '0';
     -- Right now this maps to the first 4 x 16kB = 64kB of flash.
 
-    flash_addr <= char_rom_start + char_rom_addr(11 downto 0)
-        when char_rom_read = '1'
+    flash_addr <= char_rom_start + char_rom_addr(11 downto 0) when char_rom_read = '1'
+        else mgc_flash_addr when IncludeMGC and (rom_latch = 2 or rom_latch = 3)
         else flash_bank & rom_latch(1 downto 0) & addr(13 downto 0);
 
-    flash : qpi_flash
+    mgc_flash_addr <= "01" & (not mgc_high_bank) & mgc_bank & addr(13 downto 0) when mgc_use_both_banks = '1'
+        else "01" & rom_latch(0) & mgc_bank & addr(13 downto 0);
+
+    flash_controller : qpi_flash
     port map (
         clk => clock_96,
         ready => flash_ready,
@@ -939,6 +949,29 @@ begin
         flash_IO2 => flash_IO2,
         flash_IO3 => flash_IO3
     );
+
+    gen_mgc : if IncludeMGC generate
+        process (clock_96)
+        begin
+            if rising_edge(clock_96) then
+                if start_write_96 = '1' then
+                    if addr = x"FC00" then
+                        mgc_bank <= data_in(6 downto 0);
+                    end if;
+                    if addr = x"FC08" then
+                        mgc_high_bank <= data_in(1);
+                        mgc_use_both_banks <= data_in(2);
+                    end if;
+                end if;
+                if RST_n_sync_16(1) = '0' then
+                    -- TODO sync with clock_96 instead
+                    mgc_bank <= (others => '0');
+                    mgc_use_both_banks <= '0';
+                    mgc_high_bank <= '0';
+                end if;
+            end if;
+        end process;
+    end generate;
 
     load_mode7_char_rom : if IncludeMode7 generate
         -- On startup, load SAA5050 character ROM from QPI flash.

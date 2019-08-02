@@ -3,9 +3,34 @@ import os
 start_addr = 4 * 1024 * 1024
 romsize = 16 * 1024
 
+# My MGC dumper program sets page_latch from 0-127 and saves the two
+# ROM banks as page_latch*2 and page_latch*2+1.  Actually it should
+# have saved them as page_latch and page_latch+128.
+
+# As such to translate from a page latch value to a filename, use
+# (bank & 0x7f) * 2 + (bank & 128 ? 1 : 0)
+
+# MGC quirk: the bank ID is inverted for single-bank roms... so
+# 3d dotty (page latch 89, RBS 0) is actually in bank 89+128 and file 89*2+1=179
+def translate(romid):
+    bank = ((romid & 0x7f) << 1) | (1 if (romid & 128) else 0)
+    print("translate romid %d (%02x) -> %d (%02x)" % (romid, romid, bank, bank))
+    return bank
+assert translate(0) == 0
+assert translate(1) == 2 # arcadians
+assert translate(1+128) == 3 # arcadians
+assert translate(72) == 144
+assert translate(72+128) == 145
+assert translate(89+128) == 179 # 3d dotty
+assert translate(90+128) == 181
+assert translate(91+128) == 183 # alien dropout
+assert translate(217-128) == 178 # hopper
+assert translate(218-128) == 180 # hunchback
+assert translate(219-128) == 182 # jet power jack
+
 def fn(romid):
     # I extracted the roms in a different order...
-    translated_romid = ((romid & 0xfe) >> 1) | (128 if (romid & 1) else 0)
+    translated_romid = translate(romid)
     return '../../../electron/elkjs/elkjs/mgc/mgc_%d.bin' % translated_romid
 
 print("programming 256 mgc roms at %d" % start_addr)
