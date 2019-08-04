@@ -117,7 +117,7 @@ entity ElectronULA_max10 is
         serial_TXD    : out std_logic := '1';
 
         -- Debug MCU interface
-        mcu_debug_RXD : out std_logic := '1';
+        mcu_debug_RXD : in std_logic;  -- prepping to switch ports around; out std_logic := '1';
         mcu_debug_TXD : in std_logic;  -- currently used to switch SPI port between flash (0) and boundary scan (1)
         mcu_MOSI      : in std_logic;
         mcu_MISO      : out std_logic := '1';
@@ -529,18 +529,28 @@ begin
     usb_serial_data <= "000000" & (not usb_elk_tx_full) & (not usb_elk_rx_empty) when addr(0) = '1' else usb_elk_rx_byte;
 
     -- DEBUG I/O
-    mcu_debug_RXD <= mcu_debug_TXD;  -- loopback serial for MCU debugging
+    -- mcu_debug_RXD <= mcu_debug_TXD;  -- loopback serial for MCU debugging
     --serial_TXD <= '1' when serial_tx_count < 417 else '0'; -- verified on scope
     --serial_TXD <= clock_16; -- verified on scope
     --serial_TXD <= cpu_clken; -- verified on scope
     --serial_TXD <= clk_out_int; -- verified on scope
     --serial_TXD <= audio_bit_clock; -- verified 8MHz
-    serial_TXD <= audio_data_out;
+    --serial_TXD <= audio_data_out;
 
     --serial_RXD <= kbd(3);
     --serial_RXD <= kbd_access;
-    serial_RXD <= audio_lr_clock;  -- verified 125 kHz
+    --serial_RXD <= audio_lr_clock;  -- verified 125 kHz
     --serial_RXD <= flash_ready;  -- goes low for 0.26 us (250 ns in simulation, so that's about right)
+
+    --serial_TXD <= sdram_ready;
+    --serial_RXD <= sdram_done;
+
+    -- char_rom_read and char_rom_we both go high for 0.7141 s, i.e. 174 us * 4096
+    -- then there's a 1.109 ms period where they behave as expected
+    -- with a pulse on read every 0.27 us.  so that's probably the full char rom read happening.
+    serial_TXD <= char_rom_read;
+    --serial_RXD <= char_rom_we;
+    serial_RXD <= flash_ready;
 
 
 --------------------------------------------------------
