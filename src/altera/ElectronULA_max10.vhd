@@ -299,7 +299,7 @@ signal char_rom_loaded   : std_logic := '0';  -- Holds system in reset until it 
 signal char_rom_state    : std_logic_vector(1 downto 0) := "00";
 signal char_rom_read     : std_logic := '0';  -- Read strobe to QPI controller
 signal char_rom_we       : std_logic := '0';  -- Write strobe to SAA5050 block RAM
-signal char_rom_start    : std_logic_vector(23 downto 0) := x"002000";  -- Char ROM lives in flash+8k (first 8k is MODE 7 ROM)
+signal char_rom_start    : std_logic_vector(23 downto 0) := x"FFC000";  -- Char ROM lives in flash-16k (first 8k is MODE 7 ROM)
 signal char_rom_addr     : std_logic_vector(12 downto 0) := (others => '0');  -- "done" bit + 4k address counter
 
 -- MGC registers
@@ -774,7 +774,7 @@ begin
 --------------------------------------------------------
 
     -- Sideways RAM
-    sdram_enable <= '1' when addr(15 downto 14) = "10" and (rom_latch > 11) else '0';
+    sdram_enable <= '1' when addr(15 downto 14) = "10" and (rom_latch >= 4 and rom_latch < 8) else '0';
 
     -- Clock it at 48 MHz, so I don't have to care too much about timing analysis
     gen_sdram_clk : process (clock_96)
@@ -917,12 +917,12 @@ begin
     ) else '0';
 
     -- Provide ROMs using the QPI flash chip
-    flash_enable <= '1' when addr(15 downto 14) = "10" and (rom_latch < 8) else '0';
-    -- Right now this maps to the first 4 x 16kB = 64kB of flash.
+    flash_enable <= '1' when addr(15 downto 14) = "10" and (rom_latch < 4 or rom_latch >= 12) else '0';
+    -- Right now this maps to the first 16 x 16kB = 256kB of flash.
 
     flash_addr <= char_rom_start + char_rom_addr(11 downto 0) when char_rom_read = '1'
         else mgc_flash_addr when IncludeMGC and (rom_latch = 2 or rom_latch = 3)
-        else flash_bank & rom_latch(1 downto 0) & addr(13 downto 0);
+        else "000000" & rom_latch & addr(13 downto 0);
 
     mgc_flash_addr <= "01" & (not mgc_high_bank) & mgc_bank & addr(13 downto 0) when mgc_use_both_banks = '1'
         else "01" & rom_latch(0) & mgc_bank & addr(13 downto 0);

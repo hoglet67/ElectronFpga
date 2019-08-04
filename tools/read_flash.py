@@ -47,7 +47,10 @@ def download():
         ser.write("\n")
         r = read_until(ser, "OK")
 
-        ser.write("R")
+        read_from = 0
+        read_length = 16384 * 16
+
+        ser.write("r%d+%d\n" % (read_from, read_length))
         resp = ''
         while True:
             r = ser.read(1024)
@@ -55,9 +58,9 @@ def download():
                 resp += r
                 print(repr(r))
                 p = resp.find("DATA:")
-                if p != -1 and len(resp) >= p+5 + 64*1024:
-                    print("got 64k")
-                    open("download.rom", "wb").write(resp[p+5:p+5+64*1024])
+                if p != -1 and len(resp) >= p+5 + read_length:
+                    print("got %d bytes" % read_length)
+                    open("download.rom", "wb").write(resp[p+5:p+5+read_length])
                     break
             time.sleep(0.1)
 

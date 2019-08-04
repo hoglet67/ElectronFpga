@@ -20,6 +20,7 @@ from __future__ import print_function
 # blocking serial comms (that would hang on the ATMEGA32U4) for Arcflash with
 # its ATSAMD21.
 
+import argparse
 import re
 import sys
 import time
@@ -46,11 +47,26 @@ def read_until(ser, match):
                 time.sleep(0.1)
     return resp
 
-def upload(rom, start_addr, length, program=True, verify=True):
+def parse_address(addr):
+    # pNN = page NN
+    m = re.search(r"^p(\d+)$", addr)
+    if m:
+        return int(m.group(1)) * 16384
+    # NNk = NN kB
+    m = re.search(r"^(\d+)k$", addr)
+    if m:
+        return int(m.group(1)) * 1024
+    # 0xNN = hex
+    m = re.search(r"^0x(.*?)$", addr)
+    if m:
+        return int(m.group(1), 16)
+    return int(addr)
+
+def upload(rom, start_addr, length, program=True, verify=True, port=None):
     assert not (start_addr % sector_size), "start_addr must be a multiple of %s" % sector_size
     assert not (length % sector_size), "length must be a multiple of %s" % sector_size
 
-    with mcu_port.Port() as ser:
+    with mcu_port.Port(port=port) as ser:
         print("\n* Port open.  Giving it a kick, and waiting for OK.")
         ser.write("\n")
         r = read_until(ser, "OK")
@@ -124,9 +140,14 @@ def upload(rom, start_addr, length, program=True, verify=True):
         ))
 
 if __name__ == '__main__':
-    filename, start_addr, length = sys.argv[1:]
-    start_addr = int(start_addr)
-    length = int(length)
+    parser = argparse.ArgumentParser(description='Program flash on a UEU board.')
+    parser.add_argument('--port', type=str, help='Serial port to use')
+    parser.add_argument('rest', nargs=argparse.REMAINDER)
+    args = parser.parse_args()
+
+    filename, start_addr, length = args.rest
+    start_addr = parse_address(start_addr)
+    length = parse_address(length)
 
     data = open(filename, 'rb').read()
     assert len(data) <= length, "file %s is %d bytes long and we only want to program %d" % (filename, len(data), length)
@@ -135,7 +156,7 @@ if __name__ == '__main__':
         print("padding data with %d FF bytes" % pad)
         data += '\xff' * pad
 
-    upload(data, start_addr, len(data), program=True, verify=True)
+    upload(data, start_addr, len(data), program=True, verify=True, port=args.port)
 
     if data == open("readback.rom").read():
         print("verified")
