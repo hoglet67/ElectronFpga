@@ -308,6 +308,8 @@ signal mgc_high_bank      : std_logic := '0';  -- High bit of the bank ID if mgc
 signal mgc_use_both_banks : std_logic := '0';  -- 0 to use two banks, 1 to use one
 signal mgc_flash_addr     : std_logic_vector(23 downto 0);
 
+-- Plus 1 registers
+signal plus1_status_selected : std_logic;
 
 begin
 
@@ -688,12 +690,28 @@ begin
     -- Order here should match D_buf_DIR expression above.
     data <= ula_data_out   when RnW = '1' and ula_enable = '1' else
             x"FF"          when RnW = '1' and empty_bank_enable = '1' else
+            x"FF"          when RnW = '1' and plus1_status_selected = '1' else
             flash_data_out when RnW = '1' and flash_enable = '1' else
             sdram_data_out(15 downto 8) when RnW = '1' and sdram_enable = '1' and addr(0) = '1' else
             sdram_data_out(7 downto 0) when RnW = '1' and sdram_enable = '1' and addr(0) = '0' else
             usb_serial_data when RnW = '1' and usb_serial_enable = '1' else
             cpu_data_out   when RnW = '0' and InternalCPU else
             "ZZZZZZZZ";  -- ext CPU, RnW = '0' or boundary_scan = '1'
+
+
+--------------------------------------------------------
+-- Internal CPU (optional)
+--------------------------------------------------------
+
+    -- Plus 1 status register:
+    -- D4 = joystick fire button 0
+    -- D5 = joystick fire button 1
+    -- D6 = analog chip select
+    -- D7 = parallel port status
+    plus1_status_selected <= '1' when addr = x"FC72" else '0';
+
+    -- Plus 1 analog data register
+    -- plus1_analog_selected <= '1' when addr = x"FC70" else '0';
 
 
 --------------------------------------------------------
