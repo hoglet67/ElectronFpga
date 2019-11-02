@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 from __future__ import print_function
 
 # Copyright 2017 Google Inc.
@@ -35,7 +37,7 @@ usb_block_size = 1024 * 1024
 sector_size = 4096
 
 def read_until(ser, match):
-    resp = ''
+    resp = b''
     while True:
         r = ser.read(1024)
         if r:
@@ -68,37 +70,37 @@ def upload(rom, start_addr, length, program=True, verify=True, port=None):
 
     with mcu_port.Port(port=port) as ser:
         print("\n* Port open.  Giving it a kick, and waiting for OK.")
-        ser.write("\n")
-        r = read_until(ser, "OK")
+        ser.write(b"\n")
+        r = read_until(ser, b"OK")
 
         program_start_time = time.time()
 
         if program:
             print("\n* Start programming process")
-            cmd = "p%d+%d\n" % (start_addr, length)
+            cmd = b"p%d+%d\n" % (start_addr, length)
             print("programming command: %s" % cmd)
             ser.write(cmd)  # program chip
 
-            input_buf = ''
+            input_buf = b''
             done = 0
             while not done:
-                input_buf += read_until(ser, "\n")
-                while input_buf.find("\n") != -1:
-                    p = input_buf.find("\n") + 1
+                input_buf += read_until(ser, b"\n")
+                while input_buf.find(b"\n") != -1:
+                    p = input_buf.find(b"\n") + 1
                     line, input_buf = input_buf[:p], input_buf[p:]
                     line = line.strip()
                     print("parse",repr(line))
-                    if line == "OK":
+                    if line == b"OK":
                         print("All done!")
                         done = 1
                         break
-                    m = re.search(r"^([0-9a-f]+)\+([0-9a-f]+)$", line)
+                    m = re.search(br"^([0-9a-f]+)\+([0-9a-f]+)$", line)
                     if not m: continue
 
                     start, size = int(m.group(1), 16), int(m.group(2), 16)
                     print("* Sending data from %d-%d (%d-%d in our buffer)" % (start, start+size, start-start_addr, start-start_addr+size))
                     blk = rom[start-start_addr:start-start_addr+size]
-                    print("First 64 bytes: %s" % `blk[:64]`)
+                    print("First 64 bytes: %s" % repr(blk[:64]))
                     assert len(blk) == size, "Remote requested %d+%d but we only have up to %d" % (start, size, len(rom))
                     while len(blk):
                         n = ser.write(blk[:usb_block_size])
@@ -112,16 +114,16 @@ def upload(rom, start_addr, length, program=True, verify=True, port=None):
 
         if verify:
             print("read back")
-            cmd = "r%d+%d\n" % (start_addr, length)
+            cmd = b"r%d+%d\n" % (start_addr, length)
             print("command: %s" % cmd)
             ser.write(cmd)  # program chip
-            resp = ''
+            resp = b''
             while True:
                 r = ser.read(1024)
                 if r:
                     resp += r
                     print(repr(r))
-                    p = resp.find("DATA:")
+                    p = resp.find(b"DATA:")
                     if p != -1 and len(resp) >= p+5 + length:
                         print("got %d bytes" % length)
                         open("readback.rom", "wb").write(resp[p+5:p+5+length])
@@ -130,7 +132,7 @@ def upload(rom, start_addr, length, program=True, verify=True, port=None):
 
         readback_end_time = time.time()
 
-        ser.write("x")
+        ser.write(b"x")
         time.sleep(0.5)
         print(ser.read(1024))
 
@@ -154,11 +156,11 @@ if __name__ == '__main__':
     if len(data) < length:
         pad = length - len(data)
         print("padding data with %d FF bytes" % pad)
-        data += '\xff' * pad
+        data += b'\xff' * pad
 
     upload(data, start_addr, len(data), program=True, verify=True, port=args.port)
 
-    if data == open("readback.rom").read():
+    if data == open("readback.rom", "rb").read():
         print("verified")
     else:
         raise Exception("verification failed")
