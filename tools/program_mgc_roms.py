@@ -1,4 +1,13 @@
-import os
+from __future__ import print_function
+
+import os, sys
+import program_flash
+
+if sys.version_info < (3, 0):
+    print("WARNING: This script is no longer tested under Python 2.  "
+          "Running under Python 3 is highly recommended.")
+
+HERE = os.path.abspath(os.path.split(sys.argv[0])[0])
 
 start_addr = 4 * 1024 * 1024
 romsize = 16 * 1024
@@ -31,7 +40,7 @@ assert translate(219-128) == 182 # jet power jack
 def fn(romid):
     # I extracted the roms in a different order...
     translated_romid = translate(romid)
-    return '../../../electron/elkjs/elkjs/mgc/mgc_%d.bin' % translated_romid
+    return '%s/../../../electron/elkjs/elkjs/mgc/mgc_%d.bin' % (HERE, translated_romid)
 
 print("programming 256 mgc roms at %d" % start_addr)
 
@@ -39,5 +48,8 @@ for romid in range(256):
     romfn = fn(romid)
     romstart = start_addr + romid * romsize
     print("- program %s in as rom id %d" % (romfn, romid))
-    if os.system("python program_flash.py %s %d %d" % (romfn, romstart, romsize)):
-        break
+    program_flash.upload(open(romfn, "rb").read(),
+                         romstart,
+                         romsize,
+                         program=True,
+                         )

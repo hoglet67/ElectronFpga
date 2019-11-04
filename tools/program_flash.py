@@ -29,6 +29,10 @@ import time
 
 import mcu_port
 
+if sys.version_info < (3, 0):
+    print("WARNING: This script is no longer tested under Python 2.  "
+          "Running under Python 3 is highly recommended.")
+
 # Arduino USB serial ports seem to crash out if you send more than 63 (or sometimes 127)
 # bytes at a time.  The ASF version works fine with full blocks.
 usb_block_size = 1024 * 1024
