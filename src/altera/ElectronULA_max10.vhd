@@ -16,6 +16,9 @@ entity ElectronULA_max10 is
         -- You MUST remove the CPU from the main board when doing this,
         -- as the ULA will drive the address bus and RnW.
         InternalCPU   : boolean := true;
+        -- Set this to output a clock low edge *before* clocking the CPU, so external
+        -- devices have time to latch address and data.
+        AdvanceExternalClock : boolean := true;
         -- Set this as true to include the experimental DAC code
         IncludeAudio  : boolean := true;
         -- Set this as true to include JAFA Mode 7 support
@@ -180,7 +183,10 @@ signal pll_locked_sync_96 : std_logic_vector(2 downto 0) := (others => '0');
 
 signal led_counter       : std_logic_vector(23 downto 0);
 signal clk_counter       : std_logic_vector(2 downto 0);
-signal cpu_clken         : std_logic;
+signal cpu_clken_from_ula : std_logic;
+signal cpu_clken_dly     : std_logic;  -- cpu_clken_from_ula delayed one clock
+signal cpu_clken         : std_logic;  -- Clocks CPU + internal memories.  Either cpu_clken_from_ula or cpu_clken_dly
+signal cpu_clken_for_out : std_logic;  -- Derives clk_out_int.  Either cpu_clken_from_ula or cpu_clken_dly
 signal clk_out_int       : std_logic;
 signal cpu_clken_16_sync : std_logic;
 signal cpu_clken_96_sync : std_logic_vector(2 downto 0);
@@ -622,7 +628,7 @@ begin
         mode_init => "00",
 
         -- Clock Generation
-        cpu_clken_out  => cpu_clken,
+        cpu_clken_out  => cpu_clken_from_ula,
         turbo          => turbo,
         turbo_out      => turbo,
 
@@ -638,6 +644,16 @@ begin
     blue  <= video_blue(3);
     csync <= video_hsync;
     caps  <= not caps_led;
+
+    -- Generate delayed cpu_clken, to provide hold time for external devices
+    cpu_clken_gen : process(clock_16)
+    begin
+        if rising_edge(clock_16) then
+            cpu_clken_dly <= cpu_clken_from_ula;
+        end if;
+    end process;
+    cpu_clken <= cpu_clken_dly when AdvanceExternalClock else cpu_clken_from_ula;
+    cpu_clken_for_out <= cpu_clken_from_ula;
 
     -- Blink CAPS at 1 Hz
     --blink_caps : process(clock_16)
@@ -1122,7 +1138,7 @@ begin
             -- Generate a signal that's synced to the rising edge, for cpu_clken_96_sync later
             cpu_clken_16_sync <= cpu_clken;
             -- Generate clk_out (but hold clock when in reset)
-            if cpu_clken = '1' then -- and RST_n_sync_16(1) = '1' then
+            if cpu_clken_for_out = '1' then -- and RST_n_sync_16(1) = '1' then
                 if turbo = "11" then
                     -- 4MHz clock; produce a 125 ns low pulse
                     clk_counter <= "011";
