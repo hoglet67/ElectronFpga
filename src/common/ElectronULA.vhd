@@ -88,6 +88,7 @@ entity ElectronULA is
 
         -- Clock Generation
         cpu_clken_out  : out std_logic;
+        cpu_clk_out    : out std_logic;
         turbo          : in std_logic_vector(1 downto 0);
         turbo_out      : out std_logic_vector(1 downto 0);
 
@@ -104,6 +105,7 @@ architecture behavioral of ElectronULA is
   signal hsync_int      : std_logic;
   signal vsync_int      : std_logic;
 
+  signal ram_addr       : std_logic_vector(15 downto 0);
   signal ram_we         : std_logic;
   signal ram_data       : std_logic_vector(7 downto 0);
 
@@ -282,7 +284,7 @@ architecture behavioral of ElectronULA is
   signal kbd_access     : std_logic;
   -- set to 1 to read keyboard at 1MHz, if there's too much capacitance on the
   -- buffer inputs.  (seems unnecessary with extra pullup on kbd* lines)
-  signal kbd_delay      : std_logic := '0';
+  signal kbd_delay      : std_logic := '1';
 
   signal clk_state      : std_logic_vector(2 downto 0);
   signal cpu_clken      : std_logic;
@@ -297,6 +299,8 @@ architecture behavioral of ElectronULA is
   signal via4_clken_1   : std_logic;
   signal via4_clken_2   : std_logic;
   signal via4_clken_4   : std_logic;
+  signal cpu_clk        : std_logic := '1';
+  signal clk_counter    : std_logic_vector(2 downto 0) := (others => '0');
 
   signal mc6522_enable     : std_logic;
   signal mc6522_data       : std_logic_vector(7 downto 0);
@@ -462,7 +466,7 @@ begin
             -- Port A is the 6502 port
             clka  => clk_16M00,
             wea   => ram_we,
-            addra => addr(14 downto 0),
+            addra => ram_addr(14 downto 0),
             dina  => ram_data_in_sync,
             douta => ram_data,
             -- Port B is the VGA Port
@@ -1236,6 +1240,26 @@ begin
             cpu_clken_4  <= clken_counter(0) and clken_counter(1);
             via1_clken_4 <= clken_counter(1);
             via4_clken_4 <= '1';
+
+            -- Generate cpu_clk
+            if cpu_clken = '1' then
+                if turbo = "11" then
+                    -- 4MHz clock; produce a 125 ns low pulse
+                    clk_counter <= "011";
+                else
+                    -- 1MHz or 2MHz clock; produce a 250 ns low pulse
+                    clk_counter <= "001";
+                end if;
+                cpu_clk <= '0';
+            elsif clk_counter(2) = '0' then
+                clk_counter <= clk_counter + 1;
+            else
+                -- Update addr for synchronous ram on rising clk_out edge
+                if cpu_clk = '0' then
+                    ram_addr <= addr;
+                end if;
+                cpu_clk <= '1';
+            end if;
         end if;
     end process;
 
@@ -1282,6 +1306,7 @@ begin
     end process;
 
     cpu_clken_out  <= cpu_clken;
+    cpu_clk_out    <= cpu_clk;
 
 --------------------------------------------------------
 -- Optional MMC Filing System

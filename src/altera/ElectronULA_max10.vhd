@@ -186,7 +186,6 @@ signal clk_counter       : std_logic_vector(2 downto 0);
 signal cpu_clken_from_ula : std_logic;
 signal cpu_clken_dly     : std_logic;  -- cpu_clken_from_ula delayed one clock
 signal cpu_clken         : std_logic;  -- Clocks CPU + internal memories.  Either cpu_clken_from_ula or cpu_clken_dly
-signal cpu_clken_for_out : std_logic;  -- Derives clk_out_int.  Either cpu_clken_from_ula or cpu_clken_dly
 signal clk_out_int       : std_logic;
 signal cpu_clken_16_sync : std_logic;
 signal cpu_clken_96_sync : std_logic_vector(2 downto 0);
@@ -202,7 +201,6 @@ signal bus_write_from_internal_device : std_logic;
 
 signal rom_enable_n      : std_logic;
 signal ula_enable        : std_logic;
-signal ula_addr          : std_logic_vector(15 downto 0);
 signal ula_data_out      : std_logic_vector(7 downto 0);
 signal ula_irq_n         : std_logic;
 signal video_red         : std_logic_vector(3 downto 0);
@@ -584,7 +582,7 @@ begin
         clken_ttxt_12M => clken_ttxt,
 
         -- CPU Interface
-        addr      => ula_addr,  -- Updated on rising clk_out edge
+        addr      => addr,
         data_in   => data_in,
         data_out  => ula_data_out,
         data_en   => ula_enable,
@@ -629,6 +627,7 @@ begin
 
         -- Clock Generation
         cpu_clken_out  => cpu_clken_from_ula,
+        cpu_clk_out    => clk_out_int,
         turbo          => turbo,
         turbo_out      => turbo,
 
@@ -653,7 +652,6 @@ begin
         end if;
     end process;
     cpu_clken <= cpu_clken_dly when AdvanceExternalClock else cpu_clken_from_ula;
-    cpu_clken_for_out <= cpu_clken_from_ula;
 
     -- Blink CAPS at 1 Hz
     --blink_caps : process(clock_16)
@@ -1137,26 +1135,6 @@ begin
             NMI_n_sync_16 <= NMI_n_sync_16(0) & NMI_n_in;
             -- Generate a signal that's synced to the rising edge, for cpu_clken_96_sync later
             cpu_clken_16_sync <= cpu_clken;
-            -- Generate clk_out (but hold clock when in reset)
-            if cpu_clken_for_out = '1' then -- and RST_n_sync_16(1) = '1' then
-                if turbo = "11" then
-                    -- 4MHz clock; produce a 125 ns low pulse
-                    clk_counter <= "011";
-                    -- TODO 4MHz will not work with QPI flash at 96MHz
-                else
-                    -- 1MHz or 2MHz clock; produce a 250 ns low pulse
-                    clk_counter <= "001";
-                end if;
-                clk_out_int <= '0';
-            elsif clk_counter(2) = '0' then
-                clk_counter <= clk_counter + 1;
-            else
-                -- Update addr from 6502 on rising clk_out edge
-                if clk_out_int = '0' then
-                    ula_addr <= addr;
-                end if;
-                clk_out_int <= '1';
-            end if;
         end if;
     end process;
     clk_out <= clk_out_int;
