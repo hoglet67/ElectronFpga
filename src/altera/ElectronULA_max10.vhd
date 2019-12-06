@@ -12,6 +12,8 @@ use ieee.numeric_std.all;
 
 entity ElectronULA_max10 is
     generic (
+        -- Set this to true to generate SDRAM clock from PLL
+        FastSDRAM : boolean := true;
         -- Set this to true to include an internal 6502 core.
         -- You MUST remove the CPU from the main board when doing this,
         -- as the ULA will drive the address bus and RnW.
@@ -158,12 +160,14 @@ end component qpi_flash;
 signal clock_input       : std_logic;
 -- Generated clocks:
 signal clock_16          : std_logic;
-signal clock_24          : std_logic;  -- TODO remove, if clken_ttxt works
-signal clock_32          : std_logic;
+-- signal clock_24          : std_logic;  -- TODO remove, if clken_ttxt works
+signal clock_32          : std_logic := '1';
 signal clock_33          : std_logic;
 signal clock_40          : std_logic;
 signal clock_96          : std_logic := '1';
+signal clock_96_sdram    : std_logic := '1';
 signal clock_div_96_24   : std_logic_vector(1 downto 0) := (others => '0');
+signal clock_div_96_32   : std_logic_vector(1 downto 0) := (others => '0');
 
 signal clken_ttxt_counter : std_logic_vector(3 downto 0) := (others => '0');
 signal clken_ttxt        : std_logic := '0';
@@ -818,14 +822,32 @@ begin
     -- Sideways RAM
     sdram_enable <= '1' when addr(15 downto 14) = "10" and (rom_latch >= 4 and rom_latch < 8) else '0';
 
-    -- Clock it at 48 MHz, so I don't have to care too much about timing analysis
-    gen_sdram_clk : process (clock_96)
+
+    fast_sdram_clock : if FastSDRAM generate
+        sdram_CLK <= clock_96_sdram;
+    end generate;
+
+    gen_sdram_ctrls : process (clock_96)
     begin
         if rising_edge(clock_96) then
             -- Signals from the controller update on cycles where sdram_clken = '1',
             -- i.e. we should output a rising clock edge then.
-            sdram_clken <= not sdram_clken;
-            sdram_CLK <= sdram_clken;
+
+            -- Reset all triggers once the SDRAM has seen them.
+            if sdram_clken = '1' then
+                sdram_access <= '0';
+                sdram_refreshing <= '0';
+            end if;
+
+            if FastSDRAM then
+                -- SDRAM controller is active on every cycle when clocking at 96MHz
+                sdram_clken <= '1';
+            else
+                -- Clock it at 48 MHz, so I don't have to care too much about timing analysis
+                sdram_clken <= not sdram_clken;
+                sdram_CLK <= sdram_clken;
+            end if;
+
             if (start_write_96 = '1' or start_read_96 = '1') and sdram_enable = '1' then
                 -- Set flags that need to stick around until a cycle where the SDRAM clock is enabled
                 sdram_access <= '1';
@@ -833,11 +855,6 @@ begin
                 sdram_address <= "0000000" & rom_latch(3 downto 0) & addr(13 downto 1);
                 sdram_high_bank_en <= not addr(0);
                 sdram_low_bank_en <= addr(0);
-            end if;
-            if sdram_clken = '1' then
-                -- Reset SDRAM trigger because it will have been seen on this cycle
-                sdram_access <= '0';
-                sdram_refreshing <= '0';
             end if;
 
             -- Generate refresh signal
@@ -1108,17 +1125,16 @@ begin
 -- Clock generation
 --------------------------------------------------------
 
-    --clock_input <= clk_osc;  -- Use 16MHz oscillator (works nicely)
-    clock_input <= clk_in;  -- Use 16MHz clock from ULA pin
-
-    -- TODO(myelin) test PLLs with both electron clock and discrete oscillator
+    -- Both of these have been verified on real hardware
+    clock_input <= clk_osc;  -- Use 16MHz oscillator
+    --clock_input <= clk_in;  -- Use 16MHz clock from ULA pin
 
     max10_pll1_inst : entity work.max10_pll1 PORT MAP (
         areset   => pll_reset,
         inclk0   => clock_input, -- PLL input: 16MHz from oscillator or ULA pin
         c0       => clock_16,    -- main system clock / sRGB video clock
-        c1       => clock_32,    -- for scan doubler for the SAA5050 in Mode 7
-        c2       => clock_96,    -- SDRAM/flash, divided to 24 for the SAA5050 in Mode 7
+        c1       => clock_96_sdram, -- phase-shifted output clock for SDRAM
+        c2       => clock_96,    -- SDRAM/flash, divided to 24 for the SAA5050 in Mode 7 and 32 for
         c3       => clock_40,    -- video clock when in 60Hz VGA Mode
         c4       => clock_33,    -- video clock when in 50Hz VGA Mode
         locked   => pll1_locked
@@ -1198,16 +1214,24 @@ begin
         end if;
     end process;
 
-    -- divide clock_96 to get clock_32 and clock_serial
+    -- divide clock_96 to get clock_24, clock_32, and clock_serial
     divide_96mhz : process(clock_96)
     begin
         if rising_edge(clock_96) then
-            -- Divide 96/4 to get 24MHz
-            if clock_div_96_24 = "11" then
-                clock_24 <= not clock_24;
-                clock_div_96_24 <= "00";
+            -- -- Divide 96/4 to get 24MHz
+            -- if clock_div_96_24 = "11" then
+            --     clock_24 <= not clock_24;
+            --     clock_div_96_24 <= "00";
+            -- else
+            --     clock_div_96_24 <= clock_div_96_24 + 1;
+            -- end if;
+
+            -- Divide 96/3 to get 32MHz
+            if clock_div_96_32 = "10" then
+                clock_32 <= not clock_32;
+                clock_div_96_32 <= "00";
             else
-                clock_div_96_24 <= clock_div_96_24 + 1;
+                clock_div_96_32 <= clock_div_96_32 + 1;
             end if;
 
             -- Generate a pulse on the 12MHz teletext clock enable
