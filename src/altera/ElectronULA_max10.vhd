@@ -12,8 +12,17 @@ use ieee.numeric_std.all;
 
 entity ElectronULA_max10 is
     generic (
+        -- Set this when running on board #1 with 74lvth162245 bus hold buffers
+        UsingBoardId1WithBusHoldBuffers : boolean := false;
         -- Set this to true to generate SDRAM clock from PLL
         FastSDRAM : boolean := true;
+        -- Set this to map banks 0-3 to flash
+        Banks_0_1_InFlash : boolean := true;
+        Banks_2_3_InFlash : boolean := true;
+        -- Set this to map banks 12-15 to flash
+        Banks_12_13_14_15_InFlash : boolean := true;
+        -- Set this to map banks 4-7 to RAM
+        Banks_4_5_6_7_InRAM : boolean := true;
         -- Set this to true to include an internal 6502 core.
         -- You MUST remove the CPU from the main board when doing this,
         -- as the ULA will drive the address bus and RnW.
@@ -816,12 +825,38 @@ begin
     end generate;
 
 --------------------------------------------------------
--- SDRAM
+-- Sideways bank enable logic
 --------------------------------------------------------
 
-    -- Sideways RAM
-    sdram_enable <= '1' when addr(15 downto 14) = "10" and (rom_latch >= 4 and rom_latch < 8) else '0';
+    -- Drive data bus with FF when nothing else is (required with bus hold buffers in v1)
+    empty_bank_enable <= '1' when (
+        UsingBoardId1WithBusHoldBuffers
+        and addr(15 downto 14) = "10"
+        and rom_latch >= 12
+        and rom_enable_n = '1' and flash_enable = '0' and sdram_enable = '0' and ula_enable = '0'
+    ) else '0';
 
+    -- Sideways RAM
+    sdram_enable <= '1' when Banks_4_5_6_7_InRAM and addr(15 downto 14) = "10" and (rom_latch >= 4 and rom_latch < 8) else '0';
+
+    -- Provide ROMs using the QPI flash chip
+    flash_enable <= '1' when addr(15 downto 14) = "10" and (
+        (Banks_0_1_InFlash and rom_latch < 2)
+        or (Banks_2_3_InFlash and rom_latch >= 2 and rom_latch < 4)
+        or (Banks_12_13_14_15_InFlash and rom_latch >= 12)
+    ) else '0';
+    -- Right now this maps to the first 16 x 16kB = 256kB of flash.
+
+    flash_addr <= char_rom_start + char_rom_addr(11 downto 0) when char_rom_read = '1'
+        else mgc_flash_addr when IncludeMGC and (rom_latch = 2 or rom_latch = 3)
+        else "000000" & rom_latch & addr(13 downto 0);
+
+    mgc_flash_addr <= "01" & (not mgc_high_bank) & mgc_bank & addr(13 downto 0) when mgc_use_both_banks = '1'
+        else "01" & rom_latch(0) & mgc_bank & addr(13 downto 0);
+
+--------------------------------------------------------
+-- SDRAM
+--------------------------------------------------------
 
     fast_sdram_clock : if FastSDRAM generate
         sdram_CLK <= clock_96_sdram;
@@ -966,25 +1001,10 @@ begin
 --    end process;
 
 --------------------------------------------------------
--- Paged ROM
+-- QPI flash
 --------------------------------------------------------
 
-    -- Drive data bus with FF when nothing else is (required with bus hold buffers in v1)
-    empty_bank_enable <= '1' when (
-        addr(15 downto 14) = "10"
-        and rom_enable_n = '1' and flash_enable = '0' and sdram_enable = '0' and ula_enable = '0'
-    ) else '0';
-
-    -- Provide ROMs using the QPI flash chip
-    flash_enable <= '1' when addr(15 downto 14) = "10" and (rom_latch < 4 or rom_latch >= 12) else '0';
-    -- Right now this maps to the first 16 x 16kB = 256kB of flash.
-
-    flash_addr <= char_rom_start + char_rom_addr(11 downto 0) when char_rom_read = '1'
-        else mgc_flash_addr when IncludeMGC and (rom_latch = 2 or rom_latch = 3)
-        else "000000" & rom_latch & addr(13 downto 0);
-
-    mgc_flash_addr <= "01" & (not mgc_high_bank) & mgc_bank & addr(13 downto 0) when mgc_use_both_banks = '1'
-        else "01" & rom_latch(0) & mgc_bank & addr(13 downto 0);
+    -- See above for bank enable logic
 
     flash_controller : qpi_flash
     port map (
