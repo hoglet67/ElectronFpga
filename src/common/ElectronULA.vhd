@@ -184,7 +184,6 @@ architecture behavioral of ElectronULA is
 
   -- Stable copies sampled once per frame
   signal screen_base1   : std_logic_vector(14 downto 6);
-  signal mode_base1     : std_logic_vector(7 downto 0);
 
   -- Tape Interface
   signal cintone        : std_logic;
@@ -683,7 +682,7 @@ begin
                 end if;
 
                 -- regardless of the comms mode, update coutbits state (at 1200Hz)
-                if general_counter(13 downto 0) = 0 then                            
+                if general_counter(13 downto 0) = 0 then
                     -- wait to TDEmpty interrupt to be cleared before starting
                     if coutbits = 0 then
                         if isr(5) = '0' then
@@ -710,7 +709,7 @@ begin
                 else
                     -- stop bit or data bit "1" or any other time= 2400Hz
                     casOut <= general_counter(12);
-                end if;                
+                end if;
 
                 -- ULA Writes
                 if (cpu_clken = '1') then
@@ -907,7 +906,6 @@ begin
                     char_row <= (others => '0');
                     row_offset <= (others => '0');
                     screen_base1  <= screen_base;
-                    mode_base1  <= mode_base;
                     if (mode = "01") then
                         -- Interlaced, so alternate odd and even fields
                         field <= not field;
@@ -1083,12 +1081,12 @@ begin
         end if;
     end process;
 
-    process (screen_base1, mode_base1, row_offset, col_offset, crtc_ma, mode7_enable)
+    process (screen_base1, mode_base, row_offset, col_offset, crtc_ma, mode7_enable)
         variable tmp: std_logic_vector(15 downto 0);
     begin
         tmp := ("0" & screen_base1 & "000000") + row_offset + col_offset;
         if (tmp(15) = '1') then
-            tmp := tmp + (mode_base1 & "00000000");
+            tmp := tmp + (mode_base & "00000000");
         end if;
         if mode7_enable = '1' then
             screen_addr <= "11111" & crtc_ma(9 downto 0);
@@ -1450,7 +1448,7 @@ begin
         ttxt_vs_out <= '1';
         ttxt_hs_out <= crtc_hsync_n and crtc_vsync_n;
     end generate;
-    
+
     JafaNotIncluded: if not IncludeJafaMode7 generate
         -- disable mode 7
         mode7_enable <= '0';
