@@ -133,7 +133,7 @@ begin
                 UseAlanDCore => false
                 )
             port map (
-                clock_avr    => clk_16M00,
+                clock_avr    => clk_24M00,
                 busmon_clk   => clk_16M00,
                 busmon_clken => cpu_clken1,
                 cpu_clk      => clk_16M00,
