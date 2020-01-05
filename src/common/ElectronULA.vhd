@@ -138,7 +138,7 @@ architecture behavioral of ElectronULA is
   signal v_display      : std_logic_vector(9 downto 0);
 
   signal char_row       : std_logic_vector(3 downto 0);
-  signal row_offset     : std_logic_vector(14 downto 0);
+  signal row_addr       : std_logic_vector(14 downto 0);
   signal col_offset     : std_logic_vector(9 downto 0);
   signal screen_addr    : std_logic_vector(14 downto 0);
   signal screen_data    : std_logic_vector(7 downto 0);
@@ -181,9 +181,6 @@ architecture behavioral of ElectronULA is
 
   -- Supports changing the jumpers
   signal mode_init_copy : std_logic_vector(1 downto 0);
-
-  -- Stable copies sampled once per frame
-  signal screen_base1   : std_logic_vector(14 downto 6);
 
   -- Tape Interface
   signal cintone        : std_logic;
@@ -894,18 +891,19 @@ begin
 
     process (clk_video)
     variable pixel : std_logic_vector(3 downto 0);
+    variable row_addr_tmp : std_logic_vector(14 downto 0);
     begin
         if rising_edge(clk_video) then
             -- pipeline h_count by one cycle to compensate the register in the RAM
             h_count1 <= h_count;
+            row_addr_tmp := row_addr;
             if (h_count = h_total) then
                 h_count <= (others => '0');
                 col_offset <= (others => '0');
                 if (v_count = v_total) then
                     v_count <= (others => '0');
                     char_row <= (others => '0');
-                    row_offset <= (others => '0');
-                    screen_base1  <= screen_base;
+                    row_addr_tmp := screen_base & "000000";
                     if (mode = "01") then
                         -- Interlaced, so alternate odd and even fields
                         field <= not field;
@@ -918,10 +916,10 @@ begin
                     if (v_count(0) = '1' or mode(1) = '0') then
                         if ((mode_text = '0' and char_row = 7) or (mode_text = '1' and char_row = 9)) then
                             char_row <= (others => '0');
-                            row_offset <= row_offset + mode_rowstep;
+                            row_addr_tmp := row_addr_tmp + mode_rowstep;
                         else
                             char_row <= char_row + 1;
-                            row_offset <= row_offset + 1;
+                            row_addr_tmp := row_addr_tmp + 1;
                         end if;
                     end if;
                 end if;
@@ -932,6 +930,11 @@ begin
                     col_offset <= col_offset + 8;
                 end if;
             end if;
+            if row_addr_tmp(14 downto 11) = "0000" then
+                row_addr_tmp(14 downto 11) := mode_base(6 downto 3);
+            end if;
+            row_addr <= row_addr_tmp;
+
             -- RGB Data
             if (h_count1 >= h_active or (mode_text = '0' and v_count >= v_active_gph) or (mode_text = '1' and v_count >= v_active_txt) or char_row >= 8) then
                 -- blanking and border are always black
@@ -1081,17 +1084,13 @@ begin
         end if;
     end process;
 
-    process (screen_base1, mode_base, row_offset, col_offset, crtc_ma, mode7_enable)
+    process (row_addr, col_offset, crtc_ma, mode7_enable)
         variable tmp: std_logic_vector(15 downto 0);
     begin
-        tmp := ("0" & screen_base1 & "000000") + row_offset + col_offset;
-        if (tmp(15) = '1') then
-            tmp := tmp + (mode_base & "00000000");
-        end if;
         if mode7_enable = '1' then
             screen_addr <= "11111" & crtc_ma(9 downto 0);
         else
-            screen_addr <= tmp(14 downto 0);
+            screen_addr <= row_addr(14 downto 0) + col_offset;
         end if;
     end process;
 
