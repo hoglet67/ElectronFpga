@@ -841,7 +841,7 @@ begin
                                     mode_text    <= '0';
                                     mode_rowstep <= std_logic_vector(to_unsigned(313, 10)); -- 320 - 7
                                 when "101" =>
-                                    mode_base    <= x"60";
+                                    mode_base    <= x"58";
                                     mode_bpp     <= "01";
                                     mode_40      <= '1';
                                     mode_text    <= '0';
