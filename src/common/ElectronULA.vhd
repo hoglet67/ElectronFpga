@@ -1084,13 +1084,17 @@ begin
         end if;
     end process;
 
-    process (row_addr, col_offset, crtc_ma, mode7_enable)
+    process (mode_base, row_addr, col_offset, crtc_ma, mode7_enable)
         variable tmp: std_logic_vector(15 downto 0);
     begin
+        tmp := ('0' & row_addr) + col_offset;
+        if tmp(15) = '1' then
+            tmp := tmp + (mode_base & x"00");
+        end if;
         if mode7_enable = '1' then
             screen_addr <= "11111" & crtc_ma(9 downto 0);
         else
-            screen_addr <= row_addr(14 downto 0) + col_offset;
+            screen_addr <= tmp(14 downto 0);
         end if;
     end process;
 
