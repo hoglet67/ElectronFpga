@@ -14,7 +14,7 @@
  * VERSION and NAME are used in the start-up message
  ********************************************************/
 
-#define VERSION "0.981"
+#define VERSION "0.986"
 
 #if defined(CPU_Z80)
   #define NAME "ICE-Z80"
@@ -190,7 +190,7 @@ static const uint8_t helpMeta[] PROGMEM = {
 #endif
   17, 15, // help
    9,  8, // continue
-  24,  7, // next
+  24,  1, // next
   32,  6, // step
   27,  7, // regs
   12, 10, // dis
@@ -1053,6 +1053,9 @@ uint8_t logDetails() {
 }
 
 void logAddr() {
+  // Delay works around a race condition with slow CPUs
+  // (really the STEP and RESET commands should be synchronous)
+  Delay_us(100);
   memAddr = hwRead16(OFFSET_IAL);
   // Update the serial console
   logCycleCount(OFFSET_CNTL, OFFSET_CNTH);
@@ -2110,8 +2113,13 @@ void doCmdNext(char *params) {
     logTooManyBreakpoints();
     return;
   }
+  addr_t addr = 0xFFFF;
+  params = parsehex4(params, &addr);
+  if (addr == 0xFFFF) {
+     addr = nextAddr;
+  }
   numbkpts++;
-  setBreakpoint(numbkpts - 1, nextAddr, 0xffff, (1 << BRKPT_EXEC) | (1 << TRANSIENT), TRIGGER_ALWAYS);
+  setBreakpoint(numbkpts - 1, addr, 0xffff, (1 << BRKPT_EXEC) | (1 << TRANSIENT), TRIGGER_ALWAYS);
   doCmdContinue(params);
 }
 
