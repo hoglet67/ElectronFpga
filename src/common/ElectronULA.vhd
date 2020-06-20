@@ -258,6 +258,7 @@ architecture behavioral of ElectronULA is
   signal contention     : std_logic;
   signal contention1    : std_logic;
   signal contention2    : std_logic;
+  signal io_access      : std_logic; -- always at 1MHz, no contention
   signal rom_access     : std_logic; -- always at 2mhz, no contention
   signal ram_access     : std_logic; -- 1MHz/2Mhz/Stopped
 
@@ -466,7 +467,7 @@ begin
     -- The external ROM is enabled:
     -- - When the address is C000-FBFF and FF00-FFFF (i.e. OS Rom)
     -- - When the address is 8000-BFFF and the ROM 10 or 11 is paged in (101x)
-    ROM_n_int <= '0' when addr(15 downto 14) = "11" and addr(15 downto 8) /= x"FC" and addr(15 downto 8) /= x"FD" and addr(15 downto 8) /= x"FE" else
+    ROM_n_int <= '0' when addr(15 downto 14) = "11" and io_access = '0' else
                  '0' when addr(15 downto 14) = "10" and page_enable = '1' and page(2 downto 1) = "01" else
                  '1';
 
@@ -1122,11 +1123,14 @@ begin
 -- clock enable generator
 --------------------------------------------------------
 
-    -- ROM accesses always happen at 2Mhz
-    rom_access <= not ROM_n_int;
-    -- RAM accesses always happen at 1Mhz and subber contention
+    -- IO accesses always happen at 1MHz (no contention)
+    io_access <= '1' when addr(15 downto 8) = x"FC" or addr(15 downto 8) = x"FD" or addr(15 downto 8) = x"FE" else '0';
+
+    -- ROM accesses always happen at 2MHz (no contention)
+    rom_access <= addr(15) and not io_access;
+
+    -- RAM accesses always happen at 1MHz (with contention)
     ram_access <= not addr(15);
-    -- IO accesses always happen at 1MHz and don't suffer contention
 
     clk_gen1 : process(clk_16M00, RST_n)
     begin
