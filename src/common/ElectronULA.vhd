@@ -381,11 +381,11 @@ begin
 
     hsync_start  <= std_logic_vector(to_unsigned(759, 11)) when mode = "11" and IncludeVGA else
                     std_logic_vector(to_unsigned(759, 11)) when mode = "10" and IncludeVGA else
-                    std_logic_vector(to_unsigned(762, 11));
+                    std_logic_vector(to_unsigned(768, 11));
 
     hsync_end    <= std_logic_vector(to_unsigned(887, 11)) when mode = "11" and IncludeVGA else
                     std_logic_vector(to_unsigned(887, 11)) when mode = "10" and IncludeVGA else
-                    std_logic_vector(to_unsigned(837, 11));
+                    std_logic_vector(to_unsigned(832, 11));
 
     h_total      <= std_logic_vector(to_unsigned(1055, 11)) when mode = "11" and IncludeVGA else
                     std_logic_vector(to_unsigned(1055, 11)) when mode = "10" and IncludeVGA else
