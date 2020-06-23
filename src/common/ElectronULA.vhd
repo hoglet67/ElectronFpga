@@ -128,14 +128,16 @@ architecture behavioral of ElectronULA is
   signal h_count1       : std_logic_vector(10 downto 0);
 
   signal vsync_start    : std_logic_vector(9 downto 0);
-  signal vsync_end      : std_logic_vector(9 downto 0);
+  signal vsync_end_o    : std_logic_vector(9 downto 0);
+  signal vsync_end_e    : std_logic_vector(9 downto 0);
   signal v_active_gph   : std_logic_vector(9 downto 0);
   signal v_active_txt   : std_logic_vector(9 downto 0);
   signal v_total        : std_logic_vector(9 downto 0);
   signal v_count        : std_logic_vector(9 downto 0);
 
   signal v_rtc          : std_logic_vector(9 downto 0);
-  signal v_display      : std_logic_vector(9 downto 0);
+  signal v_disp_gph     : std_logic_vector(9 downto 0);
+  signal v_disp_txt     : std_logic_vector(9 downto 0);
 
   signal char_row       : std_logic_vector(3 downto 0);
   signal row_addr       : std_logic_vector(14 downto 0);
@@ -395,11 +397,15 @@ begin
 
     vsync_start  <= std_logic_vector(to_unsigned(556, 10)) when mode = "11" and IncludeVGA else
                     std_logic_vector(to_unsigned(556, 10)) when mode = "10" and IncludeVGA else
-                    std_logic_vector(to_unsigned(274, 10));
+                    std_logic_vector(to_unsigned(281, 10));
 
-    vsync_end    <= std_logic_vector(to_unsigned(560, 10)) when mode = "11" and IncludeVGA else
+    vsync_end_o  <= std_logic_vector(to_unsigned(560, 10)) when mode = "11" and IncludeVGA else
                     std_logic_vector(to_unsigned(560, 10)) when mode = "10" and IncludeVGA else
-                    std_logic_vector(to_unsigned(277, 10));
+                    std_logic_vector(to_unsigned(283, 10));
+
+    vsync_end_e  <= std_logic_vector(to_unsigned(560, 10)) when mode = "11" and IncludeVGA else
+                    std_logic_vector(to_unsigned(560, 10)) when mode = "10" and IncludeVGA else
+                    std_logic_vector(to_unsigned(284, 10));
 
     v_total      <= std_logic_vector(to_unsigned(627, 10)) when mode = "11" and IncludeVGA else
                     std_logic_vector(to_unsigned(627, 10)) when mode = "10" and IncludeVGA else
@@ -414,14 +420,17 @@ begin
                     std_logic_vector(to_unsigned(500, 10)) when mode = "10" and IncludeVGA else
                     std_logic_vector(to_unsigned(250, 10));
 
-    v_display    <= std_logic_vector(to_unsigned(513, 10)) when mode = "11" and IncludeVGA else
-                    std_logic_vector(to_unsigned(513, 10)) when mode = "10" and IncludeVGA else
-                    std_logic_vector(to_unsigned(256, 10));
+    v_disp_gph   <= std_logic_vector(to_unsigned(511, 10)) when mode = "11" and IncludeVGA else
+                    std_logic_vector(to_unsigned(511, 10)) when mode = "10" and IncludeVGA else
+                    std_logic_vector(to_unsigned(255, 10));
 
-    v_rtc        <= std_logic_vector(to_unsigned(201, 10)) when mode = "11" and IncludeVGA else
-                    std_logic_vector(to_unsigned(201, 10)) when mode = "10" and IncludeVGA else
-                    std_logic_vector(to_unsigned(100, 10));
+    v_disp_txt   <= std_logic_vector(to_unsigned(499, 10)) when mode = "11" and IncludeVGA else
+                    std_logic_vector(to_unsigned(499, 10)) when mode = "10" and IncludeVGA else
+                    std_logic_vector(to_unsigned(249, 10));
 
+    v_rtc        <= std_logic_vector(to_unsigned(199, 10)) when mode = "11" and IncludeVGA else
+                    std_logic_vector(to_unsigned(199, 10)) when mode = "10" and IncludeVGA else
+                    std_logic_vector(to_unsigned( 99, 10));
 
     -- All of main memory (0x0000-0x7fff) is dual port RAM in the ULA
     ram_32k_gen: if Include32KRAM generate
@@ -1046,41 +1055,44 @@ begin
                 when others =>
                 end case;
             end if;
-            -- Vertical Sync
+            -- Vertical Sync, lasts 2.5 lines (160us)
             if (field = '0') then
-                -- first field of interlaced scanning (or non interlaced)
-                -- vsync starts at the begging of the line
-                if (h_count1 = 0) then
-                    if (v_count = vsync_start) then
-                        vsync_int <= '0';
-                    elsif (v_count = vsync_end) then
-                        vsync_int <= '1';
-                    end if;
+                -- first field (odd) of interlaced scanning (or non interlaced)
+                -- vsync starts at the beginning of the line
+                if (h_count1 = 0 and v_count = vsync_start) then
+                    vsync_int <= '0';
+                elsif (h_count1 = ('0' & h_total(10 downto 1)) and v_count = vsync_end_o) then
+                    vsync_int <= '1';
                 end if;
             else
-                -- second field of intelaced scanning
+                -- second field (even) of intelaced scanning
                 -- vsync starts half way through the line
-                if (h_count1 = ('0' & h_total(10 downto 1))) then
-                    if (v_count = vsync_start) then
-                        vsync_int <= '0';
-                    elsif (v_count = vsync_end) then
-                        vsync_int <= '1';
-                    end if;
+                if (h_count1 = ('0' & h_total(10 downto 1)) and v_count = vsync_start) then
+                    vsync_int <= '0';
+                elsif (h_count1 = 0 and v_count = vsync_end_e) then
+                    vsync_int <= '1';
                 end if;
             end if;
             -- Horizontal Sync
             if (h_count1 = hsync_start) then
                 hsync_int <= '0';
-                if (v_count = v_display) then
-                    display_intr <= '1';
-                end if;
-                if (v_count = v_rtc) then
-                    rtc_intr <= '1';
-                end if;
             elsif (h_count1 = hsync_end) then
-                hsync_int    <= '1';
+                hsync_int <= '1';
+            end if;
+            -- Display Interrupt, this is co-incident with the leading edge
+            -- of hsync at the end the last active line of display
+            -- (line 249 in text mode or line 255 in graphics mode)
+            if (h_count1 = hsync_start) and ((v_count = v_disp_gph and mode_text = '0') or (v_count = v_disp_txt and mode_text = '1')) then
+                display_intr <= '1';
+            elsif (h_count1 = hsync_end) then
                 display_intr <= '0';
-                rtc_intr     <= '0';
+            end if;
+            -- RTC Interrupt, this occurs 8192us (200 lines) after the end of
+            -- the vsync, and is not co-incident with hsync
+            if (v_count = v_rtc) and ((field = '0' and h_count1 = 0) or (field = '1' and h_count1 = ('0' & h_total(10 downto 1)))) then
+                rtc_intr <= '1';
+            elsif (v_count = 0) then
+                rtc_intr <= '0';
             end if;
         end if;
     end process;
