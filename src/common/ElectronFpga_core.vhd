@@ -122,7 +122,19 @@ architecture behavioral of ElectronFpga_core is
     signal abr_lo_bank_lock  : std_logic;
     signal abr_hi_bank_lock  : std_logic;
 
+    signal video_vsync_int   : std_logic;
+    signal video_hsync_int   : std_logic;
+    signal video_red_int     : std_logic_vector(3 downto 0);
+    signal video_green_int   : std_logic_vector(3 downto 0);
+    signal video_blue_int    : std_logic_vector(3 downto 0);
+
 begin
+
+    video_vsync <= video_vsync_int;
+    video_hsync <= video_hsync_int;
+    video_red   <= video_red_int;
+    video_green <= video_green_int;
+    video_blue  <= video_blue_int;
 
     GenDebug: if IncludeICEDebugger generate
         signal cpu_clken1 : std_logic;
@@ -220,11 +232,11 @@ begin
         ROM_n     => ROM_n,
 
         -- Video
-        red       => video_red,
-        green     => video_green,
-        blue      => video_blue,
-        vsync     => video_vsync,
-        hsync     => video_hsync,
+        red       => video_red_int,
+        green     => video_green_int,
+        blue      => video_blue_int,
+        vsync     => video_vsync_int,
+        hsync     => video_hsync_int,
 
         -- Audio
         sound     => sound,
@@ -383,9 +395,9 @@ begin
        abr_hi_bank_lock <= '1';
    end generate;
 
-
    cpu_addr <= cpu_a(15 downto 0);
 
-   test <= (others => '0');
+   test <= video_vsync_int & video_hsync_int & video_blue_int(3) & video_green_int(3) & video_red_int(3)  & "00" & cpu_IRQ_n;
+
 
 end behavioral;
