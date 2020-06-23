@@ -91,6 +91,7 @@ end;
 architecture behavioral of ElectronULA is
 
   signal hsync_int      : std_logic;
+  signal hsync_int_last : std_logic;
   signal vsync_int      : std_logic;
 
   signal ram_we         : std_logic;
@@ -128,8 +129,7 @@ architecture behavioral of ElectronULA is
   signal h_count1       : std_logic_vector(10 downto 0);
 
   signal vsync_start    : std_logic_vector(9 downto 0);
-  signal vsync_end_o    : std_logic_vector(9 downto 0);
-  signal vsync_end_e    : std_logic_vector(9 downto 0);
+  signal vsync_end      : std_logic_vector(9 downto 0);
   signal v_active_gph   : std_logic_vector(9 downto 0);
   signal v_active_txt   : std_logic_vector(9 downto 0);
   signal v_total        : std_logic_vector(9 downto 0);
@@ -140,8 +140,8 @@ architecture behavioral of ElectronULA is
   signal v_disp_txt     : std_logic_vector(9 downto 0);
 
   signal char_row       : std_logic_vector(3 downto 0);
-  signal row_addr       : std_logic_vector(14 downto 0);
   signal col_offset     : std_logic_vector(9 downto 0);
+
   signal screen_addr    : std_logic_vector(14 downto 0);
   signal screen_data    : std_logic_vector(7 downto 0);
 
@@ -149,8 +149,8 @@ architecture behavioral of ElectronULA is
 
   signal mode           : std_logic_vector(1 downto 0);
 
-  -- the 256 byte page that the mode starts at
-  signal mode_base      : std_logic_vector(7 downto 0);
+  -- bits 6..3 the of the 256 byte page that the mode starts at
+  signal mode_base      : std_logic_vector(6 downto 3);
 
   -- the number of bits per pixel (0 = 1BPP, 1 = 2BPP, 2=4BPP)
   signal mode_bpp       : std_logic_vector(1 downto 0);
@@ -161,8 +161,7 @@ architecture behavioral of ElectronULA is
   -- a '1' indicates a 40-col mode (modes 4, 5 and 6)
   signal mode_40        : std_logic;
 
-  -- the number of bytes to increment row_offset when moving from one char row to the next
-  signal mode_rowstep   : std_logic_vector(9 downto 0);
+  signal last_line      : std_logic;
 
   signal display_intr   : std_logic;
   signal display_intr1  : std_logic;
@@ -395,17 +394,20 @@ begin
 
     h_active     <= std_logic_vector(to_unsigned(640, 11));
 
+    -- Note: The real ULA uses line 281->283/4 for VSYNC, but on both
+    -- my TVs this loses part of the top line. So here we move the
+    -- screen down by 7 rows. This should be transparent to software,
+    -- as it doesn't affect the timing of the display or RTC
+    -- interrupts. I'm happy to rever this is anyone complains!
+
     vsync_start  <= std_logic_vector(to_unsigned(556, 10)) when mode = "11" and IncludeVGA else
                     std_logic_vector(to_unsigned(556, 10)) when mode = "10" and IncludeVGA else
-                    std_logic_vector(to_unsigned(281, 10));
+                    std_logic_vector(to_unsigned(274, 10));
 
-    vsync_end_o  <= std_logic_vector(to_unsigned(560, 10)) when mode = "11" and IncludeVGA else
+    vsync_end    <= std_logic_vector(to_unsigned(560, 10)) when mode = "11" and IncludeVGA else
                     std_logic_vector(to_unsigned(560, 10)) when mode = "10" and IncludeVGA else
-                    std_logic_vector(to_unsigned(283, 10));
-
-    vsync_end_e  <= std_logic_vector(to_unsigned(560, 10)) when mode = "11" and IncludeVGA else
-                    std_logic_vector(to_unsigned(560, 10)) when mode = "10" and IncludeVGA else
-                    std_logic_vector(to_unsigned(284, 10));
+                    std_logic_vector(to_unsigned(276, 10)) when field = '0'                else
+                    std_logic_vector(to_unsigned(277, 10));
 
     v_total      <= std_logic_vector(to_unsigned(627, 10)) when mode = "11" and IncludeVGA else
                     std_logic_vector(to_unsigned(627, 10)) when mode = "10" and IncludeVGA else
@@ -818,54 +820,46 @@ begin
                                 motor_int    <= data_in(6);
                                 case (data_in(5 downto 3)) is
                                 when "000" =>
-                                    mode_base    <= x"30";
+                                    mode_base    <= "0110"; -- 0x3000
                                     mode_bpp     <= "00";
                                     mode_40      <= '0';
                                     mode_text    <= '0';
-                                    mode_rowstep <= std_logic_vector(to_unsigned(633, 10)); -- 640 - 7
                                 when "001" =>
-                                    mode_base    <= x"30";
+                                    mode_base    <= "0110"; -- 0x3000
                                     mode_bpp     <= "01";
                                     mode_40      <= '0';
                                     mode_text    <= '0';
-                                    mode_rowstep <= std_logic_vector(to_unsigned(633, 10)); -- 640 - 7
                                 when "010" =>
-                                    mode_base    <= x"30";
+                                    mode_base    <= "0110"; -- 0x3000
                                     mode_bpp     <= "10";
                                     mode_40      <= '0';
                                     mode_text    <= '0';
-                                    mode_rowstep <= std_logic_vector(to_unsigned(633, 10)); -- 640 - 7
                                 when "011" =>
-                                    mode_base    <= x"40";
+                                    mode_base    <= "1000"; -- 0x4000
                                     mode_bpp     <= "00";
                                     mode_40      <= '0';
                                     mode_text    <= '1';
-                                    mode_rowstep <= std_logic_vector(to_unsigned(631, 10)); -- 640 - 9
                                 when "100" =>
-                                    mode_base    <= x"58";
+                                    mode_base    <= "1011"; -- 0x5800
                                     mode_bpp     <= "00";
                                     mode_40      <= '1';
                                     mode_text    <= '0';
-                                    mode_rowstep <= std_logic_vector(to_unsigned(313, 10)); -- 320 - 7
                                 when "101" =>
-                                    mode_base    <= x"58";
+                                    mode_base    <= "1011"; -- 0x5800
                                     mode_bpp     <= "01";
                                     mode_40      <= '1';
                                     mode_text    <= '0';
-                                    mode_rowstep <= std_logic_vector(to_unsigned(313, 10)); -- 320 - 7
                                 when "110" =>
-                                    mode_base    <= x"60";
+                                    mode_base    <= "1100"; -- 0x6000
                                     mode_bpp     <= "00";
                                     mode_40      <= '1';
                                     mode_text    <= '1';
-                                    mode_rowstep <= std_logic_vector(to_unsigned(311, 10)); -- 320 - 9
                                 when "111" =>
                                     -- mode 7 seems to default to mode 4
-                                    mode_base    <= x"58";
+                                    mode_base    <= "1011"; -- 0x5800
                                     mode_bpp     <= "00";
                                     mode_40      <= '1';
                                     mode_text    <= '0';
-                                    mode_rowstep <= std_logic_vector(to_unsigned(313, 10)); -- 320 - 7
                                 when others =>
                                 end case;
                                 comms_mode   <= data_in(2 downto 1);
@@ -900,50 +894,107 @@ begin
     -- Vertical   256 + (16 +  2) +   3 + (19 + 16) = total 312
 
     process (clk_video)
-    variable pixel : std_logic_vector(3 downto 0);
-    variable row_addr_tmp : std_logic_vector(14 downto 0);
+        variable pixel : std_logic_vector(3 downto 0);
+        -- start address of current row block (8-10 lines)
+        variable row_addr  : std_logic_vector(14 downto 6);
+        -- address within current line
+        variable byte_addr : std_logic_vector(14 downto 3);
     begin
         if rising_edge(clk_video) then
-            -- pipeline h_count by one cycle to compensate the register in the RAM
-            h_count1 <= h_count;
-            row_addr_tmp := row_addr;
-            if (h_count = h_total) then
+
+            -- Horizontal counter, clocked at the pixel clock rate
+            if h_count = h_total then
                 h_count <= (others => '0');
-                col_offset <= (others => '0');
-                if (v_count = v_total) then
-                    v_count <= (others => '0');
-                    char_row <= (others => '0');
-                    row_addr_tmp := screen_base & "000000";
-                    if (mode = "01") then
-                        -- Interlaced, so alternate odd and even fields
-                        field <= not field;
-                    else
-                        -- Non-interlaced, so odd fields only
-                        field <= '0';
-                    end if;
-                else
-                    v_count <= v_count + 1;
-                    if (v_count(0) = '1' or mode(1) = '0') then
-                        if ((mode_text = '0' and char_row = 7) or (mode_text = '1' and char_row = 9)) then
-                            char_row <= (others => '0');
-                            row_addr_tmp := row_addr_tmp + mode_rowstep;
-                        else
-                            char_row <= char_row + 1;
-                            row_addr_tmp := row_addr_tmp + 1;
-                        end if;
-                    end if;
-                end if;
             else
                 h_count <= h_count + 1;
-                if ((mode_40 = '0' and h_count(2 downto 0) = "111") or
-                    (mode_40 = '1' and h_count(3 downto 0) = "1111")) then
-                    col_offset <= col_offset + 8;
+            end if;
+
+            -- Pipelined version of h_count by to compensate the register in the RAM
+            h_count1 <= h_count;
+
+            -- Vertical counter, incremented at the end of each line
+            if h_count = h_total then
+                if v_count = v_total then
+                    v_count <= (others => '0');
+                else
+                    v_count <= v_count + 1;
                 end if;
             end if;
-            if row_addr_tmp(14 downto 11) = "0000" then
-                row_addr_tmp(14 downto 11) := mode_base(6 downto 3);
+
+            -- Field; field=0 is the (first) odd field, field=1 is the even field
+            if h_count = h_total and v_count = v_total then
+                if mode = "01" then
+                    -- Interlaced, so alternate odd and even fields
+                    field <= not field;
+                else
+                    -- Non-interlaced, so odd fields only
+                    field <= '0';
+                end if;
             end if;
-            row_addr <= row_addr_tmp;
+
+            -- Char_row counts 0..7 or 0..9 depending on the mode.
+            -- It incremented on the falling edge of hsync
+            hsync_int_last <= hsync_int;
+            if hsync_int = '0' and hsync_int_last = '1'  then
+                if v_count = v_total then
+                    char_row <= (others => '0');
+                elsif v_count(0) = '1' or mode(1) = '0' then
+                    if last_line = '1' then
+                        char_row <= (others => '0');
+                    else
+                        char_row <= char_row + 1;
+                    end if;
+                end if;
+            end if;
+
+            -- Determine last line of a row
+            if ((mode_text = '0' and char_row = 7) or (mode_text = '1' and char_row = 9)) and (v_count(0) = '1' or mode(1) = '0') then
+                last_line <= '1';
+            else
+                last_line <= '0';
+            end if;
+
+            -- RAM Address, constructed from the local row_addr and byte_addr registers
+            -- Some of this is taken from Hick's efforts to understand the schematics:
+            -- https://www.mups.co.uk/project/hardware/acorn_electron/
+
+            -- At start of the field, update row_addr and byte_addr from the ULA registers 2,3
+            if h_count = h_total and v_count = v_total then
+                row_addr  := screen_base;
+                byte_addr := screen_base & "000";
+            end if;
+
+            -- At the start of hsync,  update the row_addr from byte_addr which
+            -- gets to the start of the next block
+            if hsync_int = '0' and hsync_int_last = '1' and last_line = '1' then
+                row_addr := byte_addr(14 downto 6);
+            end if;
+
+            -- During hsync, reset byte reset back to start of line, unless
+            -- it's the last line
+            if hsync_int = '0' and last_line = '0' then
+                byte_addr := row_addr & "000";
+            end if;
+
+            -- Every 8 or 16 pixels depending on mode/repeats
+            if h_count < h_active then
+                if (mode_40 = '0' and h_count(2 downto 0) = "111") or
+                   (mode_40 = '1' and h_count(3 downto 0) = "1111") then
+                    byte_addr := byte_addr + 1;
+                end if;
+            end if;
+
+            -- Handle wrap-around back to mode_base
+            if byte_addr(14 downto 11) = "0000" then
+                byte_addr := mode_base & byte_addr(10 downto 3);
+            end if;
+
+            -- Screen_addr is the final 15-bit Video RAM address
+            if mode7_enable = '1' then
+                screen_addr <= "11111" & crtc_ma(9 downto 0);
+            else
+                screen_addr <= byte_addr & char_row(2 downto 0);
+            end if;
 
             -- RGB Data
             if (h_count1 >= h_active or (mode_text = '0' and v_count >= v_active_gph) or (mode_text = '1' and v_count >= v_active_txt) or char_row >= 8) then
@@ -1061,7 +1112,7 @@ begin
                 -- vsync starts at the beginning of the line
                 if (h_count1 = 0 and v_count = vsync_start) then
                     vsync_int <= '0';
-                elsif (h_count1 = ('0' & h_total(10 downto 1)) and v_count = vsync_end_o) then
+                elsif (h_count1 = ('0' & h_total(10 downto 1)) and v_count = vsync_end) then
                     vsync_int <= '1';
                 end if;
             else
@@ -1069,7 +1120,7 @@ begin
                 -- vsync starts half way through the line
                 if (h_count1 = ('0' & h_total(10 downto 1)) and v_count = vsync_start) then
                     vsync_int <= '0';
-                elsif (h_count1 = 0 and v_count = vsync_end_e) then
+                elsif (h_count1 = 0 and v_count = vsync_end) then
                     vsync_int <= '1';
                 end if;
             end if;
@@ -1094,20 +1145,6 @@ begin
             elsif (v_count = 0) then
                 rtc_intr <= '0';
             end if;
-        end if;
-    end process;
-
-    process (mode_base, row_addr, col_offset, crtc_ma, mode7_enable)
-        variable tmp: std_logic_vector(15 downto 0);
-    begin
-        tmp := ('0' & row_addr) + col_offset;
-        if tmp(15) = '1' then
-            tmp := tmp + (mode_base & x"00");
-        end if;
-        if mode7_enable = '1' then
-            screen_addr <= "11111" & crtc_ma(9 downto 0);
-        else
-            screen_addr <= tmp(14 downto 0);
         end if;
     end process;
 
