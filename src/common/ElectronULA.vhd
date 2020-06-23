@@ -422,16 +422,16 @@ begin
                     std_logic_vector(to_unsigned(500, 10)) when mode = "10" and IncludeVGA else
                     std_logic_vector(to_unsigned(250, 10));
 
-    v_disp_gph   <= std_logic_vector(to_unsigned(511, 10)) when mode = "11" and IncludeVGA else
-                    std_logic_vector(to_unsigned(511, 10)) when mode = "10" and IncludeVGA else
+    v_disp_gph   <= std_logic_vector(to_unsigned(513, 10)) when mode = "11" and IncludeVGA else
+                    std_logic_vector(to_unsigned(513, 10)) when mode = "10" and IncludeVGA else
                     std_logic_vector(to_unsigned(255, 10));
 
-    v_disp_txt   <= std_logic_vector(to_unsigned(499, 10)) when mode = "11" and IncludeVGA else
-                    std_logic_vector(to_unsigned(499, 10)) when mode = "10" and IncludeVGA else
+    v_disp_txt   <= std_logic_vector(to_unsigned(501, 10)) when mode = "11" and IncludeVGA else
+                    std_logic_vector(to_unsigned(501, 10)) when mode = "10" and IncludeVGA else
                     std_logic_vector(to_unsigned(249, 10));
 
-    v_rtc        <= std_logic_vector(to_unsigned(199, 10)) when mode = "11" and IncludeVGA else
-                    std_logic_vector(to_unsigned(199, 10)) when mode = "10" and IncludeVGA else
+    v_rtc        <= std_logic_vector(to_unsigned(201, 10)) when mode = "11" and IncludeVGA else
+                    std_logic_vector(to_unsigned(201, 10)) when mode = "10" and IncludeVGA else
                     std_logic_vector(to_unsigned( 99, 10));
 
     -- All of main memory (0x0000-0x7fff) is dual port RAM in the ULA
