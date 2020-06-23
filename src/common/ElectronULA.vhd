@@ -1124,7 +1124,8 @@ begin
 --------------------------------------------------------
 
     -- IO accesses always happen at 1MHz (no contention)
-    io_access <= '1' when addr(15 downto 8) = x"FC" or addr(15 downto 8) = x"FD" or addr(15 downto 8) = x"FE" else '0';
+    -- This includes keyboard reads in paged ROM slots 8/9
+    io_access <= '1' when addr(15 downto 8) = x"FC" or addr(15 downto 8) = x"FD" or addr(15 downto 8) = x"FE" or (addr(15 downto 14) = "10" and page_enable = '1' and page(2 downto 1) = "00") else '0';
 
     -- ROM accesses always happen at 2MHz (no contention)
     rom_access <= addr(15) and not io_access;
