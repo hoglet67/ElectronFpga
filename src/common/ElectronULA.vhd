@@ -1,21 +1,17 @@
 --------------------------------------------------------------------------------
--- Copyright (c) 2015 David Banks
+-- Copyright (c) 2020 David Banks
 --------------------------------------------------------------------------------
 --   ____  ____
 --  /   /\/   /
 -- /___/  \  /
 -- \   \   \/
 --  \   \
---  /   /         Filename  : ElectronFpga_core.vhd
--- /___/   /\     Timestamp : 28/07/2015
+--  /   /         Filename  : ElectronULA.vhd
+-- /___/   /\     Timestamp : 23/06/2020
 -- \   \  /  \
 --  \___\/\___\
 --
---Design Name: ElectronFpga_core
-
-
--- TODO:
--- Implement Cassette Out
+--Design Name: ElectronULA
 
 library ieee;
 use ieee.std_logic_1164.all;
@@ -31,10 +27,10 @@ entity ElectronULA is
     );
     port (
         clk_16M00 : in  std_logic;
-        clk_24M00 : in  std_logic;
+        clk_24M00 : in  std_logic; -- Used only for mode 7 pixel clock
         clk_32M00 : in  std_logic;
-        clk_33M33 : in  std_logic;
-        clk_40M00 : in  std_logic;
+        clk_27M00 : in  std_logic; -- Used only for 720x576 VGA @ 50Hz
+        clk_40M00 : in  std_logic; -- Used only for 800x600 VGA @ 60Hz
 
         -- CPU Interface
         addr      : in  std_logic_vector(15 downto 0);
@@ -244,9 +240,9 @@ architecture behavioral of ElectronULA is
   signal clk_16M00_a    :   std_logic;
   signal clk_16M00_b    :   std_logic;
   signal clk_16M00_c    :   std_logic;
-  signal clk_33M33_a    :   std_logic;
-  signal clk_33M33_b    :   std_logic;
-  signal clk_33M33_c    :   std_logic;
+  signal clk_27M00_a    :   std_logic;
+  signal clk_27M00_b    :   std_logic;
+  signal clk_27M00_c    :   std_logic;
   signal clk_40M00_a    :   std_logic;
   signal clk_40M00_b    :   std_logic;
   signal clk_40M00_c    :   std_logic;
@@ -322,7 +318,7 @@ begin
 
     -- A simple clock mux causes lots of warnings from the Xilinx tool
     --  clk_video    <= clk_40M00 when mode = "11" else
-    --                  clk_33M33 when mode = "10" else
+    --                  clk_27M00 when mode = "10" else
     --                  clk_16M00;
     -- Instead, we regenerate the clock using edge triggered flip flops
 
@@ -342,21 +338,21 @@ begin
 
     clk_16M00_c <= clk_16M00_a xor clk_16M00_b;
 
-    process(clk_33M33)
+    process(clk_27M00)
     begin
-        if rising_edge(clk_33M33) then
-            clk_33M33_a <= not clk_33M33_a;
+        if rising_edge(clk_27M00) then
+            clk_27M00_a <= not clk_27M00_a;
         end if;
     end process;
 
-    process(clk_33M33)
+    process(clk_27M00)
     begin
-        if falling_edge(clk_33M33) then
-            clk_33M33_b <= not clk_33M33_b;
+        if falling_edge(clk_27M00) then
+            clk_27M00_b <= not clk_27M00_b;
         end if;
     end process;
 
-    clk_33M33_c <= clk_33M33_a xor clk_33M33_b;
+    clk_27M00_c <= clk_27M00_a xor clk_27M00_b;
 
     process(clk_40M00)
     begin
@@ -376,20 +372,20 @@ begin
 
 
     clk_video    <= clk_40M00_c when mode = "11" and IncludeVGA else
-                    clk_33M33_c when mode = "10" and IncludeVGA else
+                    clk_27M00_c when mode = "10" and IncludeVGA else
                     clk_16M00_c;
 
 
     hsync_start  <= std_logic_vector(to_unsigned(759, 11)) when mode = "11" and IncludeVGA else
-                    std_logic_vector(to_unsigned(759, 11)) when mode = "10" and IncludeVGA else
+                    std_logic_vector(to_unsigned(692, 11)) when mode = "10" and IncludeVGA else
                     std_logic_vector(to_unsigned(768, 11));
 
     hsync_end    <= std_logic_vector(to_unsigned(887, 11)) when mode = "11" and IncludeVGA else
-                    std_logic_vector(to_unsigned(887, 11)) when mode = "10" and IncludeVGA else
+                    std_logic_vector(to_unsigned(756, 11)) when mode = "10" and IncludeVGA else
                     std_logic_vector(to_unsigned(832, 11));
 
     h_total      <= std_logic_vector(to_unsigned(1055, 11)) when mode = "11" and IncludeVGA else
-                    std_logic_vector(to_unsigned(1055, 11)) when mode = "10" and IncludeVGA else
+                    std_logic_vector(to_unsigned(863,  11)) when mode = "10" and IncludeVGA else
                     std_logic_vector(to_unsigned(1023, 11));
 
     h_active     <= std_logic_vector(to_unsigned(640, 11));
@@ -401,16 +397,16 @@ begin
     -- interrupts. I'm happy to rever this is anyone complains!
 
     vsync_start  <= std_logic_vector(to_unsigned(556, 10)) when mode = "11" and IncludeVGA else
-                    std_logic_vector(to_unsigned(556, 10)) when mode = "10" and IncludeVGA else
+                    std_logic_vector(to_unsigned(549, 10)) when mode = "10" and IncludeVGA else
                     std_logic_vector(to_unsigned(274, 10));
 
     vsync_end    <= std_logic_vector(to_unsigned(560, 10)) when mode = "11" and IncludeVGA else
-                    std_logic_vector(to_unsigned(560, 10)) when mode = "10" and IncludeVGA else
+                    std_logic_vector(to_unsigned(554, 10)) when mode = "10" and IncludeVGA else
                     std_logic_vector(to_unsigned(276, 10)) when field = '0'                else
                     std_logic_vector(to_unsigned(277, 10));
 
     v_total      <= std_logic_vector(to_unsigned(627, 10)) when mode = "11" and IncludeVGA else
-                    std_logic_vector(to_unsigned(627, 10)) when mode = "10" and IncludeVGA else
+                    std_logic_vector(to_unsigned(623, 10)) when mode = "10" and IncludeVGA else
                     std_logic_vector(to_unsigned(311, 10)) when field = '0'                else
                     std_logic_vector(to_unsigned(312, 10));
 

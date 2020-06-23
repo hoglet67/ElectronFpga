@@ -66,7 +66,7 @@ architecture behavioral of ElectronFpga_duo is
     signal clock_16        : std_logic;
     signal clock_24        : std_logic;
     signal clock_32        : std_logic;
-    signal clock_33        : std_logic;
+    signal clock_27        : std_logic;
     signal clock_40        : std_logic;
     signal hard_reset_n    : std_logic;
     signal powerup_reset_n : std_logic;
@@ -111,7 +111,7 @@ begin
     inst_dcm1 : entity work.dcm1 port map(
         CLKIN_IN          => clk_32M00,
         -- used as a video clock when the ULA is in 50Hz VGA Mode
-        CLKFX_OUT         => clock_33
+        CLKFX_OUT         => clock_27
     );
 
     electron_core : entity work.ElectronFpga_core
@@ -124,7 +124,7 @@ begin
         clk_16M00         => clock_16,
         clk_24M00         => clock_24,
         clk_32M00         => clock_32,
-        clk_33M33         => clock_33,
+        clk_27M00         => clock_27,
         clk_40M00         => clock_40,
         hard_reset_n      => hard_reset_n,
         ps2_clk           => ps2_clk,

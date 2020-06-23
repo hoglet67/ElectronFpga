@@ -29,7 +29,7 @@ entity ElectronFpga_core is
         clk_16M00      : in  std_logic;
         clk_24M00      : in  std_logic; -- for Jafa Mode7
         clk_32M00      : in  std_logic; -- for Jafa Mode7
-        clk_33M33      : in  std_logic;
+        clk_27M00      : in  std_logic;
         clk_40M00      : in  std_logic;
 
         -- Hard reset (active low)
@@ -215,7 +215,7 @@ begin
         clk_16M00 => clk_16M00,
         clk_24M00 => clk_24M00,
         clk_32M00 => clk_32M00,
-        clk_33M33 => clk_33M33,
+        clk_27M00 => clk_27M00,
         clk_40M00 => clk_40M00,
 
         -- CPU Interface
