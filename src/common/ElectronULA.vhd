@@ -1519,7 +1519,11 @@ begin
         ttxt_crs <= not crtc_ra(0);
         ttxt_lose <= crtc_de;
 
-        teletext : entity work.saa5050 port map (
+        teletext : entity work.saa5050
+        generic map (
+            IncludeTTxtROM => IncludeTTxtROM
+        )
+        port map (
             -- inputs
             CLOCK    => ttxt_clock,
             CLKEN    => ttxt_clken,

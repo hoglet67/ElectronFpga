@@ -61,6 +61,9 @@ use ieee.std_logic_unsigned.all;
 use ieee.numeric_std.all;
 
 entity saa5050 is
+generic (
+    IncludeTTxtROM : boolean -- false if the SAA5050 character ROM needs loading
+    );
 port (
     CLOCK       :   in  std_logic;
     -- 6 MHz dot clock enable
@@ -451,7 +454,7 @@ begin
                     -- e.g. 03 (Alpha Yellow) 18 (Conceal) should leave us in a conceal state
                     if conceal = '1' and unconceal_next = '1' then
                         conceal <= '0';
-                    end if;                    
+                    end if;
                 end if;
             end if;
         end if;
@@ -470,7 +473,7 @@ begin
 
     hold_active <= '1' when gfx_hold = '1' and code_r(6 downto 5) = "00" else '0';
 
-    rom_address1 <= char_rom_addr when char_rom_we = '1' else
+    rom_address1 <= char_rom_addr when char_rom_we = '1' and not IncludeTTxtROM else
                     (others => '0') when (double_high = '0' and double_high2 = '1') else
                     gfx & last_gfx & std_logic_vector(line_addr) when hold_active = '1' else
                     gfx & code_r & std_logic_vector(line_addr);
@@ -479,16 +482,34 @@ begin
     rom_address2 <= rom_address1 + 1 when ((double_high = '0' and CRS = '1') or (double_high = '1' and line_counter(0) = '1')) else
                     rom_address1 - 1;
 
-    -- TODO(myelin) re-add option to use initialized char rom, for Xilinx chips with memory initialization
-    char_rom : entity work.saa5050_rom_dual_port_uninitialized port map (
-        clock    => CLOCK,
-        wea      => char_rom_we,
-        addressA => rom_address1,
-        dina     => char_rom_data,
-        QA       => rom_data1,
-        addressB => rom_address2,
-        QB       => rom_data2
-    );
+    -- If IncludeTTxtROM is true then we include the "ROM" version that is
+    -- initialized with the mode 7 character set data
+    -- (this is generally used for Xilinx builds)
+    char_rom_block: if IncludeTTxtROM generate
+        char_rom : entity work.saa5050_rom_dual_port port map (
+            clock    => CLOCK,
+            addressA => rom_address1,
+            QA       => rom_data1,
+            addressB => rom_address2,
+            QB       => rom_data2
+            );
+    end generate;
+
+
+    -- If IncludeTTxtROM is false then we include the "RAM" version that is
+    -- uninitialized, and needs loading during the core boostrap phase
+    -- (this is generally used for Altera builds)
+    char_ram_block: if not IncludeTTxtROM generate
+        char_ram : entity work.saa5050_rom_dual_port_uninitialized port map (
+            clock    => CLOCK,
+            wea      => char_rom_we,
+            addressA => rom_address1,
+            dina     => char_rom_data,
+            QA       => rom_data1,
+            addressB => rom_address2,
+            QB       => rom_data2
+            );
+    end generate;
 
     --------------------------------------------------------------------
     -- Shift register

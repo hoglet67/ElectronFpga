@@ -112,7 +112,7 @@ entity ElectronULA_max10 is
         -- Keyboard
         kbd           : in  std_logic_vector(3 downto 0);
         caps          : out std_logic;
-        
+
         -- Cassette
         casIn         : in  std_logic;
         casOut        : out std_logic;
@@ -583,7 +583,8 @@ begin
         IncludeVGA       => false,
         IncludeJafaMode7 => IncludeMode7,
         UseClockMux      => true,
-        UseTTxtClock     => true
+        UseTTxtClock     => true,
+        IncludeTTxtROM   => false
     )
     port map (
         clk_16M00 => clock_16,
@@ -677,7 +678,7 @@ begin
 
     -- Light up CAPS on reset
     --caps <= RST_n_sync_16(1);
-    
+
     -- IRQ_n_out drives the enable on an open collector buffer which pulls the external IRQ line down
     IRQ_n_out <= ula_irq_n;
 
@@ -952,7 +953,7 @@ begin
     -- 5: NOP
     -- 6: NOP
     -- 7: NOP    -- Now switch to refresh mode
-    -- 8: AUTO REFRESH -- 
+    -- 8: AUTO REFRESH --
     -- 9: nCS=1
 
 --    sdram_loop : process(clock_96)
