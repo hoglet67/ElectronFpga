@@ -1,0 +1,67 @@
+# Copyright 2017 Google Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Include this file in your Makefile after defining NAME=<project name>
+
+# Also change ROOT if the board is not two levels down from the root
+ROOT?=../..
+
+# Change SCHEMATIC if you are using a differently-named schematic file
+SCHEMATIC?=$(NAME).py
+
+# Change OUTPUT_NAME if you don't want your .zip file to use $NAME
+OUTPUT_NAME?=$(NAME)
+
+# Change LAYERS if you want other than two layers
+LAYERS?=2
+
+# -----
+
+ifndef SKIP_NETLIST
+	ALL += $(NAME).net
+endif
+ifndef SKIP_SETUP_DEFAULTS
+	ALL = setup $(ALL)
+endif
+
+ALL+=$(OUTPUT_NAME).zip
+
+default: all
+
+rebuild: clean all
+
+all: $(ALL)
+
+clean:
+	rm -vf $(ALL) pcb-front.png pcb-back.png
+	rm -vrf gerber_tmp
+
+setup:
+	NAME=$(NAME) OUTPUT_NAME=$(OUTPUT_NAME) python $(ROOT)/common/setup_defaults.py
+
+net: $(NAME).net
+
+$(NAME).net: $(SCHEMATIC)
+	python $<
+
+fab: $(OUTPUT_NAME).zip
+
+$(OUTPUT_NAME).zip: $(NAME).kicad_pcb
+	rm -rf gerber_tmp
+	# This will only work in macOS, and only if you've copied the system Python executable into kicad.app: cp /System/Library/Frameworks/Python.framework/Versions/2.7/Resources/Python.app/Contents/MacOS/Python /Applications/Kicad/kicad.app/Contents/Applications/pcbnew.app/Contents/MacOS/python
+	# PYTHONPATH=/Applications/Kicad/kicad.app/Contents/Frameworks/python/site-packages /Applications/Kicad/kicad.app/Contents/Applications/pcbnew.app/Contents/MacOS/python $(ROOT)/common/build_fab_outputs.py $<
+	PYTHONPATH=/Applications/KiCad/kicad.app/Contents/Frameworks/python/site-packages LAYERS=$(LAYERS) /Applications/KiCad/kicad.app/Contents/Frameworks/Python.framework/Versions/2.7/bin/python $(ROOT)/common/build_fab_outputs.py $<
+	cd gerber_tmp && zip ../$(OUTPUT_NAME) *
+	# Build gerber previews using pcb-tools.  If this fails, sudo easy_install pip && sudo pip install pcb-tools
+	python $(ROOT)/common/build_gerber_previews.py

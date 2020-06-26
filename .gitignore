@@ -1,10 +1,13 @@
 xilinx/iseconfig/
 xilinx/working/
 
-
 altera/db/
 altera/incremental_db/
 altera/output_files/
+altera/greybox_tmp
+
+*.vcd
+*.vvp
 
 nohup.out
 *~
@@ -12,6 +15,8 @@ nohup.out
 not_in_git/
 roms/tmp/
 *.bak
+.DS_Store
+*.pyc
 
 src/xilinx/CpuMon_bd.bmm
 

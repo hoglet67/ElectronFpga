@@ -1,0 +1,3 @@
+[submodule "pcb/myelin-kicad.pretty"]
+	path = pcb/myelin-kicad.pretty
+	url = git@github.com:myelin/myelin-kicad.pretty.git

@@ -6,16 +6,12 @@
 -- /___/  \  /
 -- \   \   \/
 --  \   \
---  /   /         Filename  : ElectronFpga_core.vhd
--- /___/   /\     Timestamp : 28/07/2015
+--  /   /         Filename  : ElectronULA.vhd
+-- /___/   /\     Timestamp : 27/06/2020
 -- \   \  /  \
 --  \___\/\___\
 --
---Design Name: ElectronFpga_core
-
-
--- TODO:
--- Implement Cassette Out
+--Design Name: ElectronULA
 
 library ieee;
 use ieee.std_logic_1164.all;
@@ -27,18 +23,24 @@ entity ElectronULA is
         IncludeMMC       : boolean := true;
         Include32KRAM    : boolean := true;
         IncludeVGA       : boolean := true;
-        IncludeJafaMode7 : boolean := false
+        IncludeJafaMode7 : boolean := false;
+        UseClockMux      : boolean := false;  -- false for Xilinx, true for Altera
+        UseTTxtClock     : boolean := false;  -- true to use clk_ttxt/clken_ttxt_12M, false to use clk_24M00
+        IncludeTTxtROM   : boolean := true    -- false if the SAA5050 character ROM needs loading
     );
     port (
         clk_16M00 : in  std_logic;
-        clk_24M00 : in  std_logic;
+        clk_24M00 : in  std_logic := '0';
+        clk_ttxt  : in  std_logic := '0';
         clk_32M00 : in  std_logic;
         clk_33M33 : in  std_logic;
         clk_40M00 : in  std_logic;
 
+        clken_ttxt_12M : in std_logic := '0';
+
         -- CPU Interface
         addr      : in  std_logic_vector(15 downto 0);
-        data_in   : in  std_logic_vector(7 downto 0);
+        data_in   : in  std_logic_vector(7 downto 0);  -- Async, but stable on rising edge of cpu_clken
         data_out  : out std_logic_vector(7 downto 0);
         data_en   : out std_logic;
         R_W_n     : in  std_logic;
@@ -60,7 +62,7 @@ entity ElectronULA is
         sound     : out std_logic;
 
         -- Keyboard
-        kbd       : in  std_logic_vector(3 downto 0);
+        kbd       : in  std_logic_vector(3 downto 0);  -- Async
 
         -- SD Card
         SDMISO    : in  std_logic;
@@ -82,8 +84,14 @@ entity ElectronULA is
 
         -- Clock Generation
         cpu_clken_out  : out std_logic;
+        cpu_clk_out    : out std_logic;
         turbo          : in std_logic_vector(1 downto 0);
-        turbo_out      : out std_logic_vector(1 downto 0)
+        turbo_out      : out std_logic_vector(1 downto 0);
+
+        -- SAA5050 character ROM loading
+        char_rom_we   : in std_logic := '0';
+        char_rom_addr : in std_logic_vector(11 downto 0) := (others => '0');
+        char_rom_data : in std_logic_vector(7 downto 0) := (others => '0')
 
         );
 end;
@@ -94,6 +102,7 @@ architecture behavioral of ElectronULA is
   signal hsync_int_last : std_logic;
   signal vsync_int      : std_logic;
 
+  signal ram_addr       : std_logic_vector(15 downto 0);
   signal ram_we         : std_logic;
   signal ram_data       : std_logic_vector(7 downto 0);
 
@@ -106,6 +115,8 @@ architecture behavioral of ElectronULA is
   signal general_counter: std_logic_vector(15 downto 0);
   signal sound_bit      : std_logic;
   signal isr_data       : std_logic_vector(7 downto 0);
+
+  signal ram_data_in_sync : std_logic_vector(7 downto 0);
 
   -- ULA Registers
   signal isr            : std_logic_vector(6 downto 2);
@@ -216,6 +227,7 @@ architecture behavioral of ElectronULA is
   signal status_do      :   std_logic_vector(7 downto 0);
 
   -- SAA5050 signals (only used when Jafa Mode 7 is enabled)
+  signal ttxt_clock     :   std_logic;
   signal ttxt_clken     :   std_logic;
   signal ttxt_glr       :   std_logic;
   signal ttxt_dew       :   std_logic;
@@ -263,6 +275,11 @@ architecture behavioral of ElectronULA is
   signal rom_access     : std_logic; -- always at 2mhz, no contention
   signal ram_access     : std_logic; -- 1MHz/2Mhz/Stopped
 
+  signal kbd_access     : std_logic;
+  -- set to 1 to read keyboard at 1MHz, if there's too much capacitance on the
+  -- buffer inputs.  (seems unnecessary with extra pullup on kbd* lines)
+  signal kbd_delay      : std_logic := '1';
+
   signal clk_state      : std_logic_vector(2 downto 0);
   signal cpu_clken      : std_logic;
   signal cpu_clken_1    : std_logic;
@@ -276,6 +293,8 @@ architecture behavioral of ElectronULA is
   signal via4_clken_1   : std_logic;
   signal via4_clken_2   : std_logic;
   signal via4_clken_4   : std_logic;
+  signal cpu_clk        : std_logic := '1';
+  signal clk_counter    : std_logic_vector(2 downto 0) := (others => '0');
 
   signal mc6522_enable     : std_logic;
   signal mc6522_data       : std_logic_vector(7 downto 0);
@@ -320,65 +339,76 @@ begin
     -- mode 10 - SVGA  @ 50Hz
     -- mode 11 - SVGA  @ 60Hz
 
-    -- A simple clock mux causes lots of warnings from the Xilinx tool
-    --  clk_video    <= clk_40M00 when mode = "11" else
-    --                  clk_33M33 when mode = "10" else
-    --                  clk_16M00;
-    -- Instead, we regenerate the clock using edge triggered flip flops
+    gen_clk_mux : if UseClockMux generate
 
-    process(clk_16M00)
-    begin
-        if rising_edge(clk_16M00) then
-            clk_16M00_a <= not clk_16M00_a;
-        end if;
-    end process;
+        -- A simple clock mux causes lots of warnings from the Xilinx tool,
+        -- but is OK with Quartus.
 
-    process(clk_16M00)
-    begin
-        if falling_edge(clk_16M00) then
-            clk_16M00_b <= not clk_16M00_b;
-        end if;
-    end process;
+        clk_video    <= clk_40M00 when mode = "11" else
+                        clk_33M33 when mode = "10" else
+                        clk_16M00;
 
-    clk_16M00_c <= clk_16M00_a xor clk_16M00_b;
-
-    process(clk_33M33)
-    begin
-        if rising_edge(clk_33M33) then
-            clk_33M33_a <= not clk_33M33_a;
-        end if;
-    end process;
-
-    process(clk_33M33)
-    begin
-        if falling_edge(clk_33M33) then
-            clk_33M33_b <= not clk_33M33_b;
-        end if;
-    end process;
-
-    clk_33M33_c <= clk_33M33_a xor clk_33M33_b;
-
-    process(clk_40M00)
-    begin
-        if rising_edge(clk_40M00) then
-            clk_40M00_a <= not clk_40M00_a;
-        end if;
-    end process;
-
-    process(clk_40M00)
-    begin
-        if falling_edge(clk_40M00) then
-            clk_40M00_b <= not clk_40M00_b;
-        end if;
-    end process;
-
-    clk_40M00_c <= clk_40M00_a xor clk_40M00_b;
+    end generate;
 
 
-    clk_video    <= clk_40M00_c when mode = "11" and IncludeVGA else
-                    clk_33M33_c when mode = "10" and IncludeVGA else
-                    clk_16M00_c;
+    gen_clk_with_flops : if not UseClockMux generate
 
+        -- Regenerate the clock using edge triggered flip flops on Xilinx.
+
+        process(clk_16M00)
+        begin
+            if rising_edge(clk_16M00) then
+                clk_16M00_a <= not clk_16M00_a;
+            end if;
+        end process;
+
+        process(clk_16M00)
+        begin
+            if falling_edge(clk_16M00) then
+                clk_16M00_b <= not clk_16M00_b;
+            end if;
+        end process;
+
+        clk_16M00_c <= clk_16M00_a xor clk_16M00_b;
+
+        process(clk_33M33)
+        begin
+            if rising_edge(clk_33M33) then
+                clk_33M33_a <= not clk_33M33_a;
+            end if;
+        end process;
+
+        process(clk_33M33)
+        begin
+            if falling_edge(clk_33M33) then
+                clk_33M33_b <= not clk_33M33_b;
+            end if;
+        end process;
+
+        clk_33M33_c <= clk_33M33_a xor clk_33M33_b;
+
+        process(clk_40M00)
+        begin
+            if rising_edge(clk_40M00) then
+                clk_40M00_a <= not clk_40M00_a;
+            end if;
+        end process;
+
+        process(clk_40M00)
+        begin
+            if falling_edge(clk_40M00) then
+                clk_40M00_b <= not clk_40M00_b;
+            end if;
+        end process;
+
+        clk_40M00_c <= clk_40M00_a xor clk_40M00_b;
+
+
+        clk_video    <= clk_40M00_c when mode = "11" and IncludeVGA else
+                        clk_33M33_c when mode = "10" and IncludeVGA else
+                        clk_16M00_c;
+
+    end generate;
 
     hsync_start  <= std_logic_vector(to_unsigned(759, 11)) when mode = "11" and IncludeVGA else
                     std_logic_vector(to_unsigned(759, 11)) when mode = "10" and IncludeVGA else
@@ -440,8 +470,8 @@ begin
             -- Port A is the 6502 port
             clka  => clk_16M00,
             wea   => ram_we,
-            addra => addr(14 downto 0),
-            dina  => data_in,
+            addra => ram_addr(14 downto 0),
+            dina  => ram_data_in_sync,
             douta => ram_data,
             -- Port B is the VGA Port
             clkb  => clk_video,
@@ -450,7 +480,17 @@ begin
             dinb  => x"00",
             doutb => screen_data
             );
-        ram_we <= '1' when addr(15) = '0' and R_W_n = '0' and cpu_clken = '1' else '0';
+        -- Synchronize wea and dina
+        synchronize_wea_and_dina : process(clk_16M00)
+        begin
+          if rising_edge(clk_16M00) then
+            ram_we <= '0';
+            if addr(15) = '0' and R_W_n = '0' and cpu_clken = '1' then
+              ram_we <= '1';
+              ram_data_in_sync <= data_in;
+            end if;
+          end if;
+        end process;
     end generate;
 
     -- Just screen memory (0x3000-0x7fff) is dual port RAM in the ULA
@@ -486,7 +526,7 @@ begin
 
     -- ULA Reads + RAM Reads + KBD Reads
     data_out <= ram_data                  when addr(15) = '0' else
-                "0000" & (kbd xor "1111") when addr(15 downto 14) = "10" and page_enable = '1' and page(2 downto 1) = "00" else
+                "0000" & (kbd xor "1111") when kbd_access = '1' else
                 isr_data                  when addr(15 downto 8) = x"FE" and addr(3 downto 0) = x"0" else
                 data_shift                when addr(15 downto 8) = x"FE" and addr(3 downto 0) = x"4" else
                 crtc_do                   when crtc_enable = '1' and IncludeJafaMode7 else
@@ -495,7 +535,7 @@ begin
                 x"F1"; -- todo FIXEME
 
     data_en  <= '1'                       when addr(15) = '0' else
-                '1'                       when addr(15 downto 14) = "10" and page_enable = '1' and page(2 downto 1) = "00" else
+                '1'                       when kbd_access = '1' else
                 '1'                       when addr(15 downto 8) = x"FE" else
                 '1'                       when crtc_enable = '1' and IncludeJafaMode7 else
                 '1'                       when status_enable = '1' and IncludeJafaMode7 else
@@ -725,7 +765,7 @@ begin
                     if delayed_clear_reset = '1' then
                         power_on_reset <= '0';
                     end if;
-                    -- Detect control+caps 1...4 and change video format
+                    ---- Detect control+caps 1...4 and change video format
                     if (addr = x"9fff" and page_enable = '1' and page(2 downto 1) = "00") then
                         if (kbd(2 downto 1) = "00") then
                             ctrl_caps <= '1';
@@ -733,35 +773,35 @@ begin
                             ctrl_caps <= '0';
                         end if;
                     end if;
-                    -- Detect "1" being pressed
+                    -- Detect "1" being pressed: RGB non-interlaced (default)
                     if (addr = x"afff" and page_enable = '1' and page(2 downto 1) = "00" and ctrl_caps = '1' and kbd(0) = '0') then
                         mode <= "00";
                     end if;
-                    -- Detect "2" being pressed
+                    -- Detect "2" being pressed: RGB interlaced
                     if (addr = x"b7ff" and page_enable = '1' and page(2 downto 1) = "00" and ctrl_caps = '1' and kbd(0) = '0') then
                         mode <= "01";
                     end if;
-                    -- Detect "3" being pressed
+                    -- Detect "3" being pressed: SVGA @ 50 Hz (33 MHz clock)
                     if (addr = x"bbff" and page_enable = '1' and page(2 downto 1) = "00" and ctrl_caps = '1' and kbd(0) = '0' and IncludeVGA) then
                         mode <= "10";
                     end if;
-                    -- Detect "4" being pressed
+                    -- Detect "4" being pressed: SVGA @ 60 Hz (40 MHz clock)
                     if (addr = x"bdff" and page_enable = '1' and page(2 downto 1) = "00" and ctrl_caps = '1' and kbd(0) = '0' and IncludeVGA) then
                         mode <= "11";
                     end if;
-                    -- Detect "5" being pressed
+                    -- Detect "5" being pressed: 1MHz
                     if (addr = x"beff" and page_enable = '1' and page(2 downto 1) = "00" and ctrl_caps = '1' and kbd(0) = '0') then
                         turbo_out <= "00";
                     end if;
-                    -- Detect "6" being pressed
+                    -- Detect "6" being pressed: 2MHz with contention (default)
                     if (addr = x"bf7f" and page_enable = '1' and page(2 downto 1) = "00" and ctrl_caps = '1' and kbd(0) = '0') then
                         turbo_out <= "01";
                     end if;
-                    -- Detect "7" being pressed
+                    -- Detect "7" being pressed: 2MHz no contention
                     if (addr = x"bfbf" and page_enable = '1' and page(2 downto 1) = "00" and ctrl_caps = '1' and kbd(0) = '0') then
                         turbo_out <= "10";
                     end if;
-                    -- Detect "8" being pressed
+                    -- Detect "8" being pressed: 4MHz
                     if (addr = x"bfdf" and page_enable = '1' and page(2 downto 1) = "00" and ctrl_caps = '1' and kbd(0) = '0') then
                         turbo_out <= "11";
                     end if;
@@ -1105,6 +1145,7 @@ begin
                     blue_int  <= (others => palette(4)(7));
                 when others =>
                 end case;
+                --green_int <= (not ctrl_caps) & "111"; -- DEBUG make screen green
             end if;
             -- Vertical Sync, lasts 2.5 lines (160us)
             if (field = '0') then
@@ -1172,9 +1213,12 @@ begin
 -- clock enable generator
 --------------------------------------------------------
 
+    -- Keyboard accesses are delayed to debug the UEU
+    kbd_access <= '1' when addr(15 downto 14) = "10" and page_enable = '1' and page(2 downto 1) = "00" else '0';
+
     -- IO accesses always happen at 1MHz (no contention)
     -- This includes keyboard reads in paged ROM slots 8/9
-    io_access <= '1' when addr(15 downto 8) = x"FC" or addr(15 downto 8) = x"FD" or addr(15 downto 8) = x"FE" or (addr(15 downto 14) = "10" and page_enable = '1' and page(2 downto 1) = "00") else '0';
+    io_access <= '1' when addr(15 downto 8) = x"FC" or addr(15 downto 8) = x"FD" or addr(15 downto 8) = x"FE" or kbd_access = '1' else '0';
 
     -- ROM accesses always happen at 2MHz (no contention)
     rom_access <= addr(15) and not io_access;
@@ -1185,11 +1229,11 @@ begin
     clk_gen1 : process(clk_16M00, RST_n)
     begin
         if rising_edge(clk_16M00) then
-            -- clock state machine
+            -- clock state machine, used to
             if clken_counter(0) = '1' and clken_counter(1) = '1' then
                 case clk_state is
                 when "000" =>
-                    if rom_access = '1' then
+                    if rom_access = '1' and (kbd_access = '0' or kbd_delay = '0') then
                         -- 2MHz no contention
                         clk_state <= "001";
                     else
@@ -1200,7 +1244,7 @@ begin
                     -- CPU is clocked in this state
                     clk_state <= "010";
                 when "010" =>
-                    if rom_access = '1' then
+                    if rom_access = '1' and (kbd_access = '0' or kbd_delay = '0') then
                         -- 2MHz no contention
                         clk_state <= "011";
                     else
@@ -1248,6 +1292,26 @@ begin
             cpu_clken_4  <= clken_counter(0) and clken_counter(1);
             via1_clken_4 <= clken_counter(1);
             via4_clken_4 <= '1';
+
+            -- Generate cpu_clk
+            if cpu_clken = '1' then
+                if turbo = "11" then
+                    -- 4MHz clock; produce a 125 ns low pulse
+                    clk_counter <= "011";
+                else
+                    -- 1MHz or 2MHz clock; produce a 250 ns low pulse
+                    clk_counter <= "001";
+                end if;
+                cpu_clk <= '0';
+            elsif clk_counter(2) = '0' then
+                clk_counter <= clk_counter + 1;
+            else
+                -- Update addr for synchronous ram on rising clk_out edge
+                if cpu_clk = '0' then
+                    ram_addr <= addr;
+                end if;
+                cpu_clk <= '1';
+            end if;
         end if;
     end process;
 
@@ -1294,6 +1358,7 @@ begin
     end process;
 
     cpu_clken_out  <= cpu_clken;
+    cpu_clk_out    <= cpu_clk;
 
 --------------------------------------------------------
 -- Optional MMC Filing System
@@ -1400,12 +1465,22 @@ begin
             end if;
         end process;
 
-        process (clk_24M00)
-        begin
-            if rising_edge(clk_24M00) then
-                ttxt_clken <= not ttxt_clken;
-            end if;
-        end process;
+        using_ext_ttxt_clock : if UseTTxtClock generate
+            -- Use external 96 MHz clock / 12 MHz enable
+            ttxt_clock <= clk_ttxt;
+            ttxt_clken <= clken_ttxt_12M;
+        end generate;
+
+        using_24mhz_ttxt_clock : if not UseTTxtClock generate
+            -- Use 24 MHz clock and generate 12 MHz enable
+            ttxt_clock <= clk_24M00;
+            process (clk_24M00)
+            begin
+                if rising_edge(clk_24M00) then
+                    ttxt_clken <= not ttxt_clken;
+                end if;
+            end process;
+        end generate;
 
         crtc_enable <= '1' when addr(15 downto 0) = x"fc1c" or
                                 addr(15 downto 0) = x"fc1d" or
@@ -1446,7 +1521,7 @@ begin
 
         teletext : entity work.saa5050 port map (
             -- inputs
-            CLOCK    => clk_24M00,
+            CLOCK    => ttxt_clock,
             CLKEN    => ttxt_clken,
             nRESET   => RST_n,
             DI_CLOCK => clk_16M00,
@@ -1459,7 +1534,11 @@ begin
             -- outputs
             R        => ttxt_r_int,
             G        => ttxt_g_int,
-            B        => ttxt_b_int
+            B        => ttxt_b_int,
+            -- SAA5050 character ROM loading
+            char_rom_we   => char_rom_we,
+            char_rom_addr => char_rom_addr,
+            char_rom_data => char_rom_data
         );
 
         -- make the cursor visible
