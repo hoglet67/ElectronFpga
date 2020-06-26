@@ -1229,7 +1229,7 @@ begin
             if clken_counter(0) = '1' and clken_counter(1) = '1' then
                 case clk_state is
                 when "000" =>
-                    if rom_access = '1' and kbd_access = '0' then
+                    if rom_access = '1' then
                         -- 2MHz no contention
                         clk_state <= "001";
                     else
@@ -1240,7 +1240,7 @@ begin
                     -- CPU is clocked in this state
                     clk_state <= "010";
                 when "010" =>
-                    if rom_access = '1' and kbd_access = '0' then
+                    if rom_access = '1' then
                         -- 2MHz no contention
                         clk_state <= "011";
                     else
