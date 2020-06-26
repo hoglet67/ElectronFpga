@@ -266,7 +266,8 @@ architecture behavioral of ElectronULA is
   signal ROM_n_int      :   std_logic;
 
   -- clock enable generation
-  signal clken_counter     : std_logic_vector (3 downto 0);
+  signal clken_counter  : std_logic_vector (3 downto 0);
+  signal turbo_sync     : std_logic_vector (1 downto 0);
 
   signal contention     : std_logic;
   signal contention1    : std_logic;
@@ -1225,6 +1226,10 @@ begin
     clk_gen1 : process(clk_16M00, RST_n)
     begin
         if rising_edge(clk_16M00) then
+            -- Synchronize changes in the current speed with a 1MHz clock boundary
+            if clken_counter = "1111" then
+                turbo_sync <= turbo;
+            end if;
             -- clock state machine, used to
             if clken_counter(0) = '1' and clken_counter(1) = '1' then
                 case clk_state is
@@ -1311,12 +1316,12 @@ begin
         end if;
     end process;
 
-    clk_gen2 : process(turbo, clken_counter, clk_state,
+    clk_gen2 : process(turbo_sync, clken_counter, clk_state,
                        cpu_clken_1, cpu_clken_2, cpu_clken_4,
                        via1_clken_1, via1_clken_2, via1_clken_4,
                        via4_clken_1, via4_clken_2, via4_clken_4)
     begin
-        case (turbo) is
+        case (turbo_sync) is
             when "01" =>
                 -- 2Mhz Contention
                 cpu_clken <= '0';
