@@ -1210,7 +1210,7 @@ begin
 -- clock enable generator
 --------------------------------------------------------
 
-    -- Keyboard accesses are delayed to debug the UEU
+    -- Keyboard accesses always need to happen at 1MHz
     kbd_access <= '1' when addr(15 downto 14) = "10" and page_enable = '1' and page(2 downto 1) = "00" else '0';
 
     -- IO accesses always happen at 1MHz (no contention)
