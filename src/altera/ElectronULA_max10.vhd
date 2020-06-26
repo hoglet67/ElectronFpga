@@ -35,7 +35,9 @@ entity ElectronULA_max10 is
         -- Set this as true to include JAFA Mode 7 support
         IncludeMode7  : boolean := true;
         -- Set this as true to include Mega Games Cartridge emulation
-        IncludeMGC    : boolean := true
+        IncludeMGC    : boolean := true;
+        -- Set this as true to include Plus1 emulation
+        IncludePlus1  : boolean := true
     );
     port (
         -- 16 MHz clock from Electron
@@ -736,11 +738,10 @@ begin
     -- D5 = joystick fire button 1
     -- D6 = analog chip select
     -- D7 = parallel port status
-    plus1_status_selected <= '1' when addr = x"FC72" else '0';
+     plus1_status_selected <= '1' when IncludePlus1 and addr = x"FC72" else '0';
 
     -- Plus 1 analog data register
-    -- plus1_analog_selected <= '1' when addr = x"FC70" else '0';
-
+    -- plus1_analog_selected <= '1' when IncludePlus1 and addr = x"FC70" else '0';
 
 --------------------------------------------------------
 -- Internal CPU (optional)
@@ -1175,7 +1176,7 @@ begin
         end if;
     end process;
     clk_out <= clk_out_int;
-    kbd_access <= '1' when addr(15 downto 14) = "10" and rom_latch = 8 else '0';
+    kbd_access <= '1' when addr(15 downto 14) = "10" and (rom_latch = 8 or rom_latch = 9) else '0';
 
     generate_start_read_write_signals : process(clock_96)
     begin

@@ -276,9 +276,6 @@ architecture behavioral of ElectronULA is
   signal ram_access     : std_logic; -- 1MHz/2Mhz/Stopped
 
   signal kbd_access     : std_logic;
-  -- set to 1 to read keyboard at 1MHz, if there's too much capacitance on the
-  -- buffer inputs.  (seems unnecessary with extra pullup on kbd* lines)
-  signal kbd_delay      : std_logic := '1';
 
   signal clk_state      : std_logic_vector(2 downto 0);
   signal cpu_clken      : std_logic;
@@ -1233,7 +1230,7 @@ begin
             if clken_counter(0) = '1' and clken_counter(1) = '1' then
                 case clk_state is
                 when "000" =>
-                    if rom_access = '1' and (kbd_access = '0' or kbd_delay = '0') then
+                    if rom_access = '1' and kbd_access = '0' then
                         -- 2MHz no contention
                         clk_state <= "001";
                     else
@@ -1244,7 +1241,7 @@ begin
                     -- CPU is clocked in this state
                     clk_state <= "010";
                 when "010" =>
-                    if rom_access = '1' and (kbd_access = '0' or kbd_delay = '0') then
+                    if rom_access = '1' and kbd_access = '0' then
                         -- 2MHz no contention
                         clk_state <= "011";
                     else
