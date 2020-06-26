@@ -1213,9 +1213,28 @@ begin
     -- Keyboard accesses always need to happen at 1MHz
     kbd_access <= '1' when addr(15 downto 14) = "10" and page_enable = '1' and page(2 downto 1) = "00" else '0';
 
+    -- TODO: The final term here causes ROM 13 (MMFS) in the UEU to be
+    -- accessed at 1MHz. This is a workaround for a latent bug that
+    -- surfaces when Myelin's fork was merged back upsteam. In a real
+    -- Electron, all pages ROMS were accessed at 2MHz. There has been
+    -- a long-standing bug in ElectronULA (when turbo=01) that only
+    -- the Basic ROM was accessed at 2MHz.  All other ROMs, including
+    -- MMFS, where accessed at 1MHz. This bug was fixed upstream in
+    -- commit 77489cf6f, and that works fine in ElectronFPGA (on the
+    -- Duo). However, when Myelins's fork was merged back upstream,
+    -- MMFS on the UEU would no longer catalog disks (all disks looked
+    -- blank).  I really can't imaging what's wrong here, because the
+    -- SD Card implementation is identical between ElectronFPGA and
+    -- UEU, as is the clocking of the internal 6502 core. This needs
+    -- further investion, but as it only affects the UEU this is
+    -- difficult (no access to the ICE).
+
     -- IO accesses always happen at 1MHz (no contention)
     -- This includes keyboard reads in paged ROM slots 8/9
-    io_access <= '1' when addr(15 downto 8) = x"FC" or addr(15 downto 8) = x"FD" or addr(15 downto 8) = x"FE" or kbd_access = '1' else '0';
+    io_access <= '1' when addr(15 downto 8) = x"FC" or addr(15 downto 8) = x"FD" or addr(15 downto 8) = x"FE" else
+                 '1' when kbd_access = '1'                                                                    else
+                 '1' when addr(15 downto 14) = "10" and page_enable = '1' and page = "101" and UseClockMux    else
+                 '0';
 
     -- ROM accesses always happen at 2MHz (no contention)
     rom_access <= addr(15) and not io_access;
