@@ -86,7 +86,7 @@ entity ElectronULA is
         cpu_clken_out  : out std_logic;
         cpu_clk_out    : out std_logic;
         turbo          : in std_logic_vector(1 downto 0);
-        turbo_out      : out std_logic_vector(1 downto 0);
+        turbo_out      : out std_logic_vector(1 downto 0) := "01";
 
         -- SAA5050 character ROM loading
         char_rom_we   : in std_logic := '0';
@@ -581,7 +581,6 @@ begin
                ctrl_caps       <= '0';
                cindat          <= '0';
                cintone         <= '0';
-               turbo_out       <= "01";
 
             else
                 -- Detect Jumpers being changed
