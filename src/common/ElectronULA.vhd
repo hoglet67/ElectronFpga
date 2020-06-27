@@ -266,31 +266,22 @@ architecture behavioral of ElectronULA is
   signal ROM_n_int      :   std_logic;
 
   -- clock enable generation
-  signal clken_counter  : std_logic_vector (3 downto 0);
+  signal clken_counter  : std_logic_vector (3 downto 0) := (others => '0');
   signal turbo_sync     : std_logic_vector (1 downto 0);
 
   signal contention     : std_logic;
   signal contention1    : std_logic;
   signal contention2    : std_logic;
   signal io_access      : std_logic; -- always at 1MHz, no contention
-  signal rom_access     : std_logic; -- always at 2mhz, no contention
-  signal ram_access     : std_logic; -- 1MHz/2Mhz/Stopped
+  signal rom_access     : std_logic; -- always at 2MHz, no contention
+  signal ram_access     : std_logic; -- 1MHz/2MHz/Stopped
 
   signal kbd_access     : std_logic;
 
-  signal clk_state      : std_logic_vector(2 downto 0);
+  signal clk_stopped    : std_logic := '0';
   signal cpu_clken      : std_logic;
-  signal cpu_clken_1    : std_logic;
-  signal cpu_clken_2    : std_logic;
-  signal cpu_clken_4    : std_logic;
   signal via1_clken     : std_logic;
-  signal via1_clken_1   : std_logic;
-  signal via1_clken_2   : std_logic;
-  signal via1_clken_4   : std_logic;
-  signal via4_clken   : std_logic;
-  signal via4_clken_1   : std_logic;
-  signal via4_clken_2   : std_logic;
-  signal via4_clken_4   : std_logic;
+  signal via4_clken     : std_logic;
   signal cpu_clk        : std_logic := '1';
   signal clk_counter    : std_logic_vector(2 downto 0) := (others => '0');
 
@@ -1223,80 +1214,67 @@ begin
     -- RAM accesses always happen at 1MHz (with contention)
     ram_access <= not addr(15);
 
-    clk_gen1 : process(clk_16M00, RST_n)
+    clk_gen1 : process(clk_16M00)
     begin
         if rising_edge(clk_16M00) then
             -- Synchronize changes in the current speed with a 1MHz clock boundary
             if clken_counter = "1111" then
                 turbo_sync <= turbo;
             end if;
-            -- clock state machine, used to
-            if clken_counter(0) = '1' and clken_counter(1) = '1' then
-                case clk_state is
-                when "000" =>
-                    if rom_access = '1' then
-                        -- 2MHz no contention
-                        clk_state <= "001";
-                    else
-                        -- 1MHz, possible contention
-                        clk_state <= "101";
-                    end if;
-                when "001" =>
-                    -- CPU is clocked in this state
-                    clk_state <= "010";
-                when "010" =>
-                    if rom_access = '1' then
-                        -- 2MHz no contention
-                        clk_state <= "011";
-                    else
-                        -- 1MHz, possible contention
-                        clk_state <= "111";
-                    end if;
-                when "011" =>
-                    -- CPU is clocked in this state
-                    clk_state <= "000";
-                when "100" =>
-                    clk_state <= "101";
-                when "101" =>
-                    clk_state <= "110";
-                when "110" =>
-                    if ram_access = '1' and contention2 = '1' then
-                        clk_state <= "111";
-                    else
-                        clk_state <= "011";
-                    end if;
-                when "111" =>
-                    clk_state <= "100";
-                when others => null;
-                end case;
-            end if;
-            -- clken counter
-            clken_counter <= clken_counter + 1;
+
             -- Synchronize contention signal
             contention1 <= contention;
             contention2 <= contention1;
-            -- 1MHz
-            -- cpu_clken active on cycle 0
-            -- address/data changes on cycle 1
-            cpu_clken_1  <= clken_counter(0) and clken_counter(1) and clken_counter(2) and clken_counter(3);
-            via1_clken_1 <= clken_counter(3);
-            via4_clken_1 <= clken_counter(0) and clken_counter(1);
-            -- 2MHz
-            -- cpu_clken active on cycle 0, 8
-            -- address/data changes on cycle 1, 9
-            cpu_clken_2  <= clken_counter(0) and clken_counter(1) and clken_counter(2);
-            via1_clken_2 <= clken_counter(2);
-            via4_clken_2 <= clken_counter(0);
-            -- 4MHz - no contention
-            -- cpu_clken active on cycle 0, 4, 8, 12
-            -- address/data changes on cycle 1, 5, 9, 13
-            cpu_clken_4  <= clken_counter(0) and clken_counter(1);
-            via1_clken_4 <= clken_counter(1);
-            via4_clken_4 <= '1';
+
+            -- clken counter
+            clken_counter <= clken_counter + 1;
+
+            -- Logic to switch between 1MHz and 2MHz and stopped states
+            if clk_stopped = '0' then
+                if clken_counter(2 downto 0) = "011" and rom_access = '0' then
+                    clk_stopped <= '1';
+                end if;
+            else
+                if clken_counter(3 downto 0) = "1011" and (ram_access = '0' or contention2 = '0') then
+                    clk_stopped <= '0';
+                end if;
+            end if;
+
+            case (turbo_sync) is
+                when "00" =>
+                    -- 1MHz No Contention
+                    -- cpu_clken active on cycle 0
+                    -- address/data changes on cycle 1
+                    cpu_clken  <= clken_counter(3) and clken_counter(2) and clken_counter(1) and     clken_counter(0);
+                    via1_clken <= clken_counter(3) and clken_counter(2) and clken_counter(1) and not clken_counter(0);
+                    via4_clken <=                                           clken_counter(1) and not clken_counter(0);
+                when "01" =>
+                    -- 2MHz/1MHz with Contention
+                    -- cpu_clken active on cycle 0 and sometimes cycle 8
+                    -- address/data changes on cycle 1 and sometimes cycle 9
+                    cpu_clken  <= not clk_stopped  and clken_counter(2) and clken_counter(1) and     clken_counter(0);
+                    via1_clken <= clken_counter(3) and clken_counter(2) and clken_counter(1) and not clken_counter(0);
+                    via4_clken <=                                           clken_counter(1) and not clken_counter(0);
+                when "10" =>
+                    -- 2MHz No Contention
+                    -- cpu_clken active on cycle 0, 8
+                    -- address/data changes on cycle 1, 9
+                    cpu_clken  <=                      clken_counter(2) and clken_counter(1) and     clken_counter(0);
+                    via1_clken <=                      clken_counter(2) and clken_counter(1) and not clken_counter(0);
+                    via4_clken <=                                                                not clken_counter(0);
+                when "11" =>
+                    -- 4MHz No contention
+                    -- cpu_clken active on cycle 0, 4, 8, 12
+                    -- address/data changes on cycle 1, 5, 9, 13
+                    cpu_clken  <=                                           clken_counter(1) and     clken_counter(0);
+                    via1_clken <=                                           clken_counter(1) and not clken_counter(0);
+                    via4_clken <=                                                                                 '1';
+                when others =>
+            end case;
 
             -- Generate cpu_clk
             if cpu_clken = '1' then
-                if turbo = "11" then
+                if turbo_sync = "11" then
                     -- 4MHz clock; produce a 125 ns low pulse
                     clk_counter <= "011";
                 else
@@ -1314,48 +1292,6 @@ begin
                 cpu_clk <= '1';
             end if;
         end if;
-    end process;
-
-    clk_gen2 : process(turbo_sync, clken_counter, clk_state,
-                       cpu_clken_1, cpu_clken_2, cpu_clken_4,
-                       via1_clken_1, via1_clken_2, via1_clken_4,
-                       via4_clken_1, via4_clken_2, via4_clken_4)
-    begin
-        case (turbo_sync) is
-            when "01" =>
-                -- 2Mhz Contention
-                cpu_clken <= '0';
-                via1_clken <= '0';
-                via4_clken <= '0';
-                if clken_counter(0) = '1' and clken_counter(1) = '1' then
-                    -- 1MHz/2MHz/Stopped
-                    if clk_state = "001" or clk_state = "011" then
-                        cpu_clken <= '1';
-                    end if;
-                    -- 1MHz fixed
-                    --if clk_state = "011" or clk_state = "111" then
-                    --    via1_clken <= '1';
-                    --end if;
-                    via1_clken <= clk_state(1);
-                    -- 4MHz fixed
-                    via4_clken <= '1';
-                end if;
-            when "10" =>
-                -- 2Mhz No Contention
-                cpu_clken  <= cpu_clken_2;
-                via1_clken <= via1_clken_2;
-                via4_clken <= via4_clken_2;
-            when "11" =>
-                -- 4MHz No contention
-                cpu_clken  <= cpu_clken_4;
-                via1_clken <= via1_clken_4;
-                via4_clken <= via4_clken_4;
-            when others =>
-                -- 1MHz No Contention
-                cpu_clken  <= cpu_clken_1;
-                via1_clken <= via1_clken_1;
-                via4_clken <= via4_clken_1;
-        end case;
     end process;
 
     cpu_clken_out  <= cpu_clken;
