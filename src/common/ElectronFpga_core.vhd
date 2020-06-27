@@ -209,7 +209,9 @@ begin
         IncludeMMC       => true,
         Include32KRAM    => false,
         IncludeVGA       => true,
-        IncludeJafaMode7 => IncludeJafaMode7
+        IncludeJafaMode7 => IncludeJafaMode7,
+        LimitROMSpeed    => false,
+        LimitIOSpeed     => false
     )
     port map (
         clk_16M00 => clk_16M00,

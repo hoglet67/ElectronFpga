@@ -1,5 +1,5 @@
 --------------------------------------------------------------------------------
--- Copyright (c) 2015 David Banks
+-- Copyright (c) 2020 David Banks
 --------------------------------------------------------------------------------
 --   ____  ____
 --  /   /\/   /
@@ -24,6 +24,8 @@ entity ElectronULA is
         Include32KRAM    : boolean := true;
         IncludeVGA       : boolean := true;
         IncludeJafaMode7 : boolean := false;
+        LimitROMSpeed    : boolean := true;   -- true to limit ROM speed to 2MHz
+        LimitIOSpeed     : boolean := true;   -- true to limit IO speed to 1MHz
         UseClockMux      : boolean := false;  -- false for Xilinx, true for Altera
         UseTTxtClock     : boolean := false;  -- true to use clk_ttxt/clken_ttxt_12M, false to use clk_24M00
         IncludeTTxtROM   : boolean := true    -- false if the SAA5050 character ROM needs loading
@@ -278,7 +280,8 @@ architecture behavioral of ElectronULA is
 
   signal kbd_access     : std_logic;
 
-  signal clk_stopped    : std_logic := '0';
+  signal clk_stopped    : std_logic_vector(1 downto 0) := "00";
+
   signal cpu_clken      : std_logic;
   signal via1_clken     : std_logic;
   signal via4_clken     : std_logic;
@@ -1229,48 +1232,111 @@ begin
             -- clken counter
             clken_counter <= clken_counter + 1;
 
-            -- Logic to switch between 1MHz and 2MHz and stopped states
-            if clk_stopped = '0' then
-                if clken_counter(2 downto 0) = "011" and rom_access = '0' then
-                    clk_stopped <= '1';
-                end if;
-            else
-                if clken_counter(3 downto 0) = "1011" and (ram_access = '0' or contention2 = '0') then
-                    clk_stopped <= '0';
-                end if;
-            end if;
-
+            -- Logic to supress cpu cycles
             case (turbo_sync) is
                 when "00" =>
                     -- 1MHz No Contention
+                    --    RAM accesses 1MHz
+                    --    ROM accesses 1MHz
+                    --     IO accesses 1MHz
                     -- cpu_clken active on cycle 0
                     -- address/data changes on cycle 1
-                    cpu_clken  <= clken_counter(3) and clken_counter(2) and clken_counter(1) and     clken_counter(0);
-                    via1_clken <= clken_counter(3) and clken_counter(2) and clken_counter(1) and not clken_counter(0);
-                    via4_clken <=                                           clken_counter(1) and not clken_counter(0);
+                    if clken_counter(3 downto 0) = "1111" then
+                        cpu_clken <= '1';
+                    else
+                        cpu_clken <= '0';
+                    end if;
+                    -- No stopping of the clock in this mode
+                    clk_stopped <= "00";
+
                 when "01" =>
-                    -- 2MHz/1MHz with Contention
-                    -- cpu_clken active on cycle 0 and sometimes cycle 8
-                    -- address/data changes on cycle 1 and sometimes cycle 9
-                    cpu_clken  <= not clk_stopped  and clken_counter(2) and clken_counter(1) and     clken_counter(0);
-                    via1_clken <= clken_counter(3) and clken_counter(2) and clken_counter(1) and not clken_counter(0);
-                    via4_clken <=                                           clken_counter(1) and not clken_counter(0);
-                when "10" =>
-                    -- 2MHz No Contention
+                    -- 2MHz/1MHz with Contention (match original Electron)
+                    --    RAM accesses 1MHz + contention
+                    --    ROM accesses 2MHz
+                    --     IO accesses 1MHz
                     -- cpu_clken active on cycle 0, 8
                     -- address/data changes on cycle 1, 9
-                    cpu_clken  <=                      clken_counter(2) and clken_counter(1) and     clken_counter(0);
-                    via1_clken <=                      clken_counter(2) and clken_counter(1) and not clken_counter(0);
-                    via4_clken <=                                                                not clken_counter(0);
+                    if clken_counter(2 downto 0) = "111" and clk_stopped = 0 then
+                        cpu_clken <= '1';
+                    else
+                        cpu_clken <= '0';
+                    end if;
+                    -- Stop the clock on RAM or IO accesses, in the same way the ULA does
+                    if clk_stopped = 0 and clken_counter(2 downto 0) = "110" and (ram_access = '1' or io_access = '1') then
+                        clk_stopped <= "01";
+                    elsif clken_counter(3 downto 0) = "1110" and not (ram_access = '1' and contention2 = '1') then
+                        clk_stopped <= "00";
+                    end if;
+
+                when "10" =>
+                    -- 2MHz No Contention
+                    --    RAM accesses 2MHz
+                    --    ROM accesses 2MHz
+                    --     IO accesses 2MHz (or 1MHz if LimitIOSpeed true)
+                    -- cpu_clken active on cycle 0, 8
+                    -- address/data changes on cycle 1, 9
+                    if clken_counter(2 downto 0) = "111" and clk_stopped = 0 then
+                        cpu_clken <= '1';
+                    else
+                        cpu_clken <= '0';
+                    end if;
+                    -- Stop the clock on IO accesses as required
+                    if LimitIOSpeed and clk_stopped = 0 and clken_counter(2 downto 0) = "110" and io_access = '1' then
+                        clk_stopped <= "01";
+                    elsif clken_counter(3 downto 0) = "1110" then
+                        clk_stopped <= "00";
+                    end if;
                 when "11" =>
                     -- 4MHz No contention
+                    --    RAM accesses 4MHz
+                    --    ROM accesses 4MHz (or 2MHz if LimitROMSpeed true)
+                    --     IO accesses 4MHz (or 1MHz if LimitIOSpeed true)
                     -- cpu_clken active on cycle 0, 4, 8, 12
                     -- address/data changes on cycle 1, 5, 9, 13
-                    cpu_clken  <=                                           clken_counter(1) and     clken_counter(0);
-                    via1_clken <=                                           clken_counter(1) and not clken_counter(0);
-                    via4_clken <=                                                                                 '1';
+                    if clken_counter(1 downto 0) = "11" and clk_stopped = 0 then
+                        cpu_clken <= '1';
+                    else
+                        cpu_clken <= '0';
+                    end if;
+                    -- Stop the clock on ROM or IO accesses as required
+                    if clk_stopped = 0 then
+                        if LimitROMSpeed and rom_access = '1' and clken_counter(1 downto 0) = "10" then
+                            clk_stopped <= "01";
+                        elsif LimitIOSpeed and io_access = '1' and clken_counter(1 downto 0) = "10" then
+                            if clken_counter(3 downto 2) = "00" or clken_counter(3 downto 2) = "11" then
+                                clk_stopped <= "01";
+                            else
+                                clk_stopped <= "10";
+                            end if;
+                        end if;
+                    else
+                        if rom_access = '1' and clken_counter(2 downto 0) = "110" then
+                            clk_stopped <= "00";
+                        elsif io_access = '1' and clken_counter(3 downto 0) = "1110" then
+                            if clk_stopped = "10" then
+                                clk_stopped <= "01";
+                            else
+                                clk_stopped <= "00";
+                            end if;
+                        end if;
+                    end if;
                 when others =>
             end case;
+
+            -- Generate clock enables for VIA one cycle before cpu_clken
+            if turbo_sync(1) = '0' or LimitIOSpeed then
+                -- 1MHz
+                via1_clken <= clken_counter(3) and clken_counter(2) and clken_counter(1) and not clken_counter(0);
+                via4_clken <=                                           clken_counter(1) and not clken_counter(0);
+            elsif turbo_sync(0) = '0' then
+                -- 2MHz
+                via1_clken <= clken_counter(2) and clken_counter(1) and not clken_counter(0);
+                via4_clken <=                                           not clken_counter(0);
+            else
+                -- 4MHz
+                via1_clken <= clken_counter(1) and not clken_counter(0);
+                via4_clken <= '1';
+            end if;
 
             -- Generate cpu_clk
             if cpu_clken = '1' then
