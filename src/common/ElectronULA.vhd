@@ -104,8 +104,6 @@ architecture behavioral of ElectronULA is
   signal hsync_int_last : std_logic;
   signal vsync_int      : std_logic;
 
-  signal ram_addr_wr    : std_logic_vector(15 downto 0);
-  signal ram_addr       : std_logic_vector(15 downto 0);
   signal ram_we         : std_logic;
   signal ram_data       : std_logic_vector(7 downto 0);
 
@@ -118,8 +116,6 @@ architecture behavioral of ElectronULA is
   signal general_counter: std_logic_vector(15 downto 0);
   signal sound_bit      : std_logic;
   signal isr_data       : std_logic_vector(7 downto 0);
-
-  signal ram_data_in_sync : std_logic_vector(7 downto 0);
 
   -- ULA Registers
   signal isr            : std_logic_vector(6 downto 2);
@@ -463,8 +459,8 @@ begin
             -- Port A is the 6502 port
             clka  => clk_16M00,
             wea   => ram_we,
-            addra => ram_addr(14 downto 0),
-            dina  => ram_data_in_sync,
+            addra => addr(14 downto 0),
+            dina  => data_in,
             douta => ram_data,
             -- Port B is the VGA Port
             clkb  => clk_video,
@@ -473,20 +469,7 @@ begin
             dinb  => x"00",
             doutb => screen_data
             );
-        -- Synchronize wea and dina
-        synchronize_wea_and_dina : process(clk_16M00)
-        begin
-          if rising_edge(clk_16M00) then
-            ram_we <= '0';
-            if addr(15) = '0' and R_W_n = '0' and cpu_clken = '1' then
-              ram_we <= '1';
-              ram_data_in_sync <= data_in;
-            end if;
-          end if;
-        end process;
-        -- For reads, we need to minimize latency (esp with an external 4MHz CPU)
-        -- For writes, we use the address captured on the rising edge of clk
-        ram_addr <= ram_addr_wr when ram_we = '1' else addr;
+        ram_we <= '1' when addr(15) = '0' and R_W_n = '0' and cpu_clken = '1' else '0';
     end generate;
 
     -- Just screen memory (0x3000-0x7fff) is dual port RAM in the ULA
@@ -1359,10 +1342,6 @@ begin
             elsif clk_counter(2) = '0' then
                 clk_counter <= clk_counter + 1;
             else
-                -- Update addr for synchronous ram on rising clk_out edge
-                if cpu_clk = '0' then
-                    ram_addr_wr <= addr;
-                end if;
                 cpu_clk <= '1';
             end if;
         end if;
