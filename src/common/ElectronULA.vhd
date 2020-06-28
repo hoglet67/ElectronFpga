@@ -104,6 +104,7 @@ architecture behavioral of ElectronULA is
   signal hsync_int_last : std_logic;
   signal vsync_int      : std_logic;
 
+  signal ram_addr_wr    : std_logic_vector(15 downto 0);
   signal ram_addr       : std_logic_vector(15 downto 0);
   signal ram_we         : std_logic;
   signal ram_data       : std_logic_vector(7 downto 0);
@@ -483,6 +484,9 @@ begin
             end if;
           end if;
         end process;
+        -- For reads, we need to minimize latency (esp with an external 4MHz CPU)
+        -- For writes, we use the address captured on the rising edge of clk
+        ram_addr <= ram_addr_wr when ram_we = '1' else addr;
     end generate;
 
     -- Just screen memory (0x3000-0x7fff) is dual port RAM in the ULA
@@ -1357,7 +1361,7 @@ begin
             else
                 -- Update addr for synchronous ram on rising clk_out edge
                 if cpu_clk = '0' then
-                    ram_addr <= addr;
+                    ram_addr_wr <= addr;
                 end if;
                 cpu_clk <= '1';
             end if;
