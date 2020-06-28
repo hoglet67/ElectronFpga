@@ -1310,13 +1310,17 @@ begin
                             end if;
                         end if;
                     else
-                        if rom_access = '1' and clken_counter(2 downto 0) = "110" then
-                            clk_stopped <= "00";
-                        elsif io_access = '1' and clken_counter(3 downto 0) = "1110" then
-                            if clk_stopped = "10" then
-                                clk_stopped <= "01";
-                            else
+                        if rom_access = '1' then
+                            if clken_counter(2 downto 0) = "110" then
                                 clk_stopped <= "00";
+                            end if;
+                        else
+                            if clken_counter(3 downto 0) = "1110" then
+                                if clk_stopped(1) = '1' then
+                                    clk_stopped <= "01";
+                                else
+                                    clk_stopped <= "00";
+                                end if;
                             end if;
                         end if;
                     end if;
