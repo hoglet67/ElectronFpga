@@ -1712,17 +1712,32 @@ mcu = myelin_kicad_pcb.Component(
         #                                           MOSI=3 SCK=1 SS=2 / MOSI=0 SCK=3 SS=1
 
         # connecting PA04/05/08/09/14/15 through to the FPGA gives us:
-        # - one full SPI connection (sercom0.*) + one UART (sercom2.{0, 1})
+        # - one full SPI connection (sercom0.*) + one UART (sercom1.{2, 3})
         # - three UARTs (sercom0.{0, 1}, sercom1.{2, 3}, sercom2.{0, 1})
 
-        # connecting PA14/15 up to some VREF pins is also an option -- they
-        # should still work fine up to 20MHz or so.
+        # Note that ATSAMD11C14A only has two SERCOMs, so we don't get
+        # sercom2.  v1 is laid out with the expectation that we can use
+        # SERCOM2, so some signal names are changing in v2.  This won't
+        # actually change any traces, but the MCU and FPGA pin defs will
+        # change, so it needs to be done carefully.
 
-        Pin( 1, "PA05",        "mcu_SCK"),       # sercom0.1/0.3: 0.1 SPI
-        Pin( 2, "PA08",        "mcu_SS"),        # sercom0.2/1.2: 0.2 SPI or 1.2 TXD
-        Pin( 3, "PA09",        "mcu_MISO"),      # sercom0.3/1.3: 0.3 SPI or 1.3 RXD
-        Pin( 4, "PA14",        "mcu_debug_TXD"), # sercom0.0/2.0: 2.0 TXD
-        Pin( 5, "PA15",        "mcu_debug_RXD"), # sercom0.1/2.1: 2.1 RXD
+        #         Signal change from v1 -> v2
+        # PA04 = sercom0.2/0.0 MOSI 0.0 -> 0.2 MOSI
+        # PA05 = sercom0.1/0.3  SCK 0.1 -> 0.3 SCK
+        # PA08 = sercom0.2/1.2   SS 0.2 -> 1.2 TXD
+        # PA09 = sercom0.3/1.3 MISO 0.3 -> 1.3 RXD
+        # PA14 = sercom0.0      TXD x.x -> 0.0 MISO
+        # PA15 = sercom0.1      RXD x.x -> 0.1 SS
+
+        # Note that this switches the direction around for PA14 and PA15;
+        # this will cause clashes on the new MISO and SS pins at first.
+        # TODO(v2) figure out a way to not cause a clash here.
+
+        Pin( 1, "PA05",        "mcu_SCK"),       # sercom0.1/0.3
+        Pin( 2, "PA08",        "mcu_SS"),        # sercom0.2/1.2 TODO(v2) change to 1.2 TXD
+        Pin( 3, "PA09",        "mcu_MISO"),      # sercom0.3/1.3 TODO(v2) change to 1.3 RXD
+        Pin( 4, "PA14",        "mcu_debug_TXD"), # sercom0.0 TODO(v2) change to 0.0 MISO
+        Pin( 5, "PA15",        "mcu_debug_RXD"), # sercom0.1 TODO(v2) change to 0.1 SS
         Pin( 6, "PA28_nRESET", "mcu_RESET"),
         Pin( 7, "PA30_SWCLK",  "mcu_SWCLK"),
         Pin( 8, "PA31_SWDIO",  "mcu_SWDIO"),
@@ -1731,7 +1746,7 @@ mcu = myelin_kicad_pcb.Component(
         Pin(11, "GND",         "GND"),
         Pin(12, "VDD",         "3V3"),
         Pin(13, "PA02",        "mcu_PA02"),      # no sercom
-        Pin(14, "PA04",        "mcu_MOSI"),      # sercom0.2/0.0: 0.0 SPI
+        Pin(14, "PA04",        "mcu_MOSI"),      # sercom0.2/0.0
     ],
 )
 mcu_cap = myelin_kicad_pcb.C0805("100n", "GND", "3V3", ref="DC?")
