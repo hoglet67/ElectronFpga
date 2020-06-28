@@ -702,6 +702,7 @@ begin
         InternalCPU                              -- Input to/output from internal CPU
         or boundary_scan = '1'                   -- Input to boundary scan
         or bus_write_from_internal_device = '1'  -- Something local wants to write to the bus
+        or RnW = '0'                             -- External CPU is writing
     ) else '1';
 
     -- DIR=1 buffers from Elk to FPGA, DIR=0 buffers from FPGA to Elk
