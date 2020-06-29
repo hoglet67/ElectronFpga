@@ -1215,13 +1215,13 @@ begin
                     end if;
                     sdram_refresh_counter <= (others => '0');
                 end if;
-            elsif cpu_clken_96_sync(2) = '1' and cpu_clken_96_sync(1) = '0' then
-                -- falling edge of cpu_clken
+            elsif cpu_clken_96_sync(2) = '0' and cpu_clken_96_sync(1) = '1' then
+                -- DMB: rising edge of cpu_clken_sync_16 is co-incident with PHI0 low
                 if RnW = '0' then
                     start_write_96 <= '1';
                 end if;
                 wait_for_ads_counter <= "00000";
-            elsif wait_for_ads_counter /= 18 then
+            elsif wait_for_ads_counter /= 15 then
                 -- A/RnW/D are valid for write at the start of the PHI0 low cycle (from the previous cpu cycle)
                 -- A/RnW are valid for read at the end of the PHI0 low cycle (for the current cycle).
                 -- For 2MHz parts -- R6502A: tRWS = tADS = 140 ns; UM6502B/BE: tRWS = tADS = 100ns
@@ -1229,7 +1229,9 @@ begin
                 -- For 14MHz parts -- W65C02S6TPG-14: tADS = 30 ns
                 -- These are referenced to PHI2, which can be delayed up to 30ns from PHI0.
                 -- So we really want a delay of about 170 ns (~17 * clock_96) from clk_out low to start_read_96 high.
-                if wait_for_ads_counter = 17 and RnW = '1' then
+                -- DMB: three 96MHz cycles are lost in the cpu_clken_96_sync
+                -- chain, so reduce from 17 downto 14
+                if wait_for_ads_counter = 14 and RnW = '1' then
                     start_read_96 <= '1';
                 end if;
                 wait_for_ads_counter <= wait_for_ads_counter + 1;
