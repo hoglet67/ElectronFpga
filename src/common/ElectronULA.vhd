@@ -951,9 +951,9 @@ begin
             end if;
 
             -- Char_row counts 0..7 or 0..9 depending on the mode.
-            -- It incremented on the falling edge of hsync
+            -- It incremented on the trailing edge of hsync
             hsync_int_last <= hsync_int;
-            if hsync_int = '0' and hsync_int_last = '1'  then
+            if hsync_int = '1' and hsync_int_last = '0'  then
                 if v_count = v_total then
                     char_row <= (others => '0');
                 elsif v_count(0) = '1' or mode(1) = '0' then
@@ -963,6 +963,12 @@ begin
                         char_row <= char_row + 1;
                     end if;
                 end if;
+            elsif mode_text = '0' then
+                -- From the ULA schematics sheet 7, VA3 is a T-type Latch
+                -- with an additional reset input connected to GMODE, so it's
+                -- immediately forced to zero in a graphics mode. This is
+                -- needed for 0xC0DE's Vertical Rupture demo to work.
+                char_row(3) <= '0';
             end if;
 
             -- Determine last line of a row
@@ -1583,6 +1589,5 @@ begin
         -- disable mode 7
         mode7_enable <= '0';
     end generate;
-
 
 end behavioral;
