@@ -990,7 +990,7 @@ begin
 
             -- At the start of hsync,  update the row_addr from byte_addr which
             -- gets to the start of the next block
-            if hsync_int = '0' and hsync_int_last = '1' and last_line = '1' then
+            if hsync_int = '0' and last_line = '1' then
                 row_addr := byte_addr(14 downto 6);
             end if;
 
