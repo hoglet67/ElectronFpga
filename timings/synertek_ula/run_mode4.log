@@ -1,0 +1,51 @@
+Odd VSync 404
+irq at 1429 line -1
+irq at 75692 line -1
+irq at 236219 line -1
+Even VSync 262060
+irq at 395692 line 99
+irq at 555707 line 256
+Odd VSync 582059
+irq at 101360 line 99
+irq at 261887 line 256
+Even VSync 287728
+irq at 421360 line 99
+irq at 581375 line 256
+Odd VSync 607727
+frame length: 640000 (625 lines)
+
+irq at 101360 line 99
+irq at 261887 line 256
+Even VSync 287728
+irq at 421360 line 99
+irq at 581375 line 256
+Odd VSync 607727
+frame length: 640000 (625 lines)
+
+irq at 101360 line 99
+irq at 261887 line 256
+Even VSync 287727
+irq at 421360 line 99
+irq at 581374 line 256
+Odd VSync 607728
+frame length: 640000 (625 lines)
+
+irq at 101360 line 99
+irq at 261887 line 256
+Even VSync 287727
+irq at 421360 line 99
+irq at 581375 line 256
+Odd VSync 607728
+frame length: 640000 (625 lines)
+
+irq at 101360 line 99
+irq at 261887 line 256
+Even VSync 287727
+irq at 421360 line 99
+irq at 581375 line 256
+Odd VSync 607728
+frame length: 640000 (625 lines)
+
+irq at 101359 line 99
+irq at 261887 line 256
+Even VSync 287727
