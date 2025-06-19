@@ -31,7 +31,7 @@ cat Basic2.rom                 >> $IMAGE
 cat Basic2.rom                 >> $IMAGE
 
 # Slots C-F
-cat pres_ap2_v1_23.rom         >> $IMAGE
+cat AP6v134t.rom               >> $IMAGE
 cat blank.rom                  >> $IMAGE
 cat blank.rom                  >> $IMAGE
 cat M7_191.rom                 >> $IMAGE
