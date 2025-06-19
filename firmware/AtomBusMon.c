@@ -14,16 +14,35 @@
  * VERSION and NAME are used in the start-up message
  ********************************************************/
 
-#define VERSION "0.987"
+#define VERSION "0.998"
+
+// The X commands allows the various interrupt inputs to be overridded
+// They are named after the data sheet pin name
 
 #if defined(CPU_Z80)
   #define NAME "ICE-Z80"
+  #define XCMD0 "xbusrq"
+  #define XCMD1 "xint"
+  #define XCMD2 "xnmi"
+  #define XCMD3 "xres"
 #elif defined(CPU_6502)
   #define NAME "ICE-6502"
+  #define XCMD0 "xirq"
+  #define XCMD1 "xnmi"
+  #define XCMD2 "xres"
+  #define XCMD3 "xso "
 #elif defined(CPU_65C02)
   #define NAME "ICE-65C02"
+  #define XCMD0 "xirq"
+  #define XCMD1 "xnmi"
+  #define XCMD2 "xres"
+  #define XCMD3 "xso "
 #elif defined(CPU_6809)
   #define NAME "ICE-6809"
+  #define XCMD0 "xfiq"
+  #define XCMD1 "xirq"
+  #define XCMD2 "xnmi"
+  #define XCMD3 "xres"
 #else
   #error "Unsupported CPU type"
 #endif
@@ -70,7 +89,6 @@ char *cmdStrings[] = {
   "load",
   "save",
   "srec",
-  "special",
   "reset",
   "trace",
   "blist",
@@ -88,7 +106,12 @@ char *cmdStrings[] = {
 #endif
   "clear",
   "trigger",
-  "timermode"
+  "timermode",
+  "timeout",
+  XCMD0,
+  XCMD1,
+  XCMD2,
+  XCMD3
 };
 
 // Must be kept in step with cmdStrings (just above)
@@ -124,7 +147,6 @@ void (*cmdFuncs[])(char *params) = {
   doCmdLoad,
   doCmdSave,
   doCmdSRec,
-  doCmdSpecial,
   doCmdReset,
   doCmdTrace,
   doCmdList,
@@ -142,7 +164,12 @@ void (*cmdFuncs[])(char *params) = {
 #endif
   doCmdClear,
   doCmdTrigger,
-  doCmdTimerMode
+  doCmdTimerMode,
+  doCmdTimeout,
+  doCmdXCmd0,
+  doCmdXCmd1,
+  doCmdXCmd2,
+  doCmdXCmd3
 };
 
 #if defined(EXTENDED_HELP)
@@ -165,6 +192,7 @@ static const char ARGS14[] PROGMEM = "[ <value> ]";
 static const char ARGS15[] PROGMEM = "[ <command> ]";
 static const char ARGS16[] PROGMEM = "<op1> [ <op2> [ <op3> ] ]";
 static const char ARGS17[] PROGMEM = "[ <source> [ <prescale> [ <reset address> ] ] ]";
+static const char ARGS18[] PROGMEM = "e|c|d|f";
 
 static const char * const argsStrings[] PROGMEM = {
   ARGS00,
@@ -185,6 +213,7 @@ static const char * const argsStrings[] PROGMEM = {
   ARGS15,
   ARGS16,
   ARGS17,
+  ARGS18
 };
 
 // Must be kept in step with cmdStrings (just above)
@@ -195,7 +224,7 @@ static const uint8_t helpMeta[] PROGMEM = {
   17, 15, // help
    9,  8, // continue
   24,  1, // next
-  32,  6, // step
+  31,  6, // step
   27,  7, // regs
   12, 10, // dis
   16,  7, // flush
@@ -216,11 +245,10 @@ static const uint8_t helpMeta[] PROGMEM = {
   15, 16, // exec
   23, 14, // mode
 #endif
-  33, 12, // test
+  32, 12, // test
   21,  0, // load
   29,  9, // save
-  31,  7, // srec
-  30, 14, // special
+  30,  7, // srec
   28,  7, // reset
   35,  6, // trace
    1,  7, // blist
@@ -239,6 +267,11 @@ static const uint8_t helpMeta[] PROGMEM = {
    7,  0, // clear
   36,  5, // trigger
   34, 17, // timermode
+  33, 14, // timeout
+  43, 18, // xcmd0
+  44, 18, // xcmd1
+  45, 18, // xcmd2
+  46, 18, // xcmd3
    0,  0
 };
 
@@ -283,8 +316,8 @@ static const uint8_t helpMeta[] PROGMEM = {
 // 011xx1 Unused
 // 011x1x Unused
 // 0111xx Unused
-// 100xxx Special
-// 1010xx Timer Mode
+// 10xxxx Int Ctrl
+// 1100xx Timer Mode
 //     00 - count cpu cycles where clken = 1 and CountCycle = 1
 //     01 - count cpu cycles where clken = 1 (ignoring CountCycle)
 //     10 - free running timer, using busmon_clk as the source
@@ -307,8 +340,8 @@ static const uint8_t helpMeta[] PROGMEM = {
 #define CMD_WR_IO         0x16
 #define CMD_WR_IO_INC     0x17
 #define CMD_EXEC_GO       0x18
-#define CMD_SPECIAL       0x20
-#define CMD_TIMER_MODE    0x28
+#define CMD_INT_CTRL      0x20
+#define CMD_TIMER_MODE    0x30
 
 /********************************************************
  * AVR Status Register Definitions
@@ -453,6 +486,10 @@ modes_t modes[MAXBKPTS];
 #define WATCH_EXEC      9
 #define TRANSIENT      10
 
+// Mask to test if the breakpoint/watchpoint is a Z80 IO
+#if defined(CPU_Z80)
+#define MASK_IO ((1 << BRKPT_IO_READ) |  (1 << WATCH_IO_READ) |  (1 << BRKPT_IO_WRITE) |  (1 << WATCH_IO_WRITE))
+#endif
 
 static const char MODE0[] PROGMEM = "Mem Rd Brkpt";
 static const char MODE1[] PROGMEM = "Mem Rd Watch";
@@ -603,11 +640,32 @@ static const char * triggerStrings[NUM_TRIGGERS] = {
 #define TRIGGER_UNDEFINED 31
 
 /********************************************************
+ * Interrupt controls
+ ********************************************************/
+
+static const uint8_t cmd_map[] = { 1, 3, 0, 2 };
+
+static const char INTCTRL0[] PROGMEM = "Enabled";
+static const char INTCTRL1[] PROGMEM = "Conditional";
+static const char INTCTRL2[] PROGMEM = "Forced";
+static const char INTCTRL3[] PROGMEM = "Disabled";
+
+static const char *int_ctrl_strings[] = {
+   INTCTRL0,
+   INTCTRL1,
+   INTCTRL2,
+   INTCTRL3
+};
+
+/********************************************************
  * Other global variables
  ********************************************************/
 
 // The current memory address (e.g. used when disassembling)
 addr_t memAddr = 0;
+
+// The current memory timeout value, in microseconds.
+uint16_t memTimeout = 0x1000;
 
 // The address of the next instruction
 addr_t nextAddr = 0;
@@ -627,14 +685,15 @@ uint8_t cmd_id = 0xff;
 #define MASK_CLOCK_ERROR   1
 #define MASK_TIMEOUT_ERROR 2
 
-// Current special setting
-uint8_t special = 0x00;
-
 // Current timer mode setting
 uint8_t timer_mode = 0x00;
 uint8_t timer_prescale = 0x01;
 addr_t  timer_resetaddr = 0xffff;
 unsigned long timer_offset = 0;
+
+// Current interrupts controls
+uint8_t int_ctrl = 0;
+
 
 /********************************************************
  * User Command Processor
@@ -777,9 +836,13 @@ uint8_t checkargs(char *params) {
  ********************************************************/
 
 // Send a single hardware command
+//
 void hwCmd(cmd_t cmd, cmd_t param) {
   uint8_t status = STATUS_DIN;
-  uint16_t timeout = 10000;
+  // An interation of the inner loop with a 32-bit loop variable
+  // is 9 instructions. So use F_CPU to scale to the timeout
+  // value is approx microseconds.
+  uint32_t timeout =  ((uint32_t) memTimeout) * ((F_CPU / 1000000) / 9);
   cmd |= param;
   CTRL_PORT &= ~CMD_MASK;
   CTRL_PORT ^= cmd | CMD_EDGE;
@@ -908,7 +971,7 @@ void writeIOByteInc() {
 
 addr_t disMem(addr_t addr) {
   loadAddr(addr);
-  return disassemble(addr);
+  return disassemble(addr, MODE_NORMAL);
 }
 
 void genericDump(char *params, data_t (*readFunc)()) {
@@ -1228,7 +1291,11 @@ void clearBreakpoint(bknum_t n) {
 void genericBreakpoint(char *params, unsigned int mode) {
   bknum_t i;
   addr_t addr;
+#if defined(CPU_Z80)
+  addr_t mask = (mode & MASK_IO) ? 0xFF : 0xFFFF;
+#else
   addr_t mask = 0xFFFF;
+#endif
   trigger_t trigger = TRIGGER_UNDEFINED;
   params = parsehex4required(params, &addr);
   if (checkargs(params)) {
@@ -1508,7 +1575,7 @@ void doCmdDis(char *params) {
   memAddr = startAddr;
   loadAddr(memAddr);
   do {
-    memAddr = disassemble(memAddr);
+     memAddr = disassemble(memAddr, MODE_DIS_CMD);
     i++;
   } while ((!endAddr && i < 10) || (endAddr && memAddr > startAddr && memAddr <= endAddr));
 }
@@ -2014,31 +2081,50 @@ void doCmdSRec(char *params) {
   }
 }
 
-void logSpecial(char *function, uint8_t value) {
-  logs(function);
-  if (value) {
-    logstr(" inhibited\n");
-  } else {
-    logstr(" enabled\n");
-  }
+void set_int_ctrl(uint8_t offset, char *params) {
+   // (C) 01 Conditional
+   // (D) 11 Disabled
+   // (E) 00 Enabled
+   // (F) 10 Forced
+   while (*params == ' ') {
+      params++;
+   }
+   if (!*params) {
+      uint8_t tmp = int_ctrl;
+      for (int i = 0; i < 4; i++) {
+         logs(cmdStrings[NUM_CMDS - 4 + i]);
+         logstr(" = ");
+         logpgmstr(int_ctrl_strings[tmp & 3]);
+         logc('\n');
+         tmp >>= 2;
+      }
+   } else {
+      *params &= 0xdf;
+      if (*params >= 'C' && *params <= 'F') {
+         uint8_t val = cmd_map[*params - 'C'];
+         hwCmd(CMD_INT_CTRL, (offset << 1) | val);
+         int_ctrl &= (0x03 << offset) ^ 0xFF;
+         int_ctrl |= (val  << offset);
+      } else {
+         logstr("Illegal option\n");
+      }
+   }
 }
 
-void doCmdSpecial(char *params) {
-  uint8_t tmp = 0xff;
-  parsehex2(params, &tmp);
-#if defined(CPU_6809)
-  if (tmp <= 7) {
-#else
-  if (tmp <= 3) {
-#endif
-    special = tmp;
-    hwCmd(CMD_SPECIAL, special);
-  }
-#if defined(CPU_6809)
-  logSpecial("FIRQ", special & 4);
-#endif
-  logSpecial("NMI", special & 2);
-  logSpecial("IRQ", special & 1);
+void doCmdXCmd0(char *params) {
+   set_int_ctrl(0, params);
+}
+
+void doCmdXCmd1(char *params) {
+   set_int_ctrl(2, params);
+}
+
+void doCmdXCmd2(char *params) {
+   set_int_ctrl(4, params);
+}
+
+void doCmdXCmd3(char *params) {
+   set_int_ctrl(6, params);
 }
 
 void doCmdTimerMode(char *params) {
@@ -2066,6 +2152,18 @@ void doCmdTimerMode(char *params) {
   logstr("; reset address=");
   loghex4(timer_resetaddr);
   logstr("\n");
+}
+
+void doCmdTimeout(char *params) {
+  parsehex4(params, &memTimeout);
+  // Small timeouts values cause bogus timeout errors, so enforce a minimum
+  // of 16us, which is less much than one character time at 115,200 (86us)
+  if (memTimeout < 0x10) {
+     memTimeout = 0x10;
+  }
+  logstr("timeout=");
+  loghex4(memTimeout);
+  logstr(" microseconds (hex)\n");
 }
 
 void doCmdTrace(char *params) {
