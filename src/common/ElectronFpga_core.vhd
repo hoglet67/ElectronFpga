@@ -81,7 +81,6 @@ entity ElectronFpga_core is
         cassette_in    : in  std_logic;
         cassette_out   : out std_logic;
 
-
         -- Format of Video
         -- 00 - sRGB - interlaced
         -- 01 - sRGB - non interlaced
@@ -92,7 +91,19 @@ entity ElectronFpga_core is
         -- Test outputs
         test           : out std_logic_vector(7 downto 0);
 
-        -- ICE T65 Deubgger 57600 baud serial
+        -- External 1MHz bus
+        ext_1mhz_clken : out   std_logic; -- a 1MHz strobe, valid for one system clock cycle
+        ext_1mhz_nrst  : out   std_logic;
+        ext_1mhz_pgfc_n: out   std_logic;
+        ext_1mhz_pgfd_n: out   std_logic;
+        ext_1mhz_r_nw  : out   std_logic;
+        ext_1mhz_addr  : out   std_logic_vector(7 downto 0);
+        ext_1mhz_di    : out   std_logic_vector(7 downto 0);
+        ext_1mhz_do    : in    std_logic_vector(7 downto 0) := (others => '1');
+        ext_1mhz_irq_n : in    std_logic := '1';
+        ext_1mhz_nmi_n : in    std_logic := '1';
+
+        -- ICE T65 Deubgger 115200 baud serial
         avr_RxD        : in    std_logic;
         avr_TxD        : out   std_logic;
 
@@ -110,9 +121,12 @@ architecture behavioral of ElectronFpga_core is
     signal cpu_a             : std_logic_vector (23 downto 0);
     signal cpu_din           : std_logic_vector (7 downto 0);
     signal cpu_dout          : std_logic_vector (7 downto 0);
+    signal ula_IRQ_n         : std_logic;
     signal cpu_IRQ_n         : std_logic;
     signal cpu_NMI_n         : std_logic;
     signal ROM_n             : std_logic;
+    signal io_fred           : std_logic;
+    signal io_jim            : std_logic;
 
     signal ula_data          : std_logic_vector (7 downto 0);
     signal ula_enable        : std_logic;
@@ -122,6 +136,7 @@ architecture behavioral of ElectronFpga_core is
     signal sound             : std_logic;
     signal kbd_data          : std_logic_vector(3 downto 0);
 
+    signal io_clken         : std_logic;
     signal cpu_clken         : std_logic;
     signal cpu_clken_r       : std_logic;
 
@@ -238,7 +253,7 @@ begin
         data_en   => ula_enable,
         R_W_n     => cpu_R_W_n,
         RST_n     => RSTn,
-        IRQ_n     => cpu_IRQ_n,
+        IRQ_n     => ula_IRQ_n,
         NMI_n     => cpu_NMI_n,
 
         -- Rom Enable
@@ -277,6 +292,7 @@ begin
 
         -- Clock Generation
         cpu_clken_out  => cpu_clken,
+        io_clken_out   => io_clken,
         cpu_clk_out    => phi2,
         turbo          => key_turbo
 
@@ -293,7 +309,8 @@ begin
         turbo      => key_turbo
     );
 
-    cpu_NMI_n      <= '1';
+    cpu_NMI_n <= ext_1mhz_nmi_n;
+    cpu_IRQ_n <= not((not ext_1mhz_irq_n) or (not ula_IRQ_n));
 
     RSTn    <= hard_reset_n and key_break;
     audio_l <= sound;
@@ -309,6 +326,7 @@ begin
 
     cpu_din <= ext_Dout       when ext_enable = '1' else
                ula_data       when ula_enable = '1' else
+               ext_1mhz_do    when io_fred = '1' or io_jim = '1' else
                x"F1";
 
     -- Pipeline external memory interface
@@ -532,10 +550,28 @@ begin
        abr_hi_bank_lock <= '1';
    end generate;
 
+
+--------------------------------------------------------
+-- External 1MHz Bus
+--------------------------------------------------------
+
+-- This is always included as it's cheap, and all inputs default to
+-- sensible values
+   io_fred <= '1' when cpu_a(15 downto 8) = x"FC" else '0';
+   io_jim  <= '1' when cpu_a(15 downto 8) = x"FD" else '0';
+
+   ext_1mhz_clken  <= io_clken;
+   ext_1mhz_nrst   <= RSTn;
+
+   ext_1mhz_pgfc_n <= not io_fred;
+   ext_1mhz_pgfd_n <= not io_jim;
+   ext_1mhz_r_nw   <= cpu_R_W_n;
+   ext_1mhz_addr   <= cpu_a(7 downto 0);
+   ext_1mhz_di     <= cpu_dout;
+
    cpu_addr <= cpu_a(15 downto 0);
    cpu_rnw <= CPU_R_W_n;
 
    test <= video_vsync_int & video_hsync_int & video_blue_int(3) & video_green_int(3) & video_red_int(3)  & "00" & cpu_IRQ_n;
-
 
 end behavioral;

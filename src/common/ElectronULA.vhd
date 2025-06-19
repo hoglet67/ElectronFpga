@@ -86,6 +86,7 @@ entity ElectronULA is
 
         -- Clock Generation
         cpu_clken_out  : out std_logic;
+        io_clken_out   : out std_logic;
         cpu_clk_out    : out std_logic;
         turbo          : in std_logic_vector(1 downto 0);
         turbo_out      : out std_logic_vector(1 downto 0) := "01";
@@ -1354,6 +1355,7 @@ begin
     end process;
 
     cpu_clken_out  <= cpu_clken;
+    io_clken_out   <= via1_clken;
     cpu_clk_out    <= cpu_clk;
 
 --------------------------------------------------------
