@@ -8,6 +8,8 @@ mkdir -p tmp
 
 IMAGE=tmp/rom_image.bin
 
+echo Making $IMAGE
+
 rm -f $IMAGE
 
 # Slots 0-3 (sideways RAM)
@@ -33,3 +35,12 @@ cat pres_ap2_v1_23.rom         >> $IMAGE
 cat blank.rom                  >> $IMAGE
 cat blank.rom                  >> $IMAGE
 cat M7_191.rom                 >> $IMAGE
+
+
+IMAGE=tmp/os10_basic.bit
+
+echo Making $IMAGE
+
+rm -f $IMAGE
+
+cat os100.rom Basic2.rom | xxd  -c1 -b | awk '{print $2}' > $IMAGE
