@@ -451,44 +451,74 @@ begin
         IncludeJafaMode7   => IncludeJafaMode7
     )
     port map (
+        -- Clocks
         clk_16M00         => clock_16,
         clk_24M00         => clock_24,
         clk_27M00         => clock_27,
         clk_32M00         => clock_32,
         clk_33M33         => clock_32,
         clk_40M00         => clock_40,
+        -- Hard reset (active low)
         hard_reset_n      => hard_reset_n,
+        -- Keyboard
         ps2_clk           => ps2_clk,
         ps2_data          => ps2_data,
+        -- VGA Video
         video_red         => i_VGA_R,
         video_green       => i_VGA_G,
         video_blue        => i_VGA_B,
         video_hsync       => vga_hs_int,
         video_vsync       => vga_vs_int,
+        -- HDMI Video
         hdmi_audio_en     => hdmi_audio_en,
         tmds_r            => tmds_r,
         tmds_g            => tmds_g,
         tmds_b            => tmds_b,
+        -- Audio
         audio_l           => audio_l_tmp,
         audio_r           => audio_r_tmp,
+        -- External memory (e.g. SRAM and/or FLASH)
+        -- 512KB logical address space
         ext_nOE           => ext_nOE,
         ext_nWE           => ext_nWE,
         ext_nCS           => ext_nCS,
         ext_A             => ext_A,
         ext_Dout          => ext_Dout,
         ext_Din           => ext_Din,
+        -- SD Card
         SDMISO            => tf_miso,
         SDSS              => tf_cs,
         SDCLK             => tf_sclk,
         SDMOSI            => tf_mosi,
+        -- KeyBoard LEDs (active high)
         caps_led          => caps_led,
         motor_led         => motor_led,
+        -- Casette Port
         cassette_in       => '0',
         cassette_out      => open,
+        -- Format of Video
+        -- 00 - sRGB - interlaced
+        -- 01 - sRGB - non interlaced
+        -- 10 - SVGA - 50Hz
+        -- 11 - SVGA - 60Hz
         vid_mode          => vid_mode,
+        -- Test outputs
         test              => test,
+        -- External 1MHz bus
+        ext_1mhz_clken    => ext_1mhz_clken, -- a 1MHz strobe, valid for one system clock cycle
+        ext_1mhz_nrst     => ext_1mhz_nrst,
+        ext_1mhz_pgfc_n   => ext_1mhz_pgfc_n,
+        ext_1mhz_pgfd_n   => ext_1mhz_pgfd_n,
+        ext_1mhz_r_nw     => ext_1mhz_r_nw,
+        ext_1mhz_addr     => ext_1mhz_addr,
+        ext_1mhz_di       => ext_1mhz_di,
+        ext_1mhz_do       => ext_1mhz_do,
+        ext_1mhz_irq_n    => open,
+        ext_1mhz_nmi_n    => open,
+        -- ICE T65 Deubgger 115200 baud serial
         avr_RxD           => uart_rx,
         avr_TxD           => uart_tx,
+        -- Raw CPU interface
         phi2              => phi2,
         cpu_rnw           => cpu_rnw,
         cpu_addr          => open
@@ -497,7 +527,7 @@ begin
     audio_l <= x"10000" when audio_l_tmp = '1' else x"F0000";
     audio_r <= x"10000" when audio_r_tmp = '1' else x"F0000";
 
-    vid_mode <= "10";
+    vid_mode <= "10"; -- Force 50Hz VGA mode for now
 
     --------------------------------------------------------
     -- Clock Generation
