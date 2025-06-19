@@ -1083,7 +1083,7 @@ begin
 
     GenCoProExt: if IncludeCoProExt generate
     begin
-        ext_tube_do  <= vga_g & vga_b_n & vga_vs & vga_hs & vga_r_n & vga_b & vga_g_n & vga_r;
+        ext_tube_do  <= vga_g & vga_b_n & vga_vs & vga_hs & vga_r_n & vga_b & vga_g_n & vga_r when jumper(1) = '0' else x"FE";
 
         vga_g   <= ext_1mhz_di(7) when ext_1mhz_r_nw = '0' and phi2 = '1' else 'Z';
         vga_b_n <= ext_1mhz_di(6) when ext_1mhz_r_nw = '0' and phi2 = '1' else 'Z';
