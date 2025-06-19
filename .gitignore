@@ -36,3 +36,7 @@ src/xilinx/ipcore_dir/gen_WatchEvents.tcl
 src/xilinx/ipcore_dir/tmp/
 src/xilinx/ipcore_dir/update_WatchEvents.tcl
 
+**/impl/pnr
+**/impl/gwsynthesis
+**/impl/temp
+*.gprj.user
