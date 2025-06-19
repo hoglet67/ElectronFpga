@@ -20,6 +20,7 @@ use ieee.numeric_std.all;
 
 entity ElectronFpga_core is
     generic (
+        IncludeHDMI        : boolean := false;
         IncludeICEDebugger : boolean := false;
         IncludeABRRegs     : boolean := false;
         IncludeJafaMode7   : boolean := false
@@ -31,6 +32,7 @@ entity ElectronFpga_core is
         clk_32M00      : in  std_logic; -- for Jafa Mode7
         clk_33M33      : in  std_logic;
         clk_40M00      : in  std_logic;
+        clk_27M00      : in  std_logic := '0';
 
         -- Hard reset (active low)
         hard_reset_n   : in  std_logic;
@@ -39,12 +41,18 @@ entity ElectronFpga_core is
         ps2_clk        : in  std_logic;
         ps2_data       : in  std_logic;
 
-        -- Video
+        -- VGA Video
         video_red      : out std_logic_vector (3 downto 0);
         video_green    : out std_logic_vector (3 downto 0);
         video_blue     : out std_logic_vector (3 downto 0);
         video_vsync    : out std_logic;
         video_hsync    : out std_logic;
+
+        -- HDMI Video
+        hdmi_audio_en  : in    std_logic := '0';
+        tmds_r         : out   std_logic_vector(9 downto 0);
+        tmds_g         : out   std_logic_vector(9 downto 0);
+        tmds_b         : out   std_logic_vector(9 downto 0);
 
         -- Audio
         audio_l        : out std_logic;
@@ -73,6 +81,7 @@ entity ElectronFpga_core is
         cassette_in    : in  std_logic;
         cassette_out   : out std_logic;
 
+
         -- Format of Video
         -- 00 - sRGB - interlaced
         -- 01 - sRGB - non interlaced
@@ -87,6 +96,8 @@ entity ElectronFpga_core is
         avr_RxD        : in    std_logic;
         avr_TxD        : out   std_logic;
 
+        phi2           : out   std_logic;
+        cpu_rnw        : out   std_logic;
         cpu_addr       : out   std_logic_vector(15 downto 0)
 
     );
@@ -266,6 +277,7 @@ begin
 
         -- Clock Generation
         cpu_clken_out  => cpu_clken,
+        cpu_clk_out    => phi2,
         turbo          => key_turbo
 
     );
@@ -368,6 +380,129 @@ begin
     ext_nCS <= '0';
 
 --------------------------------------------------------
+-- HDMI
+--------------------------------------------------------
+
+    GenHDMI: if IncludeHDMI generate
+        signal hsync1     : std_logic;
+        signal vsync1     : std_logic;
+        signal hcnt       : std_logic_vector(9 downto 0);
+        signal vcnt       : std_logic_vector(9 downto 0);
+        signal hdmi_red   : std_logic_vector(7 downto 0);
+        signal hdmi_green : std_logic_vector(7 downto 0);
+        signal hdmi_blue  : std_logic_vector(7 downto 0);
+        signal hdmi_hsync : std_logic;
+        signal hdmi_vsync : std_logic;
+        signal hdmi_blank : std_logic;
+        signal hdmi_audio : std_logic_vector (15 downto 0);
+    begin
+
+        -- Recreate the video sync/blank signals that match standard HDTV 720x576p
+        --
+        -- Modeline "720x576 @ 50hz"  27    720   732   796   864   576   581   586   625
+        --
+        -- Hcnt is set to 0 on the trailing edge of hsync from the Beeb core
+        -- so the H constants below need to be offset by 864-796=68
+        --
+        -- Vcnt is set to 0 on the trailing edge of vsync from the Beeb core
+        -- so the V constants below need to be offset by 625-586=39
+        --
+        -- This only works because the Beeb core is generating 32us lines
+        --
+        -- The hdmidataencode module inserts a two 32 pixel data packets after the
+        -- first edge of hsync. The hsync pluse + back porch needs to be at least
+        -- this width. There are also min requirements on the size of control
+        -- islands of 12 pixels.
+
+        process(clk_27M00)
+            variable voffset  : integer;
+            variable vsize    : integer;
+        begin
+            if rising_edge(clk_27M00) then
+                hdmi_audio <= x"1000" when sound = '1' else x"F000";
+                hsync1 <= video_hsync_int;
+                if hsync1 = '0' and video_hsync_int = '1' then
+                    hcnt <= (others => '0');
+                    vsync1 <= video_vsync_int;
+                    if vsync1 = '0' and video_vsync_int = '1' then
+                        vcnt <= (others => '0');
+                    else
+                        vcnt <= vcnt + 1;
+                    end if;
+                else
+                    hcnt <= hcnt + 1;
+                end if;
+                if hdmi_audio_en = '1' then
+                    voffset := 39;
+                    vsize   := 576;
+                else
+                    voffset := 55;
+                    vsize   := 540;
+                end if;
+                if hcnt < 68 or hcnt >= 68 + 720 or vcnt < voffset or vcnt >= voffset + vsize then
+                    hdmi_blank <= '1';
+                    hdmi_red   <= (others => '0');
+                    hdmi_green <= (others => '0');
+                    hdmi_blue  <= (others => '0');
+                else
+                    hdmi_blank <= '0';
+                    hdmi_red   <= video_red_int   & "0000";
+                    hdmi_green <= video_green_int & "0000";
+                    hdmi_blue  <= video_blue_int  & "0000";
+                end if;
+                if hcnt >= 732 + 68 then -- 800
+                    hdmi_hsync <= '0';
+                    if vcnt >= 581 + 39 then -- 620
+                        hdmi_vsync <= '0';
+                    else
+                        hdmi_vsync <= '1';
+                    end if;
+                else
+                    hdmi_hsync <= '1';
+                end if;
+            end if;
+        end process;
+
+        inst_hdmi: entity work.hdmi
+            generic map (
+                FREQ => 27000000,  -- pixel clock frequency
+                FS   => 48000,     -- audio sample rate - should be 32000, 44100 or 48000
+                CTS  => 27000,     -- CTS = Freq(pixclk) * N / (128 * Fs)
+                N    => 6144       -- N = 128 * Fs /1000,  128 * Fs /1500 <= N <= 128 * Fs /300
+                --FS   => 32000,   -- audio sample rate - should be 32000, 44100 or 48000
+                --CTS  => 27000,   -- CTS = Freq(pixclk) * N / (128 * Fs)
+                --N    => 4096     -- N = 128 * Fs /1000,  128 * Fs /1500 <= N <= 128 * Fs /300
+                )
+            port map (
+                -- clocks
+                I_CLK_PIXEL      => clk_27M00,
+                -- components
+                I_R              => hdmi_red,
+                I_G              => hdmi_green,
+                I_B              => hdmi_blue,
+                I_BLANK          => hdmi_blank,
+                I_HSYNC          => hdmi_hsync,
+                I_VSYNC          => hdmi_vsync,
+                I_ASPECT_169     => '0',
+                -- PCM audio
+                I_AUDIO_ENABLE   => hdmi_audio_en,
+                I_AUDIO_PCM_L    => hdmi_audio,
+                I_AUDIO_PCM_R    => hdmi_audio,
+                -- TMDS parallel pixel synchronous outputs (serialize LSB first)
+                O_RED            => tmds_r,
+                O_GREEN          => tmds_g,
+                O_BLUE           => tmds_b
+                );
+
+    end generate;
+
+    GenNotHDMI: if not IncludeHDMI generate
+        tmds_r <= (others => '0');
+        tmds_g <= (others => '0');
+        tmds_b <= (others => '0');
+    end generate;
+
+--------------------------------------------------------
 -- ABR Lock Registers
 --------------------------------------------------------
 
@@ -398,6 +533,7 @@ begin
    end generate;
 
    cpu_addr <= cpu_a(15 downto 0);
+   cpu_rnw <= CPU_R_W_n;
 
    test <= video_vsync_int & video_hsync_int & video_blue_int(3) & video_green_int(3) & video_red_int(3)  & "00" & cpu_IRQ_n;
 
