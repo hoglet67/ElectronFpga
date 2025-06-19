@@ -67,7 +67,10 @@ entity MOS6502CpuMonCore is
         -- OHO_DY1 connected to test connector
         tmosi           : out   std_logic;
         tdin            : out   std_logic;
-        tcclk           : out   std_logic
+        tcclk           : out   std_logic;
+
+        -- Test connector signals
+        test            : inout std_logic_vector(3 downto 0)
     );
 end MOS6502CpuMonCore;
 
@@ -100,7 +103,7 @@ architecture behavioral of MOS6502CpuMonCore is
     signal SS_Step       : std_logic;
     signal SS_Step_held  : std_logic;
     signal CountCycle    : std_logic;
-    signal special       : std_logic_vector(2 downto 0);
+    signal int_ctrl      : std_logic_vector(7 downto 0);
 
     signal memory_rd     : std_logic;
     signal memory_rd1    : std_logic;
@@ -111,8 +114,11 @@ architecture behavioral of MOS6502CpuMonCore is
     signal memory_din    : std_logic_vector(7 downto 0);
     signal memory_done   : std_logic;
 
-    signal NMI_n_masked  : std_logic;
+
     signal IRQ_n_masked  : std_logic;
+    signal NMI_n_masked  : std_logic;
+    signal Res_n_masked  : std_logic;
+    signal SO_n_masked   : std_logic;
 
     signal exec          : std_logic;
     signal exec_held     : std_logic;
@@ -139,7 +145,7 @@ begin
         WrIO_n       => '1',
         Sync         => Sync_mon,
         Rdy          => open,
-        nRSTin       => Res_n,
+        nRSTin       => Res_n_masked,
         nRSTout      => cpu_reset_n,
         CountCycle   => CountCycle,
         trig         => trig,
@@ -163,7 +169,7 @@ begin
         DataOut      => memory_dout,
         DataIn       => memory_din,
         Done         => Done_mon,
-        Special      => special,
+        int_ctrl     => int_ctrl,
         SS_Step      => SS_Step,
         SS_Single    => SS_Single
     );
@@ -173,8 +179,24 @@ begin
     Done_mon <= Rdy and memory_done;
 
     Data <= Din when R_W_n_int = '1' else Dout_int;
-    NMI_n_masked <= NMI_n or special(1);
-    IRQ_n_masked <= IRQ_n or special(0);
+
+    -- The two int control bits work as follows
+    -- 00 -> IRQ_n                (enabled)
+    -- 01 -> IRQ_n or SS_Single   (enabled when free-running)
+    -- 10 -> 0                    (forced)
+    -- 11 -> 1                    (disabled)
+
+    IRQ_n_masked <= int_ctrl(0) when int_ctrl(1) = '1' else
+                    IRQ_n or (int_ctrl(0) and SS_single);
+
+    NMI_n_masked <= int_ctrl(2) when int_ctrl(3) = '1' else
+                    NMI_n or (int_ctrl(2) and SS_single);
+
+    Res_n_masked <= int_ctrl(4) when int_ctrl(5) = '1' else
+                     Res_n or (int_ctrl(4) and SS_single);
+
+    SO_n_masked  <= int_ctrl(6) when int_ctrl(7) = '1' else
+                    SO_n or (int_ctrl(6) and SS_single);
 
     -- The CPU is slightly pipelined and the register update of the last
     -- instruction overlaps with the opcode fetch of the next instruction.
@@ -209,7 +231,7 @@ begin
         inst_t65: entity work.T65 port map (
             mode            => "00",
             Abort_n         => '1',
-            SO_n            => SO_n,
+            SO_n            => SO_n_masked,
             Res_n           => cpu_reset_n,
             Enable          => cpu_clken_ss,
             Clk             => cpu_clk,
@@ -278,6 +300,7 @@ begin
     begin
         if cpu_reset_n = '0' then
             state <= idle;
+            exec_held <= '0';
         elsif rising_edge(cpu_clk) then
             -- Extend the control signals from BusMonitorCore which
             -- only last one cycle.
@@ -371,5 +394,11 @@ begin
     memory_done <= '1' when state = rd or state = wr or (op3 = '0' and state = exec1) or state = exec2 else '0';
 
     memory_din <= Din;
+
+    -- Test outputs
+    test(0) <= SS_Single;     -- GODIL J5 pin 1 (46)
+    test(1) <= 'Z';           -- GODIL J5 pin 2 (47)
+    test(2) <= 'Z';           -- GODIL J5 pin 3 (48)
+    test(3) <= 'Z';           -- GODIL J5 pin 4 (56)
 
 end behavioral;
