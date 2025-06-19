@@ -354,8 +354,8 @@ begin
             elsif cpu_a(15 downto 14) = "10" and rom_latch(3 downto 2) = "00" then
                 -- Slots 0..3 are mapped to SRAM
                 ext_A <= "1" & rom_latch & cpu_a(13 downto 0);
-            elsif cpu_a(15 downto 14) = "10" and rom_latch(3 downto 0) = "0100" and cpu_a(13 downto 8) >= "110110" then
-                -- Slots 4 (MMFS) has B600 onwards as writeable for private workspace so mapped to SRAM
+            elsif cpu_a(15 downto 14) = "10" and rom_latch(3 downto 0) = "0100" and cpu_a(13 downto 8) >= "110111" then
+                -- Slots 4 (MMFS) has B700 onwards as writeable for private workspace so mapped to SRAM
                 ext_A <= "1" & rom_latch & cpu_a(13 downto 0);
             else
                 -- everyting else is ROM
