@@ -1,0 +1,47 @@
+<?xml version="1" encoding="UTF-8"?>
+<!DOCTYPE gowin-fpga-project>
+<Project>
+    <Template>FPGA</Template>
+    <Version>5</Version>
+    <Device name="GW2AR-18C" pn="GW2AR-LV18QN88C8/I7">gw2ar18c-000</Device>
+    <FileList>
+        <File path="../../../src/common/hdmi/hdmidataencoder.v" type="file.verilog" enable="1"/>
+        <File path="../src/ElectronFpga_TangNano20K.vhd" type="file.vhdl" enable="1"/>
+        <File path="../src/dac1_oser.vhd" type="file.vhdl" enable="1"/>
+        <File path="../src/i2s_simple.vhd" type="file.vhdl" enable="1"/>
+        <File path="../src/mem_tang_20k.vhd" type="file.vhdl" enable="1"/>
+        <File path="../src/pwm_sddac.vhd" type="file.vhdl" enable="1"/>
+        <File path="../src/sdramctl.vhd" type="file.vhdl" enable="1"/>
+        <File path="../src/spdif_serializer.vhd" type="file.vhdl" enable="1"/>
+        <File path="src/board_config_pack.vhd" type="file.vhdl" enable="1"/>
+        <File path="src/version_config_pack.vhd" type="file.vhdl" enable="1"/>
+        <File path="../../../src/common/AlanD/R65Cx2.vhd" type="file.vhdl" enable="1"/>
+        <File path="../../../src/common/ElectronFpga_core.vhd" type="file.vhdl" enable="1"/>
+        <File path="../../../src/common/ElectronULA.vhd" type="file.vhdl" enable="1"/>
+        <File path="../../../src/common/MC6522/m6522.vhd" type="file.vhdl" enable="1"/>
+        <File path="../../../src/common/RAM/RAM_20K_DualPort.vhd" type="file.vhdl" enable="1"/>
+        <File path="../../../src/common/RAM/RAM_32K_DualPort.vhd" type="file.vhdl" enable="1"/>
+        <File path="../../../src/common/ROM/RomBasic2.vhd" type="file.vhdl" enable="1"/>
+        <File path="../../../src/common/ROM/RomOS100.vhd" type="file.vhdl" enable="1"/>
+        <File path="../../../src/common/ROM/RomSmelk3006.vhd" type="file.vhdl" enable="1"/>
+        <File path="../../../src/common/T6502/T65.vhd" type="file.vhdl" enable="1"/>
+        <File path="../../../src/common/T6502/T65_ALU.vhd" type="file.vhdl" enable="1"/>
+        <File path="../../../src/common/T6502/T65_MCode.vhd" type="file.vhdl" enable="1"/>
+        <File path="../../../src/common/T6502/T65_Pack.vhd" type="file.vhdl" enable="1"/>
+        <File path="../../../src/common/bootstrap/bootstrap.vhd" type="file.vhdl" enable="1"/>
+        <File path="../../../src/common/bootstrap/spi_flash.vhd" type="file.vhdl" enable="1"/>
+        <File path="../../../src/common/hdmi/encoder.vhd" type="file.vhdl" enable="1"/>
+        <File path="../../../src/common/hdmi/hdmi.vhd" type="file.vhdl" enable="1"/>
+        <File path="../../../src/common/hdmi/hdmidelay.vhd" type="file.vhdl" enable="1"/>
+        <File path="../../../src/common/library/common.vhd" type="file.vhdl" enable="1"/>
+        <File path="../../../src/common/mist_scandoubler.vhd" type="file.vhdl" enable="1"/>
+        <File path="../../../src/common/mode7/mc6845.vhd" type="file.vhdl" enable="1"/>
+        <File path="../../../src/common/mode7/saa5050.vhd" type="file.vhdl" enable="1"/>
+        <File path="../../../src/common/mode7/saa5050_rom_dual_port.vhd" type="file.vhdl" enable="1"/>
+        <File path="../../../src/common/mode7/saa5050_rom_dual_port_uninitialized.vhd" type="file.vhdl" enable="1"/>
+        <File path="../../../src/common/ps2kybrd/keyboard.vhd" type="file.vhdl" enable="1"/>
+        <File path="../../../src/common/ps2kybrd/ps2_intf.vhd" type="file.vhdl" enable="1"/>
+        <File path="../src/ElectronFpga_TangNano20K_pitube.cst" type="file.cst" enable="1"/>
+        <File path="src/board_timings.sdc" type="file.sdc" enable="1"/>
+    </FileList>
+</Project>

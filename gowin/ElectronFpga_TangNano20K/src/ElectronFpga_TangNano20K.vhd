@@ -398,12 +398,8 @@ architecture rtl of ElectronFpga_TangNano20K is
 
     -- External tube
     signal phi2            : std_logic;
-    signal ext_tube_r_nw   : std_logic;
-    signal ext_tube_nrst   : std_logic;
-    signal ext_tube_ntube  : std_logic;
-    signal ext_tube_a      : std_logic_vector(6 downto 0);
-    signal ext_tube_di     : std_logic_vector(7 downto 0);
     signal ext_tube_do     : std_logic_vector(7 downto 0);
+    signal ext_tube_ntube  : std_logic;
     signal ext_tube_ctrl   : std_logic_vector(5 downto 0); -- signals that use the LED output
 
     -- CPU tracing
@@ -1083,25 +1079,27 @@ begin
 
     -- Note: It's a build error if both IncludeVGADAC and IncludeCoProExt are both set
 
+    ext_tube_ntube <= '0' when ext_1mhz_pgfc_n = '0' and ext_1mhz_addr(7 downto 3) = "11100" else '1';
+
     GenCoProExt: if IncludeCoProExt generate
     begin
         ext_tube_do  <= vga_g & vga_b_n & vga_vs & vga_hs & vga_r_n & vga_b & vga_g_n & vga_r;
 
-        vga_g   <= ext_tube_di(7) when ext_tube_r_nw = '0' and phi2 = '1' else 'Z';
-        vga_b_n <= ext_tube_di(6) when ext_tube_r_nw = '0' and phi2 = '1' else 'Z';
-        vga_vs  <= ext_tube_di(5) when ext_tube_r_nw = '0' and phi2 = '1' else 'Z';
-        vga_hs  <= ext_tube_di(4) when ext_tube_r_nw = '0' and phi2 = '1' else 'Z';
-        vga_r_n <= ext_tube_di(3) when ext_tube_r_nw = '0' and phi2 = '1' else 'Z';
-        vga_b   <= ext_tube_di(2) when ext_tube_r_nw = '0' and phi2 = '1' else 'Z';
-        vga_g_n <= ext_tube_di(1) when ext_tube_r_nw = '0' and phi2 = '1' else 'Z';
-        vga_r   <= ext_tube_di(0) when ext_tube_r_nw = '0' and phi2 = '1' else 'Z';
+        vga_g   <= ext_1mhz_di(7) when ext_1mhz_r_nw = '0' and phi2 = '1' else 'Z';
+        vga_b_n <= ext_1mhz_di(6) when ext_1mhz_r_nw = '0' and phi2 = '1' else 'Z';
+        vga_vs  <= ext_1mhz_di(5) when ext_1mhz_r_nw = '0' and phi2 = '1' else 'Z';
+        vga_hs  <= ext_1mhz_di(4) when ext_1mhz_r_nw = '0' and phi2 = '1' else 'Z';
+        vga_r_n <= ext_1mhz_di(3) when ext_1mhz_r_nw = '0' and phi2 = '1' else 'Z';
+        vga_b   <= ext_1mhz_di(2) when ext_1mhz_r_nw = '0' and phi2 = '1' else 'Z';
+        vga_g_n <= ext_1mhz_di(1) when ext_1mhz_r_nw = '0' and phi2 = '1' else 'Z';
+        vga_r   <= ext_1mhz_di(0) when ext_1mhz_r_nw = '0' and phi2 = '1' else 'Z';
 
-        ext_tube_ctrl(5) <= ext_tube_nrst;
-        ext_tube_ctrl(4) <= ext_tube_a(2);
-        ext_tube_ctrl(3) <= ext_tube_a(1);
+        ext_tube_ctrl(5) <= ext_1mhz_nrst;
+        ext_tube_ctrl(4) <= ext_1mhz_addr(2);
+        ext_tube_ctrl(3) <= ext_1mhz_addr(1);
         ext_tube_ctrl(2) <= ext_tube_ntube;
-        ext_tube_ctrl(1) <= ext_tube_r_nw;
-        ext_tube_ctrl(0) <= ext_tube_a(0);
+        ext_tube_ctrl(1) <= ext_1mhz_r_nw;
+        ext_tube_ctrl(0) <= ext_1mhz_addr(0);
 
     end generate;
 
@@ -1163,7 +1161,8 @@ begin
         end if;
     end process;
 
-    ext_1mhz_do <= version_rom_byte           when                                                 ext_1mhz_pgfd_n = '0' else
+    ext_1mhz_do <= ext_tube_do      when ext_tube_ntube  = '0' else
+                   version_rom_byte when ext_1mhz_pgfd_n = '0' else
                    x"FF";
 
     ws2812_din <= '0';
