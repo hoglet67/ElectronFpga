@@ -115,7 +115,7 @@ architecture behavioral of ElectronULA is
   signal power_on_reset : std_logic := '1';
   signal delayed_clear_reset : std_logic := '0';
 
-  signal rtc_counter    : std_logic_vector(18 downto 0);
+  signal intr_counter   : std_logic_vector(19 downto 0);
   signal general_counter: std_logic_vector(15 downto 0);
   signal sound_bit      : std_logic;
   signal isr_data       : std_logic_vector(7 downto 0);
@@ -152,10 +152,6 @@ architecture behavioral of ElectronULA is
   signal v_total        : std_logic_vector(9 downto 0);
   signal v_count        : std_logic_vector(9 downto 0);
 
-  signal v_rtc          : std_logic_vector(9 downto 0);
-  signal v_disp_gph     : std_logic_vector(9 downto 0);
-  signal v_disp_txt     : std_logic_vector(9 downto 0);
-
   signal char_row       : std_logic_vector(3 downto 0);
   signal col_offset     : std_logic_vector(9 downto 0);
 
@@ -180,19 +176,14 @@ architecture behavioral of ElectronULA is
 
   signal last_line      : std_logic;
 
-  signal display_intr   : std_logic;
-  signal display_intr1  : std_logic;
-  signal display_intr2  : std_logic;
-
-  signal rtc_intr       : std_logic;
-  signal rtc_intr1      : std_logic;
-  signal rtc_intr2      : std_logic;
-
   signal clk_video      : std_logic;
 
   signal ctrl_caps      : std_logic;
 
   signal field          : std_logic;
+  signal field1         : std_logic;
+  signal field2         : std_logic;
+  signal field3         : std_logic;
 
   signal caps_int       : std_logic;
   signal motor_int      : std_logic;
@@ -464,7 +455,7 @@ begin
 
     v_total      <= std_logic_vector(to_unsigned(628-1, 10)) when mode = "011" and IncludeVGA else
                     std_logic_vector(to_unsigned(628-1, 10)) when mode = "010" and IncludeVGA else
-                    std_logic_vector(to_unsigned(624-1, 10)) when mode = "100" and IncludeVGA else
+                    std_logic_vector(to_unsigned(625-1, 10)) when mode = "100" and IncludeVGA else
                     std_logic_vector(to_unsigned(312-1, 10)) when field = '0'                 else
                     std_logic_vector(to_unsigned(313-1, 10));
 
@@ -477,21 +468,6 @@ begin
                     std_logic_vector(to_unsigned(500, 10)) when mode = "010" and IncludeVGA else
                     std_logic_vector(to_unsigned(500, 10)) when mode = "100" and IncludeVGA else
                     std_logic_vector(to_unsigned(250, 10));
-
-    v_disp_gph   <= std_logic_vector(to_unsigned(513, 10)) when mode = "011" and IncludeVGA else
-                    std_logic_vector(to_unsigned(513, 10)) when mode = "010" and IncludeVGA else
-                    std_logic_vector(to_unsigned(511, 10)) when mode = "100" and IncludeVGA else
-                    std_logic_vector(to_unsigned(255, 10));
-
-    v_disp_txt   <= std_logic_vector(to_unsigned(501, 10)) when mode = "011" and IncludeVGA else
-                    std_logic_vector(to_unsigned(501, 10)) when mode = "010" and IncludeVGA else
-                    std_logic_vector(to_unsigned(499, 10)) when mode = "100" and IncludeVGA else
-                    std_logic_vector(to_unsigned(249, 10));
-
-    v_rtc        <= std_logic_vector(to_unsigned(201, 10)) when mode = "011" and IncludeVGA else
-                    std_logic_vector(to_unsigned(201, 10)) when mode = "010" and IncludeVGA else
-                    std_logic_vector(to_unsigned(199, 10)) when mode = "100" and IncludeVGA else
-                    std_logic_vector(to_unsigned( 99, 10));
 
     -- Precise blanking is quite tricky, because the 640x512 active part of the screen is at 0,0
     --
@@ -560,7 +536,7 @@ begin
 
     vblank_end   <= std_logic_vector(to_unsigned(628-44-1, 10)) when mode = "011" and IncludeVGA else
                     std_logic_vector(to_unsigned(628-44-1, 10)) when mode = "010" and IncludeVGA else
-                    std_logic_vector(to_unsigned(624-32-1, 10)) when mode = "100" and IncludeVGA else
+                    std_logic_vector(to_unsigned(625-33-1, 10)) when mode = "100" and IncludeVGA else
                     std_logic_vector(to_unsigned(312-16-1, 10)) when field = '0'                 else
                     std_logic_vector(to_unsigned(313-16-1, 10));
 
@@ -651,6 +627,8 @@ begin
     rom_latch  <= page_enable & page;
 
     process (clk_16M00, RST_n)
+        variable rtc_skew : integer;
+        variable disp_skew : integer;
     begin
 
         if rising_edge(clk_16M00) then
@@ -667,7 +645,7 @@ begin
                comms_mode      <= "01";
                motor_int       <= '0';
                caps_int        <= '0';
-               rtc_counter     <= (others => '0');
+               intr_counter    <= (others => '0');
                general_counter <= (others => '0');
                sound_bit       <= '0';
                mode            <= mode_init;
@@ -682,35 +660,39 @@ begin
                     mode <= mode_init;
                     mode_init_copy <= mode_init;
                 end if;
-                -- Synchronize the display interrupt signal from the VGA clock domain
-                display_intr1 <= display_intr;
-                display_intr2 <= display_intr1;
-                -- Generate the display end interrupt on the rising edge (line 256 of the screen)
-                if (display_intr2 = '0' and display_intr1 = '1') then
+
+                -- Synchronize the field signal from the VGA clock domain
+                field1 <= field;
+                field2 <= field1;
+                field3 <= field2;
+
+                -- This 20 bit-counter counts two fields in 16MHz cycles (0 to approx 639999)
+                if intr_counter = 639999 then
+                    intr_counter <= (others => '0');
+                else
+                    intr_counter <= intr_counter + 1;
+                end if;
+
+                -- Synchronise the interrupt counter with some hysteresis when field transitions from 0 to 1
+                if field2 = '1' and field3 = '0' and intr_counter > 4  and intr_counter < 640000 - 4 then
+                    intr_counter <= (others => '0');
+                end if;
+
+                -- Allow fine tuning of interrupt positions (16 = 1us late)
+                rtc_skew  := 16;
+                disp_skew := 16; -- this is critical to firetrack (0, -16, -32 induce failures)
+
+                -- RTC interrupt exact timing (from logic analyzer captures in 16MHz cycles)
+                if intr_counter = 101874 + rtc_skew or intr_counter = 421874 + rtc_skew then
+                    isr(3) <= '1';
+                end if;
+
+                -- Display interrupt exact timing (from logic analyzer captures in 16MHz cycles)
+                if ((intr_counter = 261888 + disp_skew or intr_counter = 582400 + disp_skew) and mode_text = '0') or
+                   ((intr_counter = 255744 + disp_skew or intr_counter = 576256 + disp_skew) and mode_text = '1') then
                     isr(2) <= '1';
                 end if;
-                -- Synchronize the rtc interrupt signal from the VGA clock domain
-                rtc_intr1 <= rtc_intr;
-                rtc_intr2 <= rtc_intr1;
-                if mode = "011" and IncludeVGA then
-                    -- For 60Hz frame rates we must synthesise a the 50Hz real time clock interrupt
-                    -- In theory the counter limit should be 319999, but there are additional
-                    -- rtc ticks if not rtc interrupt is received between two display interrupts
-                    -- hence the correction factor of 6/5. This comes from the probability
-                    -- of the there not being a 50Hz rtc interrupts between any two successive
-                    -- 60Hz display interrupts.
-                    if (rtc_counter = 383999) then
-                        rtc_counter <= (others => '0');
-                        isr(3) <= '1';
-                    else
-                        rtc_counter <= rtc_counter + 1;
-                    end if;
-                else
-                    -- Generate the rtc interrupt on the rising edge (line 100 of the screen)
-                    if (rtc_intr2 = '0' and rtc_intr1 = '1') then
-                        isr(3) <= '1';
-                    end if;
-                end if;
+
                 if (comms_mode = "00") then
                     -- Cassette In Mode
                     if (casIn2 = '0') then
@@ -736,7 +718,6 @@ begin
                         general_counter <= general_counter - x"001";
                     end if;
                 end if;
-
 
                 -- Tape Interface Receive
                 casIn1 <= casIn;
@@ -1058,13 +1039,7 @@ begin
 
             -- Field; field=0 is the (first) odd field, field=1 is the even field
             if h_count = h_total and v_count = v_total then
-                if mode = "001" then
-                    -- Interlaced, so alternate odd and even fields
-                    field <= not field;
-                else
-                    -- Non-interlaced, so odd fields only
-                    field <= '0';
-                end if;
+                field <= not field;
             end if;
 
             -- Char_row counts 0..7 or 0..9 depending on the mode.
@@ -1249,7 +1224,7 @@ begin
                 --green_int <= (not ctrl_caps) & "111"; -- DEBUG make screen green
             end if;
             -- Vertical Sync, lasts 2.5 lines (160us)
-            if (field = '0') then
+            if (field = '0' or mode /= "001") then
                 -- first field (odd) of interlaced scanning (or non interlaced)
                 -- vsync starts at the beginning of the line
                 if (h_count1 = 0 and v_count = vsync_start) then
@@ -1278,21 +1253,9 @@ begin
             elsif h_count1 = hblank_end and (v_count < vblank_start or v_count >= vblank_end) then
                 blank_int <= '0';
             end if;
-            -- Display Interrupt, this is co-incident with the leading edge
-            -- of hsync at the end the last active line of display
-            -- (line 249 in text mode or line 255 in graphics mode)
-            if (h_count1 = hsync_start) and ((v_count = v_disp_gph and mode_text = '0') or (v_count = v_disp_txt and mode_text = '1')) then
-                display_intr <= '1';
-            elsif (h_count1 = hsync_end) then
-                display_intr <= '0';
-            end if;
-            -- RTC Interrupt, this occurs 8192us (200 lines) after the end of
-            -- the vsync, and is not co-incident with hsync
-            if (v_count = v_rtc) and ((field = '0' and h_count1 = 0) or (field = '1' and h_count1 = ('0' & h_total(10 downto 1)))) then
-                rtc_intr <= '1';
-            elsif (v_count = 0) then
-                rtc_intr <= '0';
-            end if;
+
+
+
         end if;
     end process;
 
