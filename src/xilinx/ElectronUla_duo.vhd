@@ -53,7 +53,7 @@ entity ElectronULA_duo is
         -- Keyboard
         kbd           : in  std_logic_vector(3 downto 0);
         caps          : out std_logic;
-        
+
         -- Cassette
         casIn         : in  std_logic;
         casOut        : out std_logic;
@@ -207,7 +207,7 @@ begin
 
         rom_latch => rom_latch,
 
-        mode_init => "00",
+        mode_init => "000",
 
         -- Clock Generation
         cpu_clken_out  => cpu_clken,
@@ -220,7 +220,7 @@ begin
     blue  <= video_blue(3);
     csync <= video_hsync;
     caps  <= not caps_led;
-    
+
     -- IRQ is open collector to avoid contention with the expansion bus
     IRQ_n <= '0' when ula_irq_n = '0' else 'Z';
 

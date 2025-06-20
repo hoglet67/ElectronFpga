@@ -150,7 +150,7 @@ begin
         motor_led         => LED2,
         cassette_in       => casIn,
         cassette_out      => casOut,
-        vid_mode          => DIP,
+        vid_mode          => "0" & DIP,
         test              => test,
         avr_RxD           => avr_RxD,
         avr_TxD           => avr_TxD,

@@ -374,7 +374,7 @@ architecture rtl of ElectronFpga_TangNano20K is
     signal ext_nWE_long    : std_logic;
     signal ext_nOE         : std_logic;
 
-    signal vid_mode        : std_logic_vector(1 downto 0);
+    signal vid_mode        : std_logic_vector(2 downto 0);
 
     signal caps_led        : std_logic;
     signal motor_led       : std_logic;
@@ -493,10 +493,11 @@ begin
         cassette_in       => '0',
         cassette_out      => open,
         -- Format of Video
-        -- 00 - sRGB - interlaced
-        -- 01 - sRGB - non interlaced
-        -- 10 - SVGA - 50Hz
-        -- 11 - SVGA - 60Hz
+        -- 000 - sRGB - interlaced
+        -- 001 - sRGB - non interlaced
+        -- 010 - SVGA - 50Hz
+        -- 011 - SVGA - 60Hz
+        -- 100 - HDMI - 50Hz
         vid_mode          => vid_mode,
         -- Test outputs
         test              => test,
@@ -523,7 +524,7 @@ begin
     audio_l <= x"10000" when audio_l_tmp = '1' else x"F0000";
     audio_r <= x"10000" when audio_r_tmp = '1' else x"F0000";
 
-    vid_mode <= "10"; -- Force 50Hz VGA mode for now
+    vid_mode <= "100"; -- Default to HDMI for now
 
     --------------------------------------------------------
     -- Clock Generation

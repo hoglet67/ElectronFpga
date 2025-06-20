@@ -82,11 +82,12 @@ entity ElectronFpga_core is
         cassette_out   : out std_logic;
 
         -- Format of Video
-        -- 00 - sRGB - interlaced
-        -- 01 - sRGB - non interlaced
-        -- 10 - SVGA - 50Hz
-        -- 11 - SVGA - 60Hz
-        vid_mode       : in  std_logic_vector(1 downto 0);
+        -- 000 - sRGB - interlaced
+        -- 001 - sRGB - non interlaced
+        -- 010 - SVGA - 50Hz
+        -- 011 - SVGA - 60Hz
+        -- 100 - HDMI - 50Hz
+        vid_mode       : in  std_logic_vector(2 downto 0);
 
         -- Test outputs
         test           : out std_logic_vector(7 downto 0);
@@ -242,6 +243,7 @@ begin
     port map (
         clk_16M00 => clk_16M00,
         clk_24M00 => clk_24M00,
+        clk_27M00 => clk_27M00,
         clk_32M00 => clk_32M00,
         clk_33M33 => clk_33M33,
         clk_40M00 => clk_40M00,
