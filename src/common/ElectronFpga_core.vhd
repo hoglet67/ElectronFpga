@@ -151,6 +151,7 @@ architecture behavioral of ElectronFpga_core is
 
     signal video_vsync_int   : std_logic;
     signal video_hsync_int   : std_logic;
+    signal video_blank_int   : std_logic;
     signal video_red_int     : std_logic_vector(3 downto 0);
     signal video_green_int   : std_logic_vector(3 downto 0);
     signal video_blue_int    : std_logic_vector(3 downto 0);
@@ -267,6 +268,7 @@ begin
         blue      => video_blue_int,
         vsync     => video_vsync_int,
         hsync     => video_hsync_int,
+        blank     => video_blank_int,
 
         -- Audio
         sound     => sound,
@@ -404,10 +406,6 @@ begin
 --------------------------------------------------------
 
     GenHDMI: if IncludeHDMI generate
-        signal hsync1     : std_logic;
-        signal vsync1     : std_logic;
-        signal hcnt       : std_logic_vector(9 downto 0);
-        signal vcnt       : std_logic_vector(9 downto 0);
         signal hdmi_red   : std_logic_vector(7 downto 0);
         signal hdmi_green : std_logic_vector(7 downto 0);
         signal hdmi_blue  : std_logic_vector(7 downto 0);
@@ -417,69 +415,16 @@ begin
         signal hdmi_audio : std_logic_vector (15 downto 0);
     begin
 
-        -- Recreate the video sync/blank signals that match standard HDTV 720x576p
-        --
-        -- Modeline "720x576 @ 50hz"  27    720   732   796   864   576   581   586   625
-        --
-        -- Hcnt is set to 0 on the trailing edge of hsync from the Beeb core
-        -- so the H constants below need to be offset by 864-796=68
-        --
-        -- Vcnt is set to 0 on the trailing edge of vsync from the Beeb core
-        -- so the V constants below need to be offset by 625-586=39
-        --
-        -- This only works because the Beeb core is generating 32us lines
-        --
-        -- The hdmidataencode module inserts a two 32 pixel data packets after the
-        -- first edge of hsync. The hsync pluse + back porch needs to be at least
-        -- this width. There are also min requirements on the size of control
-        -- islands of 12 pixels.
-
         process(clk_27M00)
-            variable voffset  : integer;
-            variable vsize    : integer;
         begin
             if rising_edge(clk_27M00) then
                 hdmi_audio <= x"1000" when sound = '1' else x"F000";
-                hsync1 <= video_hsync_int;
-                if hsync1 = '0' and video_hsync_int = '1' then
-                    hcnt <= (others => '0');
-                    vsync1 <= video_vsync_int;
-                    if vsync1 = '0' and video_vsync_int = '1' then
-                        vcnt <= (others => '0');
-                    else
-                        vcnt <= vcnt + 1;
-                    end if;
-                else
-                    hcnt <= hcnt + 1;
-                end if;
-                if hdmi_audio_en = '1' then
-                    voffset := 39;
-                    vsize   := 576;
-                else
-                    voffset := 55;
-                    vsize   := 540;
-                end if;
-                if hcnt < 68 or hcnt >= 68 + 720 or vcnt < voffset or vcnt >= voffset + vsize then
-                    hdmi_blank <= '1';
-                    hdmi_red   <= (others => '0');
-                    hdmi_green <= (others => '0');
-                    hdmi_blue  <= (others => '0');
-                else
-                    hdmi_blank <= '0';
-                    hdmi_red   <= video_red_int   & "0000";
-                    hdmi_green <= video_green_int & "0000";
-                    hdmi_blue  <= video_blue_int  & "0000";
-                end if;
-                if hcnt >= 732 + 68 then -- 800
-                    hdmi_hsync <= '0';
-                    if vcnt >= 581 + 39 then -- 620
-                        hdmi_vsync <= '0';
-                    else
-                        hdmi_vsync <= '1';
-                    end if;
-                else
-                    hdmi_hsync <= '1';
-                end if;
+                hdmi_vsync <= video_vsync_int;
+                hdmi_hsync <= video_hsync_int;
+                hdmi_blank <= video_blank_int;
+                hdmi_red   <= video_red_int   & "0000";
+                hdmi_green <= video_green_int & "0000";
+                hdmi_blue  <= video_blue_int  & "0000";
             end if;
         end process;
 
