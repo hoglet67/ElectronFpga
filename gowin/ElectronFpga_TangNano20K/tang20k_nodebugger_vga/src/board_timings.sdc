@@ -11,8 +11,13 @@ create_generated_clock -name clock_32 -source [get_ports {sys_clk}] -master_cloc
 create_generated_clock -name clock_96 -source [get_ports {sys_clk}] -master_clock sys_clk -divide_by 27 -multiply_by 96 [get_nets {clock_96}]
 create_generated_clock -name clock_81 -source [get_ports {sys_clk}] -master_clock sys_clk -divide_by 27 -multiply_by 81 [get_nets {clock_81}]
 create_generated_clock -name spdif_clk -source [get_ports {audio_clk}] -master_clock audio_clk -divide_by 4 -multiply_by 1 [get_nets {spdif_clk}]
+create_generated_clock -name clock_vid -source [get_ports {sys_clk}] -master_clock sys_clk -divide_by 27 -multiply_by 27 [get_nets {electron_core/ula/clk_video}]
 
 // Ignore any timing paths between the main and video clocks
+set_clock_groups -asynchronous -group [get_clocks {clock_16}] -group [get_clocks {clock_vid}]
+set_clock_groups -asynchronous -group [get_clocks {clock_vid}] -group [get_clocks {clock_16}]
+
+// Ignore any timing paths between the main and HDMI clocks
 set_clock_groups -asynchronous -group [get_clocks {clock_16}] -group [get_clocks {clock_27}]
 set_clock_groups -asynchronous -group [get_clocks {clock_27}] -group [get_clocks {clock_16}]
 set_clock_groups -asynchronous -group [get_clocks {clock_27}] -group [get_clocks {clock_81}]
