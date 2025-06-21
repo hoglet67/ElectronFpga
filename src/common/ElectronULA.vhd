@@ -40,6 +40,9 @@ entity ElectronULA is
         -- System clock: should be 16MHz
         clk_16M00 : in  std_logic;
 
+        -- Power on reset
+        hard_reset_n : in std_logic := '1';
+
         -- Teletext clocks
         clk_24M00 : in  std_logic := '0';
         clk_ttxt  : in  std_logic := '0';
@@ -648,7 +651,14 @@ begin
 
         if rising_edge(clk_16M00) then
 
-            if (RST_n = '0') then
+            if hard_reset_n = '0' then
+               mode                <= mode_init;
+               mode_init_copy      <= mode_init;
+               power_on_reset      <= '1';
+               delayed_clear_reset <= '0';
+            end if;
+
+            if RST_n = '0' then
 
                isr             <= (others => '0');
                ier             <= (others => '0');
@@ -663,8 +673,6 @@ begin
                intr_counter    <= (others => '0');
                general_counter <= (others => '0');
                sound_bit       <= '0';
-               mode            <= mode_init;
-               mode_init_copy  <= mode_init;
                ctrl_caps       <= '0';
                cindat          <= '0';
                cintone         <= '0';

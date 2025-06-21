@@ -250,6 +250,8 @@ begin
         clk_33M33 => clk_33M33,
         clk_40M00 => clk_40M00,
 
+        hard_reset_n => hard_reset_n,
+
         -- CPU Interface
         addr      => cpu_a(15 downto 0),
         data_in   => cpu_dout,
