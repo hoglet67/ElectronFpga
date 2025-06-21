@@ -222,6 +222,7 @@ architecture behavioral of ElectronULA is
   signal field1         : std_logic;
   signal field2         : std_logic;
   signal field3         : std_logic;
+  signal is_int_field   : std_logic; -- field qualified by is_interlaced
 
   signal caps_int       : std_logic;
   signal motor_int      : std_logic;
@@ -360,6 +361,7 @@ begin
     -- Decode mode into more friendly form
     is_interlaced  <= '1' when mode = "01" else '0';
     is_scandoubled <= '1' when IncludeVGA and (mode = "10" or mode = "11") else '0';
+    is_int_field   <= '1' when field = '1' and is_interlaced = '1' else '0';
 
     -- video timing constants
     -- mode 00 - RGB/s @ 50Hz non-interlaced
@@ -464,12 +466,12 @@ begin
 
     vsync_end    <= std_logic_vector(to_unsigned(560, 10)) when mode = "11" and IncludeVGA else
                     std_logic_vector(to_unsigned(554, 10)) when mode = "10" and IncludeVGA else
-                    std_logic_vector(to_unsigned(276, 10)) when field = '0'                else
+                    std_logic_vector(to_unsigned(276, 10)) when is_int_field = '0'         else
                     std_logic_vector(to_unsigned(277, 10));
 
     v_total      <= std_logic_vector(to_unsigned(627, 10)) when mode = "11" and IncludeVGA else
                     std_logic_vector(to_unsigned(624, 10)) when mode = "10" and IncludeVGA else
-                    std_logic_vector(to_unsigned(311, 10)) when field = '0'                else
+                    std_logic_vector(to_unsigned(311, 10)) when is_int_field = '0'         else
                     std_logic_vector(to_unsigned(312, 10));
 
     v_active_gph <= std_logic_vector(to_unsigned(512, 10)) when mode = "11" and IncludeVGA else
@@ -556,7 +558,7 @@ begin
 
     vblank_end   <= std_logic_vector(to_unsigned(628-44-1, 10)) when mode = "11" and IncludeVGA else
                     std_logic_vector(to_unsigned(625-32-1, 10)) when mode = "10" and IncludeVGA else
-                    std_logic_vector(to_unsigned(312-16-1, 10)) when field = '0'                 else
+                    std_logic_vector(to_unsigned(312-16-1, 10)) when is_int_field = '0'         else
                     std_logic_vector(to_unsigned(313-16-1, 10));
 
     -- All of main memory (0x0000-0x7fff) is dual port RAM in the ULA
@@ -1257,7 +1259,7 @@ begin
                 --green_int <= (not ctrl_caps) & "111"; -- DEBUG make screen green
             end if;
             -- Vertical Sync, lasts 2.5 lines (160us)
-            if field = '0' or is_interlaced = '0' then
+            if is_int_field = '0' then
                 -- first field (odd) of interlaced scanning (or non interlaced)
                 -- vsync starts at the beginning of the line
                 if (h_count1 = 0 and v_count = vsync_start) then
@@ -1296,7 +1298,7 @@ begin
             end if;
             -- RTC Interrupt, this occurs 8192us (200 lines) after the end of
             -- the vsync, and is not co-incident with hsync
-            if (v_count = v_rtc) and (((field = '0' or is_interlaced = '0') and h_count1 = 0) or (field = '1' and is_interlaced = '1' and h_count1 = ('0' & h_total(10 downto 1)))) then
+            if (v_count = v_rtc) and ((is_int_field = '0' and h_count1 = 0) or (is_int_field = '1' and h_count1 = ('0' & h_total(10 downto 1)))) then
                 rtc_intr <= '1';
             elsif (v_count = 0) then
                 rtc_intr <= '0';
