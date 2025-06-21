@@ -485,9 +485,9 @@ begin
                     std_logic_vector(to_unsigned(512, 10)) when mode = "10" and field = '1' and IncludeVGA else
                     std_logic_vector(to_unsigned(255, 10));
 
-    v_disp_txt   <= std_logic_vector(to_unsigned(501, 10)) when mode = "11"               and IncludeVGA else
-                    std_logic_vector(to_unsigned(499, 10)) when mode = "10" and field='0' and IncludeVGA else
-                    std_logic_vector(to_unsigned(500, 10)) when mode = "10" and field='1' and IncludeVGA else
+    v_disp_txt   <= std_logic_vector(to_unsigned(501, 10)) when mode = "11"                 and IncludeVGA else
+                    std_logic_vector(to_unsigned(499, 10)) when mode = "10" and field = '0' and IncludeVGA else
+                    std_logic_vector(to_unsigned(500, 10)) when mode = "10" and field = '1' and IncludeVGA else
                     std_logic_vector(to_unsigned(249, 10));
 
     v_rtc        <= std_logic_vector(to_unsigned(201, 10)) when mode = "11" and IncludeVGA else
@@ -1257,7 +1257,7 @@ begin
                 --green_int <= (not ctrl_caps) & "111"; -- DEBUG make screen green
             end if;
             -- Vertical Sync, lasts 2.5 lines (160us)
-            if field = '0' or is_scandoubled = '1' then
+            if field = '0' or is_interlaced = '0' then
                 -- first field (odd) of interlaced scanning (or non interlaced)
                 -- vsync starts at the beginning of the line
                 if (h_count1 = 0 and v_count = vsync_start) then
@@ -1296,7 +1296,7 @@ begin
             end if;
             -- RTC Interrupt, this occurs 8192us (200 lines) after the end of
             -- the vsync, and is not co-incident with hsync
-            if (v_count = v_rtc) and (((field = '0' or is_scandoubled = '1') and h_count1 = 0) or (field = '1' and h_count1 = ('0' & h_total(10 downto 1)))) then
+            if (v_count = v_rtc) and (((field = '0' or is_interlaced = '0') and h_count1 = 0) or (field = '1' and is_interlaced = '1' and h_count1 = ('0' & h_total(10 downto 1)))) then
                 rtc_intr <= '1';
             elsif (v_count = 0) then
                 rtc_intr <= '0';
