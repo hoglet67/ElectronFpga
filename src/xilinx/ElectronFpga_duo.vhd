@@ -65,8 +65,7 @@ architecture behavioral of ElectronFpga_duo is
 
     signal clock_16        : std_logic;
     signal clock_24        : std_logic;
-    signal clock_32        : std_logic;
-    signal clock_33        : std_logic;
+    signal clock_27        : std_logic;
     signal clock_40        : std_logic;
     signal hard_reset_n    : std_logic;
     signal powerup_reset_n : std_logic;
@@ -102,7 +101,7 @@ begin
         -- used as a 24.00MHz for the SAA5050 in Mode 7
         CLK1_OUT  => clock_24,
         -- used as a output clock MIST scan doubler for the SAA5050 in Mode 7
-        CLK2_OUT  => clock_32,
+        CLK2_OUT  => open,
         -- used as a video clock when the ULA is in 60Hz VGA Mode
         CLK3_OUT  => clock_40
     );
@@ -111,7 +110,7 @@ begin
     inst_dcm1 : entity work.dcm1 port map(
         CLKIN_IN          => clk_32M00,
         -- used as a video clock when the ULA is in 50Hz VGA Mode
-        CLKFX_OUT         => clock_33
+        CLKFX_OUT         => clock_27
     );
 
     electron_core : entity work.ElectronFpga_core
@@ -123,9 +122,8 @@ begin
     port map (
         clk_16M00         => clock_16,
         clk_24M00         => clock_24,
-        clk_32M00         => clock_32,
-        clk_33M33         => clock_33,
-        clk_40M00         => clock_40,
+        clk_33M33         => clock_27, -- clock for mode="10" (576p)
+        clk_40M00         => clock_40, -- clock for mode="11" (600p)
         hard_reset_n      => hard_reset_n,
         ps2_clk           => ps2_clk,
         ps2_data          => ps2_data,
@@ -162,9 +160,9 @@ begin
 --------------------------------------------------------
 
     -- Generate a reliable power up reset, as ERST on the Papilio doesn't do this
-    reset_gen : process(clock_32)
+    reset_gen : process(clock_16)
     begin
-        if rising_edge(clock_32) then
+        if rising_edge(clock_16) then
             if (reset_counter(reset_counter'high) = '0') then
                 reset_counter <= reset_counter + 1;
             end if;
