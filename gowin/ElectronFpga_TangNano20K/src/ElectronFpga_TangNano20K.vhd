@@ -477,6 +477,7 @@ begin
         -- 512KB logical address space
         ext_nOE           => ext_nOE,
         ext_nWE           => ext_nWE,
+        ext_nWE_long      => ext_nWE_long,
         ext_nCS           => ext_nCS,
         ext_A             => ext_A,
         ext_Dout          => ext_Dout,
@@ -954,7 +955,7 @@ begin
             core_Dout      => ext_Dout,
             core_nCS       => ext_nCS,
             core_nWE       => '1', -- not currently used by the memory controller
-            core_nWE_long  => cpu_rnw,
+            core_nWE_long  => ext_nWE_long,
             core_nOE       => ext_nOE,
 
             O_sdram_clk    => O_sdram_clk     ,
