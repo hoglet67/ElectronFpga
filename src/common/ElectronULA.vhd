@@ -98,9 +98,18 @@ entity ElectronULA is
         caps      : out std_logic;
         motor     : out std_logic;
 
+        -- 4-bit ROM latch
         rom_latch : out std_logic_vector(3 downto 0);
 
-        mode_init : in std_logic_vector(1 downto 0);
+        -- Format of Video
+        -- 00 - sRGB - interlaced
+        -- 01 - sRGB - non interlaced
+        -- 10 - 576p - 50Hz (27MHz pixel clock for 720x576 50Hz HDMI timings)
+        -- 11 - 600p - 60Hz (40MHz pixel clock for 800x600 60Hz SVGA timings)
+        mode_init      : in  std_logic_vector(1 downto 0);
+
+        -- Fake the RTC and Display interrupt timing (useful in 60Hz modes)
+        fake_timing    : in  std_logic := '0';
 
         -- Clock Generation
         cpu_clken_out  : out std_logic;
@@ -131,7 +140,7 @@ architecture behavioral of ElectronULA is
   signal power_on_reset : std_logic := '1';
   signal delayed_clear_reset : std_logic := '0';
 
-  signal rtc_counter    : std_logic_vector(18 downto 0);
+  signal intr_counter   : std_logic_vector(19 downto 0);
   signal general_counter: std_logic_vector(15 downto 0);
   signal sound_bit      : std_logic;
   signal isr_data       : std_logic_vector(7 downto 0);
@@ -211,6 +220,9 @@ architecture behavioral of ElectronULA is
   signal ctrl_caps      : std_logic;
 
   signal field          : std_logic;
+  signal field1         : std_logic;
+  signal field2         : std_logic;
+  signal field3         : std_logic;
 
   signal caps_int       : std_logic;
   signal motor_int      : std_logic;
@@ -635,6 +647,8 @@ begin
     rom_latch  <= page_enable & page;
 
     process (clk_16M00, RST_n)
+        variable rtc_skew  : integer;
+        variable disp_skew : integer;
     begin
 
         if rising_edge(clk_16M00) then
@@ -651,7 +665,7 @@ begin
                comms_mode      <= "01";
                motor_int       <= '0';
                caps_int        <= '0';
-               rtc_counter     <= (others => '0');
+               intr_counter    <= (others => '0');
                general_counter <= (others => '0');
                sound_bit       <= '0';
                mode            <= mode_init;
@@ -666,33 +680,51 @@ begin
                     mode <= mode_init;
                     mode_init_copy <= mode_init;
                 end if;
+                -- Synchronize the field signal from the VGA clock domain
+                field1 <= field;
+                field2 <= field1;
+                field3 <= field2;
+                -- This 20 bit-counter counts two fields in 16MHz cycles (0 to approx 639999)
+                if intr_counter = 639999 then
+                    intr_counter <= (others => '0');
+                else
+                    intr_counter <= intr_counter + 1;
+                end if;
+                -- Synchronise the interrupt counter with some hysteresis when field transitions from 0 to 1
+                if field2 = '1' and field3 = '0' and intr_counter > 4  and intr_counter < 640000 - 4 then
+                    intr_counter <= (others => '0');
+                end if;
+
                 -- Synchronize the display interrupt signal from the VGA clock domain
                 display_intr1 <= display_intr;
                 display_intr2 <= display_intr1;
-                -- Generate the display end interrupt on the rising edge (line 256 of the screen)
-                if (display_intr2 = '0' and display_intr1 = '1') then
-                    isr(2) <= '1';
-                end if;
+
                 -- Synchronize the rtc interrupt signal from the VGA clock domain
                 rtc_intr1 <= rtc_intr;
                 rtc_intr2 <= rtc_intr1;
-                if mode = "11" and IncludeVGA then
-                    -- For 60Hz frame rates we must synthesise a the 50Hz real time clock interrupt
-                    -- In theory the counter limit should be 319999, but there are additional
-                    -- rtc ticks if not rtc interrupt is received between two display interrupts
-                    -- hence the correction factor of 6/5. This comes from the probability
-                    -- of the there not being a 50Hz rtc interrupts between any two successive
-                    -- 60Hz display interrupts.
-                    if (rtc_counter = 383999) then
-                        rtc_counter <= (others => '0');
+
+                -- Two options for generating the display/rtc interrupt, depening on the fake_timing input
+                if fake_timing = '1' then
+                    -- Allow fine tuning of interrupt positions (16 = 1us late)
+                    disp_skew := 16; -- this is critical to firetrack (0, -16, -32 induce failures)
+                    rtc_skew  := 16;
+                    -- RTC interrupt exact timing (from logic analyzer captures in 16MHz cycles)
+                    if intr_counter = 101874 + rtc_skew or intr_counter = 421874 + rtc_skew then
                         isr(3) <= '1';
-                    else
-                        rtc_counter <= rtc_counter + 1;
+                    end if;
+                    -- Display interrupt exact timing (from logic analyzer captures in 16MHz cycles)
+                    if ((intr_counter = 261888 + disp_skew or intr_counter = 582400 + disp_skew) and mode_text = '0') or
+                       ((intr_counter = 255744 + disp_skew or intr_counter = 576256 + disp_skew) and mode_text = '1') then
+                        isr(2) <= '1';
                     end if;
                 else
                     -- Generate the rtc interrupt on the rising edge (line 100 of the screen)
                     if (rtc_intr2 = '0' and rtc_intr1 = '1') then
                         isr(3) <= '1';
+                    end if;
+                    -- Generate the display end interrupt on the rising edge (line 256 of the screen)
+                    if display_intr2 = '0' and display_intr1 = '1' then
+                        isr(2) <= '1';
                     end if;
                 end if;
                 if (comms_mode = "00") then

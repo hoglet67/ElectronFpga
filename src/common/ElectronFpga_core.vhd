@@ -84,9 +84,12 @@ entity ElectronFpga_core is
         -- Format of Video
         -- 00 - sRGB - interlaced
         -- 01 - sRGB - non interlaced
-        -- 10 - SVGA - 50Hz
-        -- 11 - SVGA - 60Hz
+        -- 10 - 576p - 50Hz (27MHz pixel clock for 720x576 50Hz HDMI timings)
+        -- 11 - 600p - 60Hz (40MHz pixel clock for 800x600 60Hz SVGA timings)
         vid_mode       : in  std_logic_vector(1 downto 0);
+
+        -- Fake the RTC and Display interrupt timing (useful in 60Hz modes)
+        fake_timing    : in  std_logic := '0';
 
         -- Test outputs
         test           : out std_logic_vector(7 downto 0);
@@ -291,6 +294,7 @@ begin
         rom_latch => rom_latch,
 
         mode_init => vid_mode,
+        fake_timing => fake_timing,
 
         -- Clock Generation
         cpu_clken_out  => cpu_clken,
