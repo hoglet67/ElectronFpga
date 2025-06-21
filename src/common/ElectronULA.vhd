@@ -76,6 +76,7 @@ entity ElectronULA is
         blue      : out std_logic_vector(3 downto 0);
         vsync     : out std_logic;
         hsync     : out std_logic;
+        blank     : out std_logic;
 
         -- Audio
         sound     : out std_logic;
@@ -151,6 +152,8 @@ architecture behavioral of ElectronULA is
 
   signal hsync_start    : std_logic_vector(10 downto 0);
   signal hsync_end      : std_logic_vector(10 downto 0);
+  signal hblank_start   : std_logic_vector(10 downto 0);
+  signal hblank_end     : std_logic_vector(10 downto 0);
   signal h_active       : std_logic_vector(10 downto 0);
   signal h_total        : std_logic_vector(10 downto 0);
   signal h_count        : std_logic_vector(10 downto 0);
@@ -158,6 +161,8 @@ architecture behavioral of ElectronULA is
 
   signal vsync_start    : std_logic_vector(9 downto 0);
   signal vsync_end      : std_logic_vector(9 downto 0);
+  signal vblank_start   : std_logic_vector(9 downto 0);
+  signal vblank_end     : std_logic_vector(9 downto 0);
   signal v_active_gph   : std_logic_vector(9 downto 0);
   signal v_active_txt   : std_logic_vector(9 downto 0);
   signal v_total        : std_logic_vector(9 downto 0);
@@ -476,6 +481,73 @@ begin
     v_rtc        <= std_logic_vector(to_unsigned(201, 10)) when mode = "11" and IncludeVGA else
                     std_logic_vector(to_unsigned(199, 10)) when mode = "10" and IncludeVGA else
                     std_logic_vector(to_unsigned( 99, 10));
+
+    -- Precise blanking is quite tricky, because the 640x512 active part of the screen is at 0,0
+    --
+    -- The code is:
+    --
+    --   if h_count1 = hblank_start then
+    --       blank_int <= '1';
+    --   elsif h_count1 = hblank_end and (v_count < vblank_start or v_count >= vblank_end) then
+    --       blank_int <= '0';
+    --   end if;
+    --
+    -- 720x576p50 example (864x624 total)
+    --    640x512 needs 40px left/right borders and 32px top/bottom borders
+    --
+    -- lines   0..511 are active area of screen
+    -- lines 512..543 are bottom border (blank)
+    -- lines 544..591 are blanking (blanked)
+    -- lines 592..623 are top border (blank)
+    --
+    --         O = active part of screen
+    --         X = border
+    --         . = blanked        HBS HBE
+    --                            V   V
+    --     0   OOOOOOOOOOOOOOOOXXX....XXX
+    --         OOOOOOOOOOOOOOOOXXX....XXX
+    --         OOOOOOOOOOOOOOOOXXX....XXX
+    --         OOOOOOOOOOOOOOOOXXX....XXX
+    --         OOOOOOOOOOOOOOOOXXX....XXX
+    --         OOOOOOOOOOOOOOOOXXX....XXX
+    --    511  OOOOOOOOOOOOOOOOXXX....XXX
+    --    512  XXXXXXXXXXXXXXXXXXX....XXX
+    --    ...  XXXXXXXXXXXXXXXXXXX....XXX
+    --    543  XXXXXXXXXXXXXXXXXXX....... <- VBS
+    --    544  ..........................
+    --    ...  ..........................
+    --    591  .......................XXX <- VBE
+    --    592  XXXXXXXXXXXXXXXXXXX....XXX
+    --    ...  XXXXXXXXXXXXXXXXXXX....XXX
+    --    623  XXXXXXXXXXXXXXXXXXX....XXX
+    --
+    --
+    -- IMPORTANT: blanking is setup one line ahead:
+    --       last active line in the bottom border 543 is set at the end of line 542
+    --       first active line in the top border 592 is set and the end of line 591
+    --
+    -- So if v_count < 543 or v_count >= 591 then the next line is active
+    --
+    -- Hence: vblank_start = 512+32-1 and vblank_end = 624-32-1
+    --
+    -- Note: this is currentl only used for HDMI (mode 100) so the other modes are untested
+
+    hblank_start <= std_logic_vector(to_unsigned(  640+80, 11)) when mode = "11" and IncludeVGA else
+                    std_logic_vector(to_unsigned(  640+40, 11)) when mode = "10" and IncludeVGA else
+                    std_logic_vector(to_unsigned(  640+48, 11));
+
+    hblank_end   <= std_logic_vector(to_unsigned( 1056-80, 11)) when mode = "11" and IncludeVGA else
+                    std_logic_vector(to_unsigned(  864-40, 11)) when mode = "10" and IncludeVGA else
+                    std_logic_vector(to_unsigned( 1024-48, 11));
+
+    vblank_start <= std_logic_vector(to_unsigned(512+44-1, 10)) when mode = "11" and IncludeVGA else
+                    std_logic_vector(to_unsigned(512+32-1, 10)) when mode = "10" and IncludeVGA else
+                    std_logic_vector(to_unsigned(256+16-1, 10));
+
+    vblank_end   <= std_logic_vector(to_unsigned(628-44-1, 10)) when mode = "11" and IncludeVGA else
+                    std_logic_vector(to_unsigned(624-32-1, 10)) when mode = "10" and IncludeVGA else
+                    std_logic_vector(to_unsigned(312-16-1, 10)) when field = '0'                 else
+                    std_logic_vector(to_unsigned(313-16-1, 10));
 
     -- All of main memory (0x0000-0x7fff) is dual port RAM in the ULA
     ram_32k_gen: if Include32KRAM generate
@@ -1172,6 +1244,12 @@ begin
                 hsync_int <= '0';
             elsif (h_count1 = hsync_end) then
                 hsync_int <= '1';
+            end if;
+             -- Blanking
+            if h_count1 = hblank_start then
+                blank <= '1';
+            elsif h_count1 = hblank_end and (v_count < vblank_start or v_count >= vblank_end) then
+                blank <= '0';
             end if;
             -- Display Interrupt, this is co-incident with the leading edge
             -- of hsync at the end the last active line of display
