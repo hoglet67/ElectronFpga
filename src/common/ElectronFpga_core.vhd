@@ -62,6 +62,7 @@ entity ElectronFpga_core is
         -- 512KB logical address space
         ext_nOE        : out std_logic;
         ext_nWE        : out std_logic;
+        ext_nWE_long   : out std_logic;
         ext_nCS        : out std_logic;
         ext_A          : out std_logic_vector (18 downto 0);
         ext_Dout       : in  std_logic_vector (7 downto 0);
@@ -369,23 +370,29 @@ begin
 
             ext_Din <= cpu_dout;
 
-            if cpu_R_W_n = '1' or ext_enable = '0' or cpu_clken_r = '0' then
+            if cpu_R_W_n = '1' or ext_enable = '0' then
                 -- Default is disable WE, except in a few cases
+                ext_nWE_long <= '1';
                 ext_nWE <= '1';
             elsif cpu_a(15) = '0' then
                 -- exteral main memory access
-                ext_nWE <= '0';
+                ext_nWE_long <= '0';
+                ext_nWE <= cpu_clken_r;
             elsif cpu_a(14) = '0' and rom_latch(3 downto 2) = "00" and rom_latch(0) = '0' and abr_lo_bank_lock = '0' then
                 -- Slots 0,2 are write protected with FCDC/FCDD
-                ext_nWE <= '0';
+                ext_nWE_long <= '0';
+                ext_nWE <= cpu_clken_r;
             elsif cpu_a(14) = '0' and rom_latch(3 downto 2) = "00" and rom_latch(0) = '1' and abr_hi_bank_lock = '0' then
                 -- Slots 1,3 are write protected with FCDE/FCDF
-                ext_nWE <= '0';
+                ext_nWE_long <= '0';
+                ext_nWE <= cpu_clken_r;
             elsif cpu_a(14) = '0' and rom_latch(3 downto 0) = "0100" and cpu_a(13 downto 8) >= "110110" then
                 -- Slots 4 (MMFS) has B600 onwards as writeable for private workspace
-                ext_nWE <= '0';
+                ext_nWE_long <= '0';
+                ext_nWE <= cpu_clken_r;
             else
                 -- Other slots are read only
+                ext_nWE_long <= '1';
                 ext_nWE <= '1';
             end if;
 
