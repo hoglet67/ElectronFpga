@@ -419,7 +419,11 @@ begin
         process(clk_27M00)
         begin
             if rising_edge(clk_27M00) then
-                hdmi_audio <= x"1000" when sound = '1' else x"F000";
+                if sound = '1' then
+                    hdmi_audio <= x"1000";
+                else
+                    hdmi_audio <= x"F000";
+                end if;
                 hdmi_red   <= video_red_int   & "0000";
                 hdmi_green <= video_green_int & "0000";
                 hdmi_blue  <= video_blue_int  & "0000";
