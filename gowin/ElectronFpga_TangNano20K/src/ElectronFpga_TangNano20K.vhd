@@ -246,7 +246,7 @@ architecture rtl of ElectronFpga_TangNano20K is
         if SIM then
             return 10;
         else
-            return 24; --DB: > 10ms for SPI to start up?
+            return 20; --DB: > 10ms for SPI to start up?
         end if;
     end function;
 
