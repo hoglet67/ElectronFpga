@@ -965,13 +965,7 @@ begin
 
             -- Field; field=0 is the (first) odd field, field=1 is the even field
             if h_count = h_total and v_count = v_total then
-                if is_interlaced = '1' then
-                    -- Interlaced, so alternate odd and even fields
-                    field <= not field;
-                else
-                    -- Non-interlaced, so odd fields only
-                    field <= '0';
-                end if;
+                field <= not field;
             end if;
 
             -- Char_row counts 0..7 or 0..9 depending on the mode.
@@ -1156,7 +1150,7 @@ begin
                 --green_int <= (not ctrl_caps) & "111"; -- DEBUG make screen green
             end if;
             -- Vertical Sync, lasts 2.5 lines (160us)
-            if (field = '0') then
+            if field = '0' or is_scandoubled = '1' then
                 -- first field (odd) of interlaced scanning (or non interlaced)
                 -- vsync starts at the beginning of the line
                 if (h_count1 = 0 and v_count = vsync_start) then
@@ -1189,7 +1183,7 @@ begin
             end if;
             -- RTC Interrupt, this occurs 8192us (200 lines) after the end of
             -- the vsync, and is not co-incident with hsync
-            if (v_count = v_rtc) and ((field = '0' and h_count1 = 0) or (field = '1' and h_count1 = ('0' & h_total(10 downto 1)))) then
+            if (v_count = v_rtc) and (((field = '0' or is_scandoubled = '1') and h_count1 = 0) or (field = '1' and h_count1 = ('0' & h_total(10 downto 1)))) then
                 rtc_intr <= '1';
             elsif (v_count = 0) then
                 rtc_intr <= '0';
