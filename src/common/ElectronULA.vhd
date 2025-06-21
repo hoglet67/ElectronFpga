@@ -176,6 +176,8 @@ architecture behavioral of ElectronULA is
   -- Screen Mode Registers
 
   signal mode           : std_logic_vector(1 downto 0);
+  signal is_interlaced  : std_logic;
+  signal is_scandoubled : std_logic;
 
   -- bits 6..3 the of the 256 byte page that the mode starts at
   signal mode_base      : std_logic_vector(6 downto 3);
@@ -339,6 +341,10 @@ begin
 end;
 
 begin
+
+    -- Decode mode into more friendly form
+    is_interlaced  <= '1' when mode = "01"                else '0';
+    is_scandoubled <= '1' when mode = "10" or mode = "11" else '0';
 
     -- video timing constants
     -- mode 00 - RGB/s @ 50Hz non-interlaced
@@ -959,7 +965,7 @@ begin
 
             -- Field; field=0 is the (first) odd field, field=1 is the even field
             if h_count = h_total and v_count = v_total then
-                if mode = "01" then
+                if is_interlaced = '1' then
                     -- Interlaced, so alternate odd and even fields
                     field <= not field;
                 else
@@ -974,7 +980,7 @@ begin
             if hsync_int = '1' and hsync_int_last = '0'  then
                 if v_count = v_total then
                     char_row <= (others => '0');
-                elsif v_count(0) = '1' or mode(1) = '0' then
+                elsif v_count(0) = '1' or is_scandoubled = '0' then
                     if last_line = '1' then
                         char_row <= (others => '0');
                     else
@@ -990,7 +996,7 @@ begin
             end if;
 
             -- Determine last line of a row
-            if ((mode_text = '0' and char_row = 7) or (mode_text = '1' and char_row = 9)) and (v_count(0) = '1' or mode(1) = '0') then
+            if ((mode_text = '0' and char_row = 7) or (mode_text = '1' and char_row = 9)) and (v_count(0) = '1' or is_scandoubled = '0') then
                 last_line <= '1';
             else
                 last_line <= '0';
@@ -1201,11 +1207,11 @@ begin
              blue_int;
 
     vsync <= ttxt_vs_out when mode7_enable = '1' else
-             '1' when mode(1) = '0' else
+             '1' when is_scandoubled = '0' else
              vsync_int;
 
     hsync <= ttxt_hs_out when mode7_enable = '1' else
-             hsync_int and vsync_int when mode(1) = '0' else
+             hsync_int and vsync_int when is_scandoubled = '0' else
              hsync_int;
 
     caps  <= caps_int;
@@ -1588,12 +1594,12 @@ begin
             b_out     => mist_b,
             is15k     => open
             );
-        -- MUX to select sRGB/VGA based on vid_mode(1)
-        ttxt_r_out  <= mist_r(1) when mode(1) = '1' else ttxt_r;
-        ttxt_g_out  <= mist_g(1) when mode(1) = '1' else ttxt_g;
-        ttxt_b_out  <= mist_b(1) when mode(1) = '1' else ttxt_b;
-        ttxt_vs_out <= mist_vs   when mode(1) = '1' else '1';
-        ttxt_hs_out <= mist_hs   when mode(1) = '1' else crtc_hsync_n and crtc_vsync_n;
+        -- MUX to select sRGB/VGA based on vid_is_scandoubled
+        ttxt_r_out  <= mist_r(1) when is_scandoubled = '1' else ttxt_r;
+        ttxt_g_out  <= mist_g(1) when is_scandoubled = '1' else ttxt_g;
+        ttxt_b_out  <= mist_b(1) when is_scandoubled = '1' else ttxt_b;
+        ttxt_vs_out <= mist_vs   when is_scandoubled = '1' else '1';
+        ttxt_hs_out <= mist_hs   when is_scandoubled = '1' else crtc_hsync_n and crtc_vsync_n;
     end generate;
 
     JafaAndNotVGAIncluded: if IncludeJafaMode7 and not IncludeVGA generate
