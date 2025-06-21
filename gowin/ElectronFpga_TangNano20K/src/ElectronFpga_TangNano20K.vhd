@@ -452,7 +452,7 @@ begin
         clk_24M00         => clock_24,
         clk_27M00         => clock_27,
         clk_32M00         => clock_32,
-        clk_33M33         => clock_32,
+        clk_33M33         => clock_27,
         clk_40M00         => clock_40,
         -- Hard reset (active low)
         hard_reset_n      => hard_reset_n,
