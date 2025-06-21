@@ -31,13 +31,30 @@ entity ElectronULA is
         IncludeTTxtROM   : boolean := true    -- false if the SAA5050 character ROM needs loading
     );
     port (
+        -- TODO: Rationalize clocks
+        --    clk33M33  => clk_576p
+        --    clk40M00  => clk_600p
+        --    clk_16M00 => clk_sys (+add clken)
+        --    clk_24M00 => drop (use clk_ttxt instead)
+        --    clk_32M00 => drop (use retimer rather than scan doubler)
+
+        -- System clock: should be 16MHz
         clk_16M00 : in  std_logic;
+
+        -- Teletext clocks
         clk_24M00 : in  std_logic := '0';
         clk_ttxt  : in  std_logic := '0';
+
+        -- Teletext scan doubler clock
         clk_32M00 : in  std_logic;
+
+        -- Pixel clock used when mode=10 (576p)
         clk_33M33 : in  std_logic;
+
+        -- Pixel clock used when mode=11 (600p)
         clk_40M00 : in  std_logic;
 
+        -- Clock enable for clk_ttxt
         clken_ttxt_12M : in std_logic := '0';
 
         -- CPU Interface
