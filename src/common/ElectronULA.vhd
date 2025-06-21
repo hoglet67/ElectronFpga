@@ -36,7 +36,6 @@ entity ElectronULA is
         --    clk40M00  => clk_600p
         --    clk_16M00 => clk_sys (+add clken)
         --    clk_24M00 => drop (use clk_ttxt instead)
-        --    clk_32M00 => drop (use retimer rather than scan doubler)
 
         -- System clock: should be 16MHz
         clk_16M00 : in  std_logic;
@@ -44,9 +43,6 @@ entity ElectronULA is
         -- Teletext clocks
         clk_24M00 : in  std_logic := '0';
         clk_ttxt  : in  std_logic := '0';
-
-        -- Teletext scan doubler clock
-        clk_32M00 : in  std_logic;
 
         -- Pixel clock used when mode=10 (576p)
         clk_33M33 : in  std_logic;
@@ -244,6 +240,7 @@ architecture behavioral of ElectronULA is
   signal red_int        : std_logic_vector(3 downto 0);
   signal green_int      : std_logic_vector(3 downto 0);
   signal blue_int       : std_logic_vector(3 downto 0);
+  signal blank_int      : std_logic;
 
   -- CRTC signals (only used when Jafa Mode 7 is enabled)
   signal crtc_enable    :   std_logic;
@@ -272,19 +269,17 @@ architecture behavioral of ElectronULA is
   signal ttxt_r_int     :   std_logic;
   signal ttxt_g_int     :   std_logic;
   signal ttxt_b_int     :   std_logic;
+  signal ttxt_de_int    :   std_logic;
   signal ttxt_r         :   std_logic;
   signal ttxt_g         :   std_logic;
   signal ttxt_b         :   std_logic;
+  signal ttxt_de        :   std_logic;
   signal ttxt_r_out     :   std_logic;
   signal ttxt_g_out     :   std_logic;
   signal ttxt_b_out     :   std_logic;
   signal ttxt_hs_out    :   std_logic;
   signal ttxt_vs_out    :   std_logic;
-  signal mist_r         :   std_logic_vector(1 downto 0);
-  signal mist_g         :   std_logic_vector(1 downto 0);
-  signal mist_b         :   std_logic_vector(1 downto 0);
-  signal mist_hs        :   std_logic;
-  signal mist_vs        :   std_logic;
+  signal ttxt_de_out    :   std_logic;
 
   signal mode7_enable   :   std_logic;
 
@@ -360,8 +355,8 @@ end;
 begin
 
     -- Decode mode into more friendly form
-    is_interlaced  <= '1' when mode = "01"                else '0';
-    is_scandoubled <= '1' when mode = "10" or mode = "11" else '0';
+    is_interlaced  <= '1' when mode = "01" else '0';
+    is_scandoubled <= '1' when IncludeVGA and (mode = "10" or mode = "11") else '0';
 
     -- video timing constants
     -- mode 00 - RGB/s @ 50Hz non-interlaced
@@ -1279,9 +1274,9 @@ begin
             end if;
              -- Blanking
             if h_count1 = hblank_start then
-                blank <= '1';
+                blank_int <= '1';
             elsif h_count1 = hblank_end and (v_count < vblank_start or v_count >= vblank_end) then
-                blank <= '0';
+                blank_int <= '0';
             end if;
             -- Display Interrupt, this is co-incident with the leading edge
             -- of hsync at the end the last active line of display
@@ -1310,6 +1305,9 @@ begin
     blue  <= (others => ttxt_b_out) when mode7_enable = '1' else
              blue_int;
 
+    blank <= not ttxt_de_out        when mode7_enable = '1' else
+             blank_int;
+
     vsync <= ttxt_vs_out when mode7_enable = '1' else
              '1' when is_scandoubled = '0' else
              vsync_int;
@@ -1317,6 +1315,7 @@ begin
     hsync <= ttxt_hs_out when mode7_enable = '1' else
              hsync_int and vsync_int when is_scandoubled = '0' else
              hsync_int;
+
 
     caps  <= caps_int;
     motor <= motor_int;
@@ -1576,7 +1575,7 @@ begin
         variable counter : std_logic_vector(3 downto 0);
         begin
             if rising_edge(clk_16M00) then
-                if counter = "1111" then
+                if counter = "1111" or (is_scandoubled = '1' and counter = "0111") then
                     crtc_clken <= '1';
                 else
                     crtc_clken <= '0';
@@ -1602,7 +1601,11 @@ begin
             process (clk_24M00)
             begin
                 if rising_edge(clk_24M00) then
-                    ttxt_clken <= not ttxt_clken;
+                    if is_scandoubled = '1' then
+                        ttxt_clken <= '1';
+                    else
+                        ttxt_clken <= not ttxt_clken;
+                    end if;
                 end if;
             end process;
         end generate;
@@ -1618,22 +1621,24 @@ begin
 
         crtc : entity work.mc6845 port map (
             -- inputs
-            CLOCK  => clk_16M00,
-            CLKEN  => crtc_clken,
-            nRESET => RST_n,
-            ENABLE => crtc_enable,
-            R_nW   => R_W_n,
-            RS     => addr(0),
-            DI     => data_in,
-            LPSTB  => '0',
+            CLOCK     => clk_16M00,
+            CLKEN     => crtc_clken,
+            CLKEN_CPU => '1',
+            VGA       => is_scandoubled,
+            nRESET    => RST_n,
+            ENABLE    => crtc_enable,
+            R_nW      => R_W_n,
+            RS        => addr(0),
+            DI        => data_in,
+            LPSTB     => '0',
             -- outputs
-            DO     => crtc_do,
-            VSYNC  => crtc_vsync,
-            HSYNC  => crtc_hsync,
-            DE     => crtc_de,
-            CURSOR => crtc_cursor,
-            MA     => crtc_ma,
-            RA     => crtc_ra
+            DO        => crtc_do,
+            VSYNC     => crtc_vsync,
+            HSYNC     => crtc_hsync,
+            DE        => crtc_de,
+            CURSOR    => crtc_cursor,
+            MA        => crtc_ma,
+            RA        => crtc_ra
         );
 
         crtc_hsync_n <= not crtc_hsync;
@@ -1653,6 +1658,7 @@ begin
             CLOCK    => ttxt_clock,
             CLKEN    => ttxt_clken,
             nRESET   => RST_n,
+            VGA      => is_scandoubled,
             DI_CLOCK => clk_16M00,
             DI_CLKEN => '1',
             DI       => screen_data(6 downto 0),
@@ -1664,6 +1670,8 @@ begin
             R        => ttxt_r_int,
             G        => ttxt_g_int,
             B        => ttxt_b_int,
+            PIXDE    => ttxt_de_int,
+
             -- SAA5050 character ROM loading
             char_rom_we   => char_rom_we,
             char_rom_addr => char_rom_addr,
@@ -1671,45 +1679,65 @@ begin
         );
 
         -- make the cursor visible
-        ttxt_r <= ttxt_r_int xor crtc_cursor2;
-        ttxt_g <= ttxt_g_int xor crtc_cursor2;
-        ttxt_b <= ttxt_b_int xor crtc_cursor2;
+        ttxt_r  <= ttxt_r_int xor crtc_cursor2;
+        ttxt_g  <= ttxt_g_int xor crtc_cursor2;
+        ttxt_b  <= ttxt_b_int xor crtc_cursor2;
+        ttxt_de <= ttxt_de_int;
 
         -- enable mode 7
         mode7_enable <= crtc_ma(13);
     end generate;
 
     JafaAndVGAIncluded: if IncludeJafaMode7 and IncludeVGA generate
+        signal tmp_r     : std_logic;
+        signal tmp_g     : std_logic;
+        signal tmp_b     : std_logic;
+        signal tmp_hs    : std_logic;
+        signal tmp_vs    : std_logic;
+        signal tmp_de    : std_logic;
+    begin
+        -----------------------------------------------
+        -- 24MHz to 27MHz Scan Retimer (by DMB)
+        -----------------------------------------------
+
+        inst_retimer: entity work.retimer
+            generic map (
+                WIDTH => 1
+                )
+            port map (
+                clk_in    => ttxt_clock,
+                clken_in  => ttxt_clken,
+                clk_out   => clk_video,
+                clken_out => '1',
+                hs_in     => crtc_hsync_n,
+                vs_in     => crtc_vsync_n,
+                r_in(0)   => ttxt_r,
+                g_in(0)   => ttxt_g,
+                b_in(0)   => ttxt_b,
+                de_in     => ttxt_de,
+                hs_out    => tmp_hs,
+                vs_out    => tmp_vs,
+                de_out    => tmp_de,
+                r_out(0)  => tmp_r,
+                g_out(0)  => tmp_g,
+                b_out(0)  => tmp_b
+                );
+
         -- Scan Doubler from the MIST project
-        inst_mist_scandoubler: entity work.mist_scandoubler port map (
-            clk       => clk_32M00,
-            clk_16    => clk_16M00,
-            clk_16_en => '1',
-            scanlines => '0',
-            hs_in     => crtc_hsync_n,
-            vs_in     => crtc_vsync_n,
-            r_in      => ttxt_r,
-            g_in      => ttxt_g,
-            b_in      => ttxt_b,
-            hs_out    => mist_hs,
-            vs_out    => mist_vs,
-            r_out     => mist_r,
-            g_out     => mist_g,
-            b_out     => mist_b,
-            is15k     => open
-            );
         -- MUX to select sRGB/VGA based on vid_is_scandoubled
-        ttxt_r_out  <= mist_r(1) when is_scandoubled = '1' else ttxt_r;
-        ttxt_g_out  <= mist_g(1) when is_scandoubled = '1' else ttxt_g;
-        ttxt_b_out  <= mist_b(1) when is_scandoubled = '1' else ttxt_b;
-        ttxt_vs_out <= mist_vs   when is_scandoubled = '1' else '1';
-        ttxt_hs_out <= mist_hs   when is_scandoubled = '1' else crtc_hsync_n and crtc_vsync_n;
+        ttxt_r_out  <= tmp_r  when is_scandoubled = '1' else ttxt_r;
+        ttxt_g_out  <= tmp_g  when is_scandoubled = '1' else ttxt_g;
+        ttxt_b_out  <= tmp_b  when is_scandoubled = '1' else ttxt_b;
+        ttxt_de_out <= tmp_de when is_scandoubled = '1' else ttxt_de;
+        ttxt_vs_out <= tmp_vs when is_scandoubled = '1' else '1';
+        ttxt_hs_out <= tmp_hs when is_scandoubled = '1' else crtc_hsync_n and crtc_vsync_n;
     end generate;
 
     JafaAndNotVGAIncluded: if IncludeJafaMode7 and not IncludeVGA generate
         ttxt_r_out  <= ttxt_r;
         ttxt_g_out  <= ttxt_g;
         ttxt_b_out  <= ttxt_b;
+        ttxt_de_out <= ttxt_de;
         ttxt_vs_out <= '1';
         ttxt_hs_out <= crtc_hsync_n and crtc_vsync_n;
     end generate;
