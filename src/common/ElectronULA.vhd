@@ -458,7 +458,7 @@ begin
                     std_logic_vector(to_unsigned(277, 10));
 
     v_total      <= std_logic_vector(to_unsigned(627, 10)) when mode = "11" and IncludeVGA else
-                    std_logic_vector(to_unsigned(623, 10)) when mode = "10" and IncludeVGA else
+                    std_logic_vector(to_unsigned(624, 10)) when mode = "10" and IncludeVGA else
                     std_logic_vector(to_unsigned(311, 10)) when field = '0'                else
                     std_logic_vector(to_unsigned(312, 10));
 
@@ -470,12 +470,14 @@ begin
                     std_logic_vector(to_unsigned(500, 10)) when mode = "10" and IncludeVGA else
                     std_logic_vector(to_unsigned(250, 10));
 
-    v_disp_gph   <= std_logic_vector(to_unsigned(513, 10)) when mode = "11" and IncludeVGA else
-                    std_logic_vector(to_unsigned(511, 10)) when mode = "10" and IncludeVGA else
+    v_disp_gph   <= std_logic_vector(to_unsigned(513, 10)) when mode = "11"                 and IncludeVGA else
+                    std_logic_vector(to_unsigned(511, 10)) when mode = "10" and field = '0' and IncludeVGA else
+                    std_logic_vector(to_unsigned(512, 10)) when mode = "10" and field = '1' and IncludeVGA else
                     std_logic_vector(to_unsigned(255, 10));
 
-    v_disp_txt   <= std_logic_vector(to_unsigned(501, 10)) when mode = "11" and IncludeVGA else
-                    std_logic_vector(to_unsigned(499, 10)) when mode = "10" and IncludeVGA else
+    v_disp_txt   <= std_logic_vector(to_unsigned(501, 10)) when mode = "11"               and IncludeVGA else
+                    std_logic_vector(to_unsigned(499, 10)) when mode = "10" and field='0' and IncludeVGA else
+                    std_logic_vector(to_unsigned(500, 10)) when mode = "10" and field='1' and IncludeVGA else
                     std_logic_vector(to_unsigned(249, 10));
 
     v_rtc        <= std_logic_vector(to_unsigned(201, 10)) when mode = "11" and IncludeVGA else
@@ -492,13 +494,13 @@ begin
     --       blank_int <= '0';
     --   end if;
     --
-    -- 720x576p50 example (864x624 total)
+    -- 720x576p50 example (864x625 total)
     --    640x512 needs 40px left/right borders and 32px top/bottom borders
     --
     -- lines   0..511 are active area of screen
-    -- lines 512..543 are bottom border (blank)
-    -- lines 544..591 are blanking (blanked)
-    -- lines 592..623 are top border (blank)
+    -- lines 512..543 are bottom border (black)
+    -- lines 544..592 are blanking (blanked)
+    -- lines 593..624 are top border (black)
     --
     --         O = active part of screen
     --         X = border
@@ -516,21 +518,19 @@ begin
     --    543  XXXXXXXXXXXXXXXXXXX....... <- VBS
     --    544  ..........................
     --    ...  ..........................
-    --    591  .......................XXX <- VBE
-    --    592  XXXXXXXXXXXXXXXXXXX....XXX
+    --    592  .......................XXX <- VBE
+    --    593  XXXXXXXXXXXXXXXXXXX....XXX
     --    ...  XXXXXXXXXXXXXXXXXXX....XXX
-    --    623  XXXXXXXXXXXXXXXXXXX....XXX
+    --    624  XXXXXXXXXXXXXXXXXXX....XXX
     --
     --
     -- IMPORTANT: blanking is setup one line ahead:
     --       last active line in the bottom border 543 is set at the end of line 542
-    --       first active line in the top border 592 is set and the end of line 591
+    --       first active line in the top border 593 is set and the end of line 592
     --
-    -- So if v_count < 543 or v_count >= 591 then the next line is active
+    -- So if v_count < 543 or v_count >= 592 then the next line is active
     --
-    -- Hence: vblank_start = 512+32-1 and vblank_end = 624-32-1
-    --
-    -- Note: this is currentl only used for HDMI (mode 100) so the other modes are untested
+    -- Hence: vblank_start = 512+32-1 and vblank_end = 625-32-1
 
     hblank_start <= std_logic_vector(to_unsigned(  640+80, 11)) when mode = "11" and IncludeVGA else
                     std_logic_vector(to_unsigned(  640+40, 11)) when mode = "10" and IncludeVGA else
@@ -545,7 +545,7 @@ begin
                     std_logic_vector(to_unsigned(256+16-1, 10));
 
     vblank_end   <= std_logic_vector(to_unsigned(628-44-1, 10)) when mode = "11" and IncludeVGA else
-                    std_logic_vector(to_unsigned(624-32-1, 10)) when mode = "10" and IncludeVGA else
+                    std_logic_vector(to_unsigned(625-32-1, 10)) when mode = "10" and IncludeVGA else
                     std_logic_vector(to_unsigned(312-16-1, 10)) when field = '0'                 else
                     std_logic_vector(to_unsigned(313-16-1, 10));
 
