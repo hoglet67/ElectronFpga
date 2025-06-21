@@ -495,9 +495,10 @@ begin
         -- Format of Video
         -- 00 - sRGB - interlaced
         -- 01 - sRGB - non interlaced
-        -- 10 - SVGA - 50Hz
-        -- 11 - SVGA - 60Hz
+        -- 10 - 576p - 50Hz (27MHz pixel clock for 720x576 50Hz HDMI timings)
+        -- 11 - 600p - 60Hz (40MHz pixel clock for 800x600 60Hz SVGA timings)
         vid_mode          => vid_mode,
+        fake_timing       => not jumper(5),
         -- Test outputs
         test              => test,
         -- External 1MHz bus
