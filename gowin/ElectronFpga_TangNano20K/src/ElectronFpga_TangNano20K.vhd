@@ -72,6 +72,7 @@ entity ElectronFpga_TangNano20K is
 
         btn1            : in    std_logic;     -- Powerup reset
         btn2            : in    std_logic;     -- Toggle HDMI / DVI modes
+        reconfig_n      : out   std_logic;
         led             : out   std_logic_vector (5 downto 0);
         ws2812_din      : out   std_logic;
         key_conf        : in    std_logic;
@@ -499,7 +500,7 @@ begin
         -- 10 - 576p - 50Hz (27MHz pixel clock for 720x576 50Hz HDMI timings)
         -- 11 - 600p - 60Hz (40MHz pixel clock for 800x600 60Hz SVGA timings)
         vid_mode          => vid_mode,
-        fake_timing       => not jumper(5),
+        fake_timing       => not jumper(3),
         -- Test outputs
         test              => test,
         -- External 1MHz bus
@@ -658,7 +659,7 @@ begin
     begin
         if rising_edge(clock_16) then
             if powerup_reset_n = '0' then
-                hdmi_audio_en <= jumper(3) or jumper(4);
+                hdmi_audio_en <= jumper(4) or jumper(5);
             elsif btn2 = '1' then
                 config_counter <= (others => '1');
             elsif config_counter(config_counter'high) = '1' then
@@ -669,6 +670,26 @@ begin
             config_last <= config_counter(config_counter'high);
         end if;
     end process;
+
+    --------------------------------------------------------
+    -- Multiboot Reconfig
+    --------------------------------------------------------
+    reconf : if G_CORE_ID >= 0 generate
+        signal reconfig_n_r         : std_logic := '1';
+        signal powerup_reset_n_last : std_logic := '1';
+    begin
+        process(clock_16)
+        begin
+            if rising_edge(clock_16) then
+                -- wait until the end of the power up reset period to ensure the jumpers are stable
+                if powerup_reset_n_last = '0' and powerup_reset_n = '1' and unsigned(jumper(1 downto 0)) /= to_unsigned(G_CORE_ID, 2) then
+                    reconfig_n_r <= '0';
+                end if;
+                powerup_reset_n_last <= powerup_reset_n;
+            end if;
+        end process;
+        reconfig_n <= '0' when reconfig_n_r = '0' else 'Z';
+    end generate;
 
     --------------------------------------------------------
     -- SPDIF
@@ -1085,7 +1106,7 @@ begin
 
     GenCoProExt: if IncludeCoProExt generate
     begin
-        ext_tube_do  <= vga_g & vga_b_n & vga_vs & vga_hs & vga_r_n & vga_b & vga_g_n & vga_r when jumper(1) = '0' else x"FE";
+        ext_tube_do  <= vga_g & vga_b_n & vga_vs & vga_hs & vga_r_n & vga_b & vga_g_n & vga_r when jumper(2) = '0' else x"FE";
 
         vga_g   <= ext_1mhz_di(7) when ext_1mhz_r_nw = '0' and phi2 = '1' else 'Z';
         vga_b_n <= ext_1mhz_di(6) when ext_1mhz_r_nw = '0' and phi2 = '1' else 'Z';
