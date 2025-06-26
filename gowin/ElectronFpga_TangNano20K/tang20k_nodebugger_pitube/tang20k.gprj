@@ -14,6 +14,7 @@
         <File path="../src/pwm_sddac.vhd" type="file.vhdl" enable="1"/>
         <File path="../src/sdramctl.vhd" type="file.vhdl" enable="1"/>
         <File path="../src/spdif_serializer.vhd" type="file.vhdl" enable="1"/>
+        <File path="../src/multiboot.vhd" type="file.vhdl" enable="1"/>
         <File path="src/board_config_pack.vhd" type="file.vhdl" enable="1"/>
         <File path="src/version_config_pack.vhd" type="file.vhdl" enable="1"/>
         <File path="../../../src/common/AlanD/R65Cx2.vhd" type="file.vhdl" enable="1"/>

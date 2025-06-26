@@ -428,7 +428,11 @@ architecture rtl of ElectronFpga_TangNano20K is
     signal ext_1mhz_di     : std_logic_vector(7 downto 0);
     signal ext_1mhz_do     : std_logic_vector(7 downto 0);
 
+    -- Multiboot
+    signal reconfig        : std_logic;
+
     -- LEDs
+    signal multiboot_leds  : std_logic_vector(5 downto 0);
     signal normal_leds     : std_logic_vector(5 downto 0);
 
     -- Test
@@ -674,22 +678,23 @@ begin
     --------------------------------------------------------
     -- Multiboot Reconfig
     --------------------------------------------------------
-    reconf : if G_CORE_ID >= 0 generate
-        signal reconfig_n_r         : std_logic := '1';
-        signal powerup_reset_n_last : std_logic := '1';
-    begin
-        process(clock_16)
-        begin
-            if rising_edge(clock_16) then
-                -- wait until the end of the power up reset period to ensure the jumpers are stable
-                if powerup_reset_n_last = '0' and powerup_reset_n = '1' and unsigned(jumper(1 downto 0)) /= to_unsigned(G_CORE_ID, 2) then
-                    reconfig_n_r <= '0';
-                end if;
-                powerup_reset_n_last <= powerup_reset_n;
-            end if;
-        end process;
-        reconfig_n <= '0' when reconfig_n_r = '0' else 'Z';
-    end generate;
+
+    inst_multiboot : entity work.multiboot
+        generic map (
+            CORE_ID => G_CORE_ID
+            )
+        port map (
+            clock           => clock_16,
+            powerup_reset_n => powerup_reset_n,
+            btn1            => btn1,
+            btn2            => btn2,
+            btn3            => key_conf,
+            jumper          => jumper,
+            led             => multiboot_leds,
+            reconfig        => reconfig
+            );
+
+    reconfig_n <= '0' when reconfig = '1' else 'Z';
 
     --------------------------------------------------------
     -- SPDIF
@@ -1169,8 +1174,9 @@ begin
 
     normal_leds <= (caps_led & motor_led & powerup_reset_n & hard_reset_n & mem_ready & hdmi_audio_en) xor "111111";
 
-    led <= ext_tube_ctrl when IncludeCoProExt else
-           monitor_leds  when IncludeMonitor  else
+    led <= ext_tube_ctrl  when IncludeCoProExt                          else
+           multiboot_leds when G_CORE_ID >= 0 and powerup_reset_n = '0' else
+           monitor_leds   when IncludeMonitor                           else
            normal_leds;
 
     process(clock_16)

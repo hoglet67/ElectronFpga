@@ -18,6 +18,7 @@
         <File path="src/version_config_pack.vhd" type="file.vhdl" enable="1"/>
         <File path="../src/WatchEvents.vhd" type="file.vhdl" enable="1"/>
         <File path="../src/fifo_sc_hs/WatchEventsCore.vhd" type="file.vhdl" enable="1"/>
+        <File path="../src/multiboot.vhd" type="file.vhdl" enable="1"/>
         <File path="../../../AtomBusMon/src/AVR8/CommonPacks/avr_adr_pack.vhd" type="file.vhdl" enable="1"/>
         <File path="../../../AtomBusMon/src/AVR8/CommonPacks/AVRuCPackage.vhd" type="file.vhdl" enable="1"/>
         <File path="../../../AtomBusMon/src/AVR8/CommonPacks/spi_mod_comp_pack.vhd" type="file.vhdl" enable="1"/>
