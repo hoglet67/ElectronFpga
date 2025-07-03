@@ -930,7 +930,24 @@ begin
     -- shouldn't matter.
 
     gen_i2s : if IncludeI2SAudio generate
+        signal tmp_l : std_logic_vector(19 downto 0);
+        signal tmp_r : std_logic_vector(19 downto 0);
     begin
+
+        -- Attenuate the speaker output
+        process(audio_l, audio_r, pa_en)
+        begin
+            if pa_en = '1' then
+                -- Speaker
+                tmp_l <= (3 downto 0 => audio_l(19)) & audio_l(19 downto 4);
+                tmp_r <= (3 downto 0 => audio_r(19)) & audio_r(19 downto 4);
+            else
+                -- Line out
+                tmp_l <= audio_l;
+                tmp_r <= audio_r;
+            end if;
+        end process;
+
         i2s : entity work.i2s_simple
             generic map (
                 ATTENUATE  => 0,         -- No attenuation, allows use of full dynamic range
@@ -940,8 +957,8 @@ begin
             port map (
                 clock      => spdif_clk,
                 reset_n    => '1',       -- Avoid a nasty click on powerup_reset_n
-                audio_l    => audio_r,   -- Swapped, see comment above
-                audio_r    => audio_l,   -- Swapped, see comment above
+                audio_l    => tmp_l,
+                audio_r    => tmp_r,
                 i2s_lrclk  => i2s_lrclk,
                 i2s_bclk   => i2s_bclk,
                 i2s_din    => i2s_din
