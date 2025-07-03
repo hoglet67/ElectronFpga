@@ -95,7 +95,7 @@ begin
                         when X"06" => turbo       <= "01";      -- F2 (2MMz)
                         when X"04" => turbo       <= "10";      -- F3 (4MHz)
                         when X"0C" => turbo       <= "11";      -- F4 (8MHz)
-                        when X"09" => break       <= releasex;  -- F10 (BREAK)
+                        when X"07" => break       <= releasex;  -- F12 (BREAK)
                         -- Key Matrix
                         when X"74" => keys( 0)(0) <= releasex;  -- RIGHT
                         when X"69" => keys( 0)(1) <= releasex;  -- END (COPY)
