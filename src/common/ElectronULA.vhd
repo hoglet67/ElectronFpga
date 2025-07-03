@@ -669,7 +669,7 @@ begin
                page_enable     <= '0';
                page            <= (others => '0');
                counter         <= (others => '0');
-               comms_mode      <= "01";
+               comms_mode      <= "00";
                motor_int       <= '0';
                caps_int        <= '0';
                intr_counter    <= (others => '0');
