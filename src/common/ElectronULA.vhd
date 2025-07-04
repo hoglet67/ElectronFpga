@@ -1258,8 +1258,17 @@ begin
                 end case;
                 --green_int <= (not ctrl_caps) & "111"; -- DEBUG make screen green
             end if;
-            -- Vertical Sync, lasts 2.5 lines (160us)
-            if is_int_field = '0' then
+            -- Vertical Sync, lasts 160us (2.5 lines; 5 lines when scan doubled)
+            if is_scandoubled = '1' then
+                -- in VGA modes, vsync changes on the leading edge of hsync
+                if h_count1 = hsync_start then
+                    if v_count = vsync_start then
+                        vsync_int <= '0';
+                    elsif v_count = vsync_end then
+                        vsync_int <= '1';
+                    end if;
+                end if;
+            elsif is_int_field = '0' then
                 -- first field (odd) of interlaced scanning (or non interlaced)
                 -- vsync starts at the beginning of the line
                 if (h_count1 = 0 and v_count = vsync_start) then
