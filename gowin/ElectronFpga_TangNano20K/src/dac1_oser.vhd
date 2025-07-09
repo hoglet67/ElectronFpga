@@ -68,6 +68,11 @@ architecture rtl of dac1_oser is
    signal r_pattern   : std_logic_vector(14 downto 0);
    signal count       : unsigned(1 downto 0);
 
+   -- Prevent GowinSynthesis making incorrect optimizations
+   -- when the input value is limited to 0000/1111.
+   attribute syn_keep : integer;
+   attribute syn_keep of sample_i : signal is 1;
+
 begin
 
     -- 27MHz input samples, calculate 15-bit pattern
