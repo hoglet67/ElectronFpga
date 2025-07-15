@@ -110,11 +110,9 @@ architecture rtl of retimer is
     --
     -- So we pre-load the addr_out counter with 1024-56 = 968
     --
-    -- DMB: The intelligent resampling of the asynchrononous signal
-    -- hs_in introduces some variable latecy, so compensate by
-    -- shifting the screen left by about 2 characters.
+    -- DMB: Fine tunning done on a scope!
 
-    constant OUTPUT_OFFSET        : integer := 1024 - 36;
+    constant OUTPUT_OFFSET        : integer := 1024 - 59;
 
     type ram_type is array (2047 downto 0) of std_logic_vector (WIDTH * 3 - 1 downto 0);
 
