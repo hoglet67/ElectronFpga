@@ -664,7 +664,7 @@ begin
     begin
         if rising_edge(clock_16) then
             if powerup_reset_n = '0' then
-                hdmi_audio_en <= jumper(4) or jumper(5);
+                hdmi_audio_en <= jumper(4);
             elsif btn2 = '1' then
                 config_counter <= (others => '1');
             elsif config_counter(config_counter'high) = '1' then
