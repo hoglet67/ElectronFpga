@@ -465,6 +465,9 @@ begin
         -- Keyboard
         ps2_clk           => ps2_clk,
         ps2_data          => ps2_data,
+        -- Digital Joystick
+        joystick1         => joystick1,
+        joystick2         => joystick2,
         -- VGA Video
         video_red         => i_VGA_R,
         video_green       => i_VGA_G,
