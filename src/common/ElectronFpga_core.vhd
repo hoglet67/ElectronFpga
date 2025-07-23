@@ -41,6 +41,15 @@ entity ElectronFpga_core is
         ps2_clk        : in  std_logic;
         ps2_data       : in  std_logic;
 
+        -- Digital Joysticks
+        -- Bit 0 - Up (active low)
+        -- Bit 1 - Down (active low)
+        -- Bit 2 - Left (active low)
+        -- Bit 3 - Right (active low)
+        -- Bit 4 - Fire (active low)
+        joystick1      : in    std_logic_vector(4 downto 0) := (others => '1');
+        joystick2      : in    std_logic_vector(4 downto 0) := (others => '1');
+
         -- VGA Video
         video_red      : out std_logic_vector (3 downto 0);
         video_green    : out std_logic_vector (3 downto 0);
@@ -332,9 +341,11 @@ begin
                   -- Sideways RAM Access
                   (cpu_a(15 downto 14) = "10" and rom_latch(3 downto 1) /= "100") else '0';
 
-    cpu_din <= ext_Dout       when ext_enable = '1' else
-               ula_data       when ula_enable = '1' else
-               ext_1mhz_do    when io_fred = '1' or io_jim = '1' else
+    cpu_din <= ext_Dout          when ext_enable = '1' else
+               ula_data          when ula_enable = '1' else
+               "111" & joystick1 when io_fred = '1' and cpu_a(7 downto 4) = x"C" else
+               "111" & joystick2 when io_fred = '1' and cpu_a(7 downto 4) = x"D" else
+               ext_1mhz_do       when io_fred = '1' or io_jim = '1' else
                x"F1";
 
     -- Pipeline external memory interface
