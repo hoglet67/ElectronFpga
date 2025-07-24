@@ -23,6 +23,7 @@ entity ElectronFpga_core is
         IncludeHDMI        : boolean := false;
         IncludeICEDebugger : boolean := false;
         IncludeABRRegs     : boolean := false;
+        IncludeSerial      : boolean := false;
         IncludeJafaMode7   : boolean := false
     );
     port (
@@ -120,6 +121,12 @@ entity ElectronFpga_core is
         avr_RxD        : in    std_logic;
         avr_TxD        : out   std_logic;
 
+        -- Serial Port
+        serial_RxD     : in    std_logic := '1'; -- TTL Levels - idle line state = 1
+        serial_CTS     : in    std_logic := '0'; -- TTL Levels - clear to send = 0
+        serial_TxD     : out   std_logic;
+        serial_RTS     : out   std_logic;
+
         phi2           : out   std_logic;
         cpu_rnw        : out   std_logic;
         cpu_addr       : out   std_logic_vector(15 downto 0)
@@ -128,6 +135,29 @@ entity ElectronFpga_core is
 end;
 
 architecture behavioral of ElectronFpga_core is
+
+    component D2681 is
+        generic (
+            CLKS_PER_BIT : integer
+            );
+        port (
+            clk     : in        std_logic;
+            reset   : in        std_logic;
+            clken   : in        std_logic;
+            enable  : in        std_logic;
+            we      : in        std_logic;
+            addr    : in        std_logic_vector(3 downto 0);
+            di      : in        std_logic_vector(7 downto 0);
+            do      : out       std_logic_vector(7 downto 0);
+            ip_n    : in        std_logic_vector(6 downto 0);
+            op_n    : out       std_logic_vector(7 downto 0);
+            txa     : out       std_logic;
+            rxa     : in        std_logic;
+            txb     : out       std_logic;
+            rxb     : in        std_logic;
+            intr_n  : out       std_logic
+            );
+    end component;
 
     signal RSTn              : std_logic;
     signal cpu_R_W_n         : std_logic;
@@ -160,6 +190,10 @@ architecture behavioral of ElectronFpga_core is
     signal abr_enable        : std_logic;
     signal abr_lo_bank_lock  : std_logic;
     signal abr_hi_bank_lock  : std_logic;
+
+    signal serial_enable     : std_logic := '0';
+    signal serial_IRQ_n      : std_logic := '1';
+    signal serial_data       : std_logic_vector(7 downto 0) := (others => '0');
 
     signal video_vsync_int   : std_logic;
     signal video_hsync_int   : std_logic;
@@ -327,11 +361,13 @@ begin
     );
 
     cpu_NMI_n <= ext_1mhz_nmi_n;
-    cpu_IRQ_n <= not((not ext_1mhz_irq_n) or (not ula_IRQ_n));
+    cpu_IRQ_n <= not((not ext_1mhz_irq_n) or (not ula_IRQ_n) or (not serial_IRQ_n));
 
     RSTn    <= hard_reset_n and key_break;
     audio_l <= sound;
     audio_r <= sound;
+
+    serial_enable <= '1' when io_fred = '1' and cpu_a(7 downto 4) = x"6" else '0';
 
     ext_enable <= '1' when
                   -- ROM accrss
@@ -343,6 +379,7 @@ begin
 
     cpu_din <= ext_Dout          when ext_enable = '1' else
                ula_data          when ula_enable = '1' else
+               serial_data       when serial_enable = '1' else
                "111" & joystick1 when io_fred = '1' and cpu_a(7 downto 4) = x"C" else
                "111" & joystick2 when io_fred = '1' and cpu_a(7 downto 4) = x"D" else
                ext_1mhz_do       when io_fred = '1' or io_jim = '1' else
@@ -521,6 +558,46 @@ begin
        abr_hi_bank_lock <= '1';
    end generate;
 
+--------------------------------------------------------
+-- Serial
+--------------------------------------------------------
+
+    SerialIncluded: if IncludeSerial generate
+        signal ip_n  : std_logic_vector(6 downto 0);
+        signal op_n  : std_logic_vector(7 downto 0);
+        signal reset : std_logic;
+        signal txa   : std_logic;
+        signal rxa   : std_logic;
+    begin
+        reset <= not RSTn;
+
+        inst_d2681 : D2681
+            generic map (
+                CLKS_PER_BIT => 139 -- 16MHz / 139 = 115,108
+                )
+            port map (
+                clk     => clk_16M00,
+                reset   => reset,
+                clken   => cpu_clken,
+                enable  => serial_enable,
+                we      => cpu_rnw,
+                addr    => cpu_addr(3 downto 0),
+                di      => cpu_dout,
+                do      => serial_data,
+                ip_n    => ip_n,
+                op_n    => op_n,
+                txa     => txa,
+                rxa     => rxa,
+                txb     => open,
+                rxb     => '1',
+                intr_n  => serial_IRQ_n
+                );
+        Serial_TxD <= not txa;
+        Serial_RTS <= not op_n(0);
+        rxa <= not Serial_TxD;
+        ip_n <= "1111" & not Serial_CTS & "11";
+        
+    end generate;
 
 --------------------------------------------------------
 -- External 1MHz Bus
