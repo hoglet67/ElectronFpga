@@ -31,9 +31,16 @@ module uart
    reg [7:0]         mr2;
    reg               pointer;
 
+   reg               reset_rx = 1'b0;
+   reg               reset_tx = 1'b0;
+   reg               reset_err = 1'b0;
+
    always @(posedge clk)
      if (clken) begin
         tx_strb <= 1'b0;
+        reset_rx <= 1'b0;
+        reset_tx <= 1'b0;
+        reset_err <= 1'b0;
         if (enable & we) begin
            case(addr)
              2'b00 :
@@ -61,14 +68,14 @@ module uart
                       // Reset MR pointer
                       pointer <= 1'b0;
                     3'b010:
-                      // Reset receiver - TODO
-                      begin end
+                      // Reset receiver
+                      reset_rx <= 1'b1;
                     3'b011:
-                      // Reset transmitter - TODO
-                      begin end
+                      // Reset transmitter
+                      reset_tx <= 1'b1;
                     3'b100:
-                      // Reset error status - TODO
-                      begin end
+                      // Reset error status
+                      reset_err <= 1'b1;
                     3'b101:
                       // Reset break change interrupt - TODO
                       begin end
@@ -101,7 +108,7 @@ module uart
     );
 
    always @(posedge clk)
-      if (reset | (clken & enable & !we & addr == 2'b11)) begin
+      if (reset | (clken & reset_rx) | (clken & enable & !we & addr == 2'b11)) begin
          rx_rdy <= 1'b0;
          rx_ful <= 1'b0;
       end else if (rx_strb) begin

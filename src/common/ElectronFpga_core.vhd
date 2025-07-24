@@ -601,6 +601,13 @@ begin
 
     end generate;
 
+    SerialNotIncluded: if not IncludeSerial generate
+        Serial_TxD   <= '1';
+        Serial_RTS   <= '1';
+        serial_IRQ_n <= '1';
+        serial_data  <= x"FC";
+    end generate;
+
 --------------------------------------------------------
 -- External 1MHz Bus
 --------------------------------------------------------
