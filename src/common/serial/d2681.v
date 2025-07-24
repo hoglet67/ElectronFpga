@@ -24,6 +24,11 @@ module d2681
    reg [7:0]        imr = 8'h00;
    reg [15:0]       counter_preset = 8'h00;
    reg [15:0]       counter_value = 8'h00;
+   wire             txa_int;
+   wire             rxa_int;
+   wire             txb_int;
+   wire             rxb_int;
+
 
    // Note: IP/OP ports are inverted
    wire [6:0]       ip = ~ip_n;
@@ -40,7 +45,9 @@ module d2681
       .di(di),
       .do(doa),
       .tx(txa),
-      .rx(rxa)
+      .rx(rxa),
+      .tx_int(txa_int),
+      .rx_int(rxa_int)
       );
 
    uart #(.CLKS_PER_BIT(CLKS_PER_BIT)) uartb
@@ -54,7 +61,9 @@ module d2681
       .di(di),
       .do(dob),
       .tx(txb),
-      .rx(rxb)
+      .rx(rxb),
+      .tx_int(txb_int),
+      .rx_int(rxb_int)
       );
 
    always @(posedge clk) begin
@@ -103,15 +112,15 @@ module d2681
       end
    end
 
-   wire [7:0] isr = { 4'b0000, counter_ready_int, 3'b000};
+   wire [7:0] isr = { 2'b00, rxb_int, txb_int, counter_ready_int, 1'b0, rxa_int, txa_int};
 
    assign intr_n = !(|(imr & isr));
 
-   assign do = (addr == 4'h1) || (addr == 4'h3) ? doa                 :
+   assign do = (addr[3:2] == 2'b00)             ? doa                 :
+               (addr[3:2] == 2'b10)             ? dob                 :
                (addr == 4'h5)                   ? isr                 :
                (addr == 4'h6)                   ? counter_value[15:8] :
                (addr == 4'h7)                   ? counter_value[ 7:0] :
-               (addr == 4'h9) || (addr == 4'hb) ? dob                 :
                (addr == 4'hd)                   ? ip                  :
                8'hFF;
 

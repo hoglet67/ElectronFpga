@@ -10,7 +10,9 @@ module uart
     input [7:0]      di,
     output [7:0]     do,
     output           tx,
-    input            rx
+    input            rx,
+    output           tx_int,
+    output           rx_int
     );
 
    reg [7:0]         rx_buffer;
@@ -19,11 +21,74 @@ module uart
    reg               rx_rdy;
    reg               rx_ful;
 
-   wire [7:0]        tx_data;
-   wire              tx_strb;
+   reg [7:0]         tx_data;
+   reg               tx_strb;
    wire              tx_emt;
    wire              tx_rdy;
    wire              tx_active;
+
+   reg [7:0]         mr1;
+   reg [7:0]         mr2;
+   reg               pointer;
+
+   always @(posedge clk)
+     if (clken) begin
+        tx_strb <= 1'b0;
+        if (enable & we) begin
+           case(addr)
+             2'b00 :
+               // Mode Register (MR1/2)
+               begin
+                  if (!pointer) begin
+                     mr1 <= di;
+                     pointer <= 1'b1;
+                  end else begin
+                     mr2 <= di;
+                  end
+               end
+             2'b01 :
+               // Clock Select Register (CSR) - TODO
+               begin
+               end
+             2'b10 :
+               // Command Register (CR)
+               begin
+                  case (di[6:4])
+                    3'b000:
+                      // No command
+                      begin end
+                    3'b001:
+                      // Reset MR pointer
+                      pointer <= 1'b0;
+                    3'b010:
+                      // Reset receiver - TODO
+                      begin end
+                    3'b011:
+                      // Reset transmitter - TODO
+                      begin end
+                    3'b100:
+                      // Reset error status - TODO
+                      begin end
+                    3'b101:
+                      // Reset break change interrupt - TODO
+                      begin end
+                    3'b110:
+                      // Start break - TODO
+                      begin end
+                    3'b111:
+                      // Stop break - TODO
+                      begin end
+                  endcase
+               end
+             2'b11 :
+               // Data Register
+               begin
+                  tx_data <= di;
+                  tx_strb <= 1'b1;
+               end
+           endcase
+        end
+     end
 
    // Receive
 
@@ -57,14 +122,17 @@ module uart
       .o_Tx_Done()
       );
 
-   assign tx_data = di;
-   assign tx_strb = clken & we & enable & addr == 2'b11;
    assign tx_rdy  = !tx_active;
    assign tx_emt  = !tx_active;
+   assign tx_int  = tx_rdy;
+   assign rx_int  = rx_rdy;
 
    wire [7:0] status = { 4'b0000, tx_emt, tx_rdy, rx_ful, rx_rdy};
 
 
-   assign do = (addr == 2'b01) ? status : rx_buffer;
+   assign do = (addr == 2'b00 && !pointer) ? mr1 :
+               (addr == 2'b00 &&  pointer) ? mr2 :
+               (addr == 2'b01)             ? status :
+               rx_buffer;
 
 endmodule

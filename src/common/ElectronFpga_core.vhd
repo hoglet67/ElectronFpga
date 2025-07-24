@@ -566,10 +566,12 @@ begin
         signal ip_n  : std_logic_vector(6 downto 0);
         signal op_n  : std_logic_vector(7 downto 0);
         signal reset : std_logic;
+        signal we    : std_logic;
         signal txa   : std_logic;
         signal rxa   : std_logic;
     begin
         reset <= not RSTn;
+        we <= not cpu_rnw;
 
         inst_d2681 : D2681
             generic map (
@@ -580,7 +582,7 @@ begin
                 reset   => reset,
                 clken   => cpu_clken,
                 enable  => serial_enable,
-                we      => cpu_rnw,
+                we      => we,
                 addr    => cpu_addr(3 downto 0),
                 di      => cpu_dout,
                 do      => serial_data,
@@ -592,11 +594,11 @@ begin
                 rxb     => '1',
                 intr_n  => serial_IRQ_n
                 );
-        Serial_TxD <= not txa;
+        Serial_TxD <= txa;
         Serial_RTS <= not op_n(0);
-        rxa <= not Serial_TxD;
+        rxa <= Serial_TxD;
         ip_n <= "1111" & not Serial_CTS & "11";
-        
+
     end generate;
 
 --------------------------------------------------------
