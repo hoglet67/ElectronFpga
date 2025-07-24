@@ -596,7 +596,7 @@ begin
                 );
         Serial_TxD <= txa;
         Serial_RTS <= not op_n(0);
-        rxa <= Serial_TxD;
+        rxa <= Serial_RxD;
         ip_n <= "1111" & not Serial_CTS & "11";
 
     end generate;
