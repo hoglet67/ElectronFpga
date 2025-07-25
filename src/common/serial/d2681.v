@@ -1,5 +1,5 @@
 module d2681
-  #(parameter CLKS_PER_BIT = 0)
+  #(parameter CLK_FREQ_HZ = 0)
   (
    input        clk,
    input        reset,
@@ -34,7 +34,7 @@ module d2681
    wire [6:0]       ip = ~ip_n;
    assign           op_n = ~op;
 
-   uart #(.CLKS_PER_BIT(CLKS_PER_BIT)) uarta
+   uart #(.CLK_FREQ_HZ(CLK_FREQ_HZ)) uarta
      (
       .clk(clk),
       .clken(clken),
@@ -50,7 +50,7 @@ module d2681
       .rx_int(rxa_int)
       );
 
-   uart #(.CLKS_PER_BIT(CLKS_PER_BIT)) uartb
+   uart #(.CLK_FREQ_HZ(CLK_FREQ_HZ)) uartb
      (
       .clk(clk),
       .clken(clken),

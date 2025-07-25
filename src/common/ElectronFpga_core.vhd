@@ -138,7 +138,7 @@ architecture behavioral of ElectronFpga_core is
 
     component D2681 is
         generic (
-            CLKS_PER_BIT : integer
+            CLK_FREQ_HZ : integer
             );
         port (
             clk     : in        std_logic;
@@ -575,7 +575,7 @@ begin
 
         inst_d2681 : D2681
             generic map (
-                CLKS_PER_BIT => 139 -- 16MHz / 139 = 115,108
+                CLK_FREQ_HZ => 16000000
                 )
             port map (
                 clk     => clk_16M00,

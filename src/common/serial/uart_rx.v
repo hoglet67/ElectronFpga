@@ -6,18 +6,19 @@
 // and no parity bit.  When receive is complete o_rx_dv will be
 // driven high for one clock cycle.
 //
-// Set Parameter CLKS_PER_BIT as follows:
-// CLKS_PER_BIT = (Frequency of i_Clock)/(Frequency of UART)
+// Set input i_Divider as follows:
+// i_Divider = (Frequency of i_Clock)/(Frequency of UART)
 // Example: 10 MHz Clock, 115200 baud UART
 // (10000000)/(115200) = 87
 
 module uart_rx
-  #(parameter CLKS_PER_BIT = 0)
+  #(parameter DIVIDER_SIZE = 0)
    (
-    input        i_Clock,
-    input        i_Rx_Serial,
-    output       o_Rx_DV,
-    output [7:0] o_Rx_Byte
+    input                    i_Clock,
+    input                    i_Rx_Serial,
+    input [DIVIDER_SIZE-1:0] i_Divider,
+    output                   o_Rx_DV,
+    output [7:0]             o_Rx_Byte
     );
 
    localparam s_IDLE         = 3'b000;
@@ -29,11 +30,11 @@ module uart_rx
    reg           r_Rx_Data_R = 1'b1;
    reg           r_Rx_Data   = 1'b1;
 
-   reg [7:0]     r_Clock_Count = 0;
-   reg [2:0]     r_Bit_Index   = 0; //8 bits total
-   reg [7:0]     r_Rx_Byte     = 0;
-   reg           r_Rx_DV       = 0;
-   reg [2:0]     r_SM_Main     = 0;
+   reg [DIVIDER_SIZE-1:0] r_Clock_Count = 0;
+   reg [2:0]              r_Bit_Index   = 0; //8 bits total
+   reg [7:0]              r_Rx_Byte     = 0;
+   reg                    r_Rx_DV       = 0;
+   reg [2:0]              r_SM_Main     = 0;
 
    // Purpose: Double-register the incoming data.
    // This allows it to be used in the UART RX Clock Domain.
@@ -65,7 +66,7 @@ module uart_rx
           // Check middle of start bit to make sure it's still low
           s_RX_START_BIT :
             begin
-               if (r_Clock_Count == (CLKS_PER_BIT-1)/2)
+               if (r_Clock_Count == (i_Divider >> 1))
                  begin
                     if (r_Rx_Data == 1'b0)
                       begin
@@ -86,7 +87,7 @@ module uart_rx
           // Wait CLKS_PER_BIT-1 clock cycles to sample serial data
           s_RX_DATA_BITS :
             begin
-               if (r_Clock_Count < CLKS_PER_BIT-1)
+               if (r_Clock_Count < i_Divider)
                  begin
                     r_Clock_Count <= r_Clock_Count + 1'b1;
                     r_SM_Main     <= s_RX_DATA_BITS;
@@ -115,7 +116,7 @@ module uart_rx
           s_RX_STOP_BIT :
             begin
                // Wait CLKS_PER_BIT-1 clock cycles for Stop bit to finish
-               if (r_Clock_Count < CLKS_PER_BIT-1)
+               if (r_Clock_Count < i_Divider)
                  begin
                     r_Clock_Count <= r_Clock_Count + 1'b1;
                     r_SM_Main     <= s_RX_STOP_BIT;
