@@ -6,6 +6,10 @@
     <Device name="GW2AR-18C" pn="GW2AR-LV18QN88C8/I7">gw2ar18c-000</Device>
     <FileList>
         <File path="../../../src/common/hdmi/hdmidataencoder.v" type="file.verilog" enable="1"/>
+        <File path="../../../src/common/serial/d2681.v" type="file.verilog" enable="1"/>
+        <File path="../../../src/common/serial/uart.v" type="file.verilog" enable="1"/>
+        <File path="../../../src/common/serial/uart_rx.v" type="file.verilog" enable="1"/>
+        <File path="../../../src/common/serial/uart_tx.v" type="file.verilog" enable="1"/>
         <File path="../../src/saa5050_rom_dual_port.vhd" type="file.vhdl" enable="1"/>
         <File path="../src/ElectronFpga_TangNano20K.vhd" type="file.vhdl" enable="1"/>
         <File path="../src/dac1_oser.vhd" type="file.vhdl" enable="1"/>

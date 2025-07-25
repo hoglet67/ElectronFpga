@@ -51,6 +51,7 @@ entity ElectronFpga_TangNano20K is
         IncludeHDMI            : boolean := true;
         IncludeICEDebugger     : boolean := G_CONFIG_DEBUGGER;
         IncludeABRRegs         : boolean := true;
+        IncludeSerial          : boolean := true;
         IncludeJafaMode7       : boolean := true;
 
         IncludeBootStrap       : boolean := true;
@@ -436,6 +437,12 @@ architecture rtl of ElectronFpga_TangNano20K is
     signal multiboot_leds  : std_logic_vector(5 downto 0);
     signal normal_leds     : std_logic_vector(5 downto 0);
 
+    -- UART
+    signal avr_rx          : std_logic;
+    signal avr_tx          : std_logic;
+    signal serial_rx       : std_logic;
+    signal serial_tx       : std_logic;
+
     -- Test
     signal test            : std_logic_vector(7 downto 0);
 
@@ -450,6 +457,7 @@ begin
         IncludeHDMI        => IncludeHDMI,
         IncludeICEDebugger => IncludeICEDebugger,
         IncludeABRRegs     => IncludeABRRegs,
+        IncludeSerial      => IncludeSerial,
         IncludeJafaMode7   => IncludeJafaMode7
     )
     port map (
@@ -523,8 +531,11 @@ begin
         ext_1mhz_irq_n    => open,
         ext_1mhz_nmi_n    => open,
         -- ICE T65 Deubgger 115200 baud serial
-        avr_RxD           => uart_rx,
-        avr_TxD           => uart_tx,
+        avr_RxD           => avr_rx,
+        avr_TxD           => avr_tx,
+        -- SCN2681 RS423 Interface
+        serial_RxD        => serial_rx,
+        serial_TxD        => serial_tx,
         -- Raw CPU interface
         phi2              => phi2,
         cpu_rnw           => cpu_rnw,
@@ -1218,5 +1229,9 @@ begin
                    x"FF";
 
     ws2812_din <= '0';
+
+    uart_tx   <= avr_tx  when IncludeICEDebugger and jumper(5) = '1' else serial_tx;
+    serial_rx <= '0'     when IncludeICEDebugger and jumper(5) = '1' else uart_rx;
+    avr_rx    <= uart_rx when IncludeICEDebugger and jumper(5) = '1' else '1';
 
 end architecture;
