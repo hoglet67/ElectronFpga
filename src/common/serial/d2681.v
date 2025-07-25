@@ -20,7 +20,9 @@ module d2681
 
    wire [7:0]       doa;
    wire [7:0]       dob;
+   reg [3:0]        ipcr = 4'h0;
    reg [7:0]        op = 8'h00;
+   reg [7:0]        acr = 8'h00;
    reg [7:0]        imr = 8'h00;
    reg [15:0]       counter_preset = 8'h00;
    reg [15:0]       counter_value = 8'h00;
@@ -32,6 +34,7 @@ module d2681
 
    // Note: IP/OP ports are inverted
    wire [6:0]       ip = ~ip_n;
+   reg[3:0]         last_ip = 4'h0;
    assign           op_n = ~op;
 
    uart #(.CLK_FREQ_HZ(CLK_FREQ_HZ)) uarta
@@ -69,31 +72,49 @@ module d2681
    always @(posedge clk) begin
       if (clken) begin
          if (enable & we) begin
-            if (addr == 4'h5)
-              imr <= di;
-            else if (addr == 4'h6)
-              counter_preset[15:8] <= di;
-            else if (addr == 4'h7)
-              counter_preset[7:0] <= di;
-            else if (addr == 4'hE)
-              op <= op | di;
-            else if (addr == 4'hF)
-              op <= op & ~di;
+            case (addr)
+              4'h4:
+                acr <= di;
+              4'h5:
+                imr <= di;
+              4'h6:
+                counter_preset[15:8] <= di;
+              4'h7:
+                counter_preset[7:0] <= di;
+              4'he:
+                op <= op | di;
+              4'hf:
+                op <= op & ~di;
+            endcase
          end
       end
    end
 
-   // Counter/Timer
+   reg ipc_read = 1'b0;
 
+   // Input port change delection
+   always @(posedge clk) begin
+      last_ip <= ip[3:0];
+      ipcr <= ipcr | (last_ip ^ ip[3:0]);
+      if (clken) begin
+         // Detect a read of the IPC register
+         ipc_read <= (enable & !we & (addr == 4'h4));
+         // Delayed by one cycle to allow read to succeed
+         if (ipc_read)
+           ipcr <= 4'h0;
+      end
+   end
+
+   wire ipc_int = |(ipcr & acr[3:0]);
+
+   // Counter/Timer
    // TODO: Only counter mode 000 is currently implemented
 
-   reg last_ip2 = 1'b0;
    reg counter_ready_int = 1'b0;
    reg counter_running = 1'b0;
 
    always @(posedge clk) begin
-      last_ip2 <= ip[2];
-      if (counter_running && !last_ip2 && ip[2]) begin
+      if (counter_running && !last_ip[2] && ip[2]) begin
          // This should be 0001, but the tracing NMI was happing a couple of cycles early
          if (counter_value == 16'hffff)
            counter_ready_int <= 1'b1;
@@ -112,12 +133,13 @@ module d2681
       end
    end
 
-   wire [7:0] isr = { 2'b00, rxb_int, txb_int, counter_ready_int, 1'b0, rxa_int, txa_int};
+   wire [7:0] isr = { ipc_int, 1'b0, rxb_int, txb_int, counter_ready_int, 1'b0, rxa_int, txa_int};
 
    assign intr_n = !(|(imr & isr));
 
    assign do = (addr[3:2] == 2'b00)             ? doa                 :
                (addr[3:2] == 2'b10)             ? dob                 :
+               (addr == 4'h4)                   ? { ipcr,  ip[3:0] }  :
                (addr == 4'h5)                   ? isr                 :
                (addr == 4'h6)                   ? counter_value[15:8] :
                (addr == 4'h7)                   ? counter_value[ 7:0] :
