@@ -380,8 +380,8 @@ begin
     cpu_din <= ext_Dout          when ext_enable = '1' else
                ula_data          when ula_enable = '1' else
                serial_data       when serial_enable = '1' else
-               "111" & joystick1 when io_fred = '1' and cpu_a(7 downto 4) = x"C" else
-               "111" & joystick2 when io_fred = '1' and cpu_a(7 downto 4) = x"D" else
+               "000" & (joystick1 xor "11111") when io_fred = '1' and cpu_a(7 downto 4) = x"C" else
+               "000" & (joystick2 xor "11111") when io_fred = '1' and cpu_a(7 downto 4) = x"D" else
                ext_1mhz_do       when io_fred = '1' or io_jim = '1' else
                x"F1";
 
