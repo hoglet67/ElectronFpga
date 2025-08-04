@@ -29,11 +29,15 @@ module uart
    reg [DIVIDER_SIZE-1:0] rx_divider;
    reg [DIVIDER_SIZE-1:0] tx_divider;
 
-   reg [7:0]              rx_buffer;
+   reg [7:0]              rx_buffer[0:3];
    wire [7:0]             rx_data;
    wire                   rx_strb;
-   reg                    rx_rdy;
-   reg                    rx_ful;
+   wire                   rx_rdy;
+   wire                   rx_ful;
+   reg [1:0]              rx_wr_ptr;
+   reg [1:0]              rx_rd_ptr;
+   wire [1:0]             rx_wr_next;
+   wire [1:0]             rx_rd_next;
 
    reg [7:0]              tx_data;
    reg                    tx_strb;
@@ -159,14 +163,27 @@ module uart
       .o_Rx_Byte(rx_data)
     );
 
+
+   // Receive Buffer
+
+   assign rx_wr_next = rx_wr_ptr + 1'b1;
+   assign rx_rd_next = rx_rd_ptr + 1'b1;
+   assign rx_rdy     = (rx_wr_ptr  != rx_rd_ptr);
+   assign rx_ful     = (rx_wr_next == rx_rd_ptr);
    always @(posedge clk)
-      if (reset | (clken & reset_rx) | (clken & enable & !we & addr == 2'b11)) begin
-         rx_rdy <= 1'b0;
-         rx_ful <= 1'b0;
-      end else if (rx_strb) begin
-         rx_buffer <= rx_data;
-         rx_rdy <= 1'b1;
-         rx_ful <= 1'b1;
+     if (reset | (clken & reset_rx)) begin
+         rx_rd_ptr <= 2'b00;
+         rx_wr_ptr <= 2'b00;
+     end else begin
+        // Write
+        if (rx_strb & !rx_ful) begin
+           rx_buffer[rx_wr_ptr] <= rx_data;
+           rx_wr_ptr <= rx_wr_next;
+        end
+        // Read
+        if (clken & enable & !we & addr == 2'b11 & rx_rdy) begin
+           rx_rd_ptr <= rx_rd_next;
+        end
       end
 
    // Transmit
@@ -193,6 +210,6 @@ module uart
    assign do = (addr == 2'b00 && !pointer) ? mr1 :
                (addr == 2'b00 &&  pointer) ? mr2 :
                (addr == 2'b01)             ? status :
-               rx_buffer;
+               rx_buffer[rx_rd_ptr];
 
 endmodule
