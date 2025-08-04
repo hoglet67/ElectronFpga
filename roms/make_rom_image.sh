@@ -31,10 +31,10 @@ cat Basic2.rom                 >> $IMAGE
 cat Basic2.rom                 >> $IMAGE
 
 # Slots C-F
-cat AP6v134t.rom               >> $IMAGE
-cat ADJI_v0_08.rom             >> $IMAGE
 cat blank.rom                  >> $IMAGE
+cat ADJI_v0_08.rom             >> $IMAGE
 cat M7_191.rom                 >> $IMAGE
+cat AP6v134t.rom               >> $IMAGE
 
 
 IMAGE=tmp/os10_basic.bit
