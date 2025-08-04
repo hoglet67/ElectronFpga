@@ -54,6 +54,9 @@ entity ElectronFpga_TangNano20K is
         IncludeSerial          : boolean := true;
         IncludeJafaMode7       : boolean := true;
 
+        IncludeFullRS423       : boolean := false; -- Overrides PiTube
+        IncludeTrace           : boolean := false; -- Overrides PiTube/VGA
+
         IncludeBootStrap       : boolean := true;
         IncludeMonitor         : boolean := true;
         IncludeCoProExt        : boolean := not G_CONFIG_VGA;
@@ -74,7 +77,7 @@ entity ElectronFpga_TangNano20K is
         btn1            : in    std_logic;     -- Powerup reset
         btn2            : in    std_logic;     -- Toggle HDMI / DVI modes
         reconfig_n      : out   std_logic;
-        led             : out   std_logic_vector (5 downto 0);
+        led             : inout std_logic_vector (5 downto 0);
         ws2812_din      : out   std_logic;
         key_conf        : in    std_logic;
 
@@ -366,7 +369,6 @@ architecture rtl of ElectronFpga_TangNano20K is
     signal config_counter  : std_logic_vector(20 downto 0) := (others => '0'); -- 16ms debounce
     signal config_last     : std_logic := '0';
 
-    signal cpu_rnw         : std_logic;
     signal ext_A_stb       : std_logic;
     signal ext_A           : std_logic_vector (18 downto 0);
     signal ext_Din         : std_logic_vector (7 downto 0);
@@ -408,8 +410,6 @@ architecture rtl of ElectronFpga_TangNano20K is
     signal trace_data      :   std_logic_vector(7 downto 0);
     signal trace_r_nw      :   std_logic;
     signal trace_sync      :   std_logic;
-    signal trace_rstn      :   std_logic;
-    signal trace_phi2      :   std_logic;
 
     -- Mem Controller Monior LEDs
     signal monitor_leds    :   std_logic_vector(5 downto 0);
@@ -442,6 +442,8 @@ architecture rtl of ElectronFpga_TangNano20K is
     signal avr_tx          : std_logic;
     signal serial_rx       : std_logic;
     signal serial_tx       : std_logic;
+    signal serial_rts      : std_logic;
+    signal serial_cts      : std_logic;
 
     -- Test
     signal test            : std_logic_vector(7 downto 0);
@@ -536,10 +538,14 @@ begin
         -- SCN2681 RS423 Interface
         serial_RxD        => serial_rx,
         serial_TxD        => serial_tx,
+        serial_CTS        => serial_cts,
+        serial_RTS        => serial_rts,
+        -- 6502 Tracing
+        trace_data        => trace_data,
+        trace_r_nw        => trace_r_nw,
+        trace_sync        => trace_sync,
         -- Raw CPU interface
-        phi2              => phi2,
-        cpu_rnw           => cpu_rnw,
-        cpu_addr          => open
+        phi2              => phi2
     );
 
     audio_l <= x"10000" when audio_l_tmp = '1' else x"F0000";
@@ -1143,7 +1149,7 @@ begin
 
     ext_tube_ntube <= '0' when ext_1mhz_pgfc_n = '0' and ext_1mhz_addr(7 downto 3) = "11100" else '1';
 
-    GenCoProExt: if IncludeCoProExt generate
+    GenCoProExt: if IncludeCoProExt and not IncludeTrace and not IncludeFullRS423 generate
     begin
         ext_tube_do  <= vga_g & vga_b_n & vga_vs & vga_hs & vga_r_n & vga_b & vga_g_n & vga_r when jumper(2) = '0' else x"FE";
 
@@ -1165,7 +1171,7 @@ begin
 
     end generate;
 
-    GenCoProNotExt: if not IncludeCoProExt generate
+    GenCoProNotExt: if not IncludeCoProExt or IncludeTrace or IncludeFullRS423 generate
     begin
         ext_tube_do  <= x"FE";
         ext_tube_ctrl <= (others => '1');
@@ -1199,6 +1205,48 @@ begin
         end if;
     end process;
 
+    --------------------------------------------------------
+    -- 6502 Instruction Tracing via the debug connector
+    --------------------------------------------------------
+
+    trace: if IncludeTrace generate
+    begin
+        -- Debug connector:
+        --  1 = GND
+        --  2 = PHI2
+        --  3 = PWM_L
+        --  4 = PWM_R
+        --  5 = VGA_HS     data(7)
+        --  6 = LED0       sync
+        --  7 = LED1       rnw
+        --  8 = VGA_R      data(6)
+        --  9 = VGA_R_n    data(5)
+        -- 10 = VGA_G      data(4)
+        -- 11 = VGA_G_n    data(3)
+        -- 12 = VGA_B      data(2)
+        -- 13 = VGA_B_n    data(1)
+        -- 14 = VGA_VS     data(0)
+        -- 15 = LED2       '1' (nTube in case Pi present)
+        -- 16 = LED5       reset_n
+        -- 17 = LED4       '0'
+        -- 18 = LED3       '0;
+        -- 19 = KEY_CONF
+        -- 20 = GND
+        --
+        -- Note: data ordering is for simplicity of wiring, and
+        -- doesn't match the PiTube data ordering.
+        vga_hs  <= trace_data(7);
+        vga_r   <= trace_data(6);
+        vga_r_n <= trace_data(5);
+        vga_g   <= trace_data(4);
+        vga_g_n <= trace_data(3);
+        vga_b   <= trace_data(2);
+        vga_b_n <= trace_data(1);
+        vga_vs  <= trace_data(0);
+        led(0)  <= trace_sync;
+        led(1)  <= trace_r_nw;
+
+    end generate;
 
 --------------------------------------------------------
 -- Outputs/signals whose function depends on the Includes
@@ -1206,12 +1254,28 @@ begin
 
     js_clk <= phi2;
 
-    normal_leds <= (caps_led & motor_led & powerup_reset_n & hard_reset_n & mem_ready & hdmi_audio_en) xor "111111";
+    gen_fullrs423: if IncludeFullRS423 generate
+        led(2) <= 'Z';        -- DTR
+        led(3) <= serial_rts; -- CTS
+        led(4) <= 'Z';        -- TX
+        led(5) <= serial_tx;  -- RX
+        serial_rx  <= led(4);
+        serial_cts <= led(2);
+        uart_tx    <= avr_tx;
+        avr_rx     <= uart_rx;
+    end generate;
 
-    led <= ext_tube_ctrl  when IncludeCoProExt                          else
-           multiboot_leds when G_CORE_ID >= 0 and powerup_reset_n = '0' else
-           monitor_leds   when IncludeMonitor                           else
-           normal_leds;
+    gen_not_fullrs423: if not IncludeFullRS423 generate
+        normal_leds <= (caps_led & motor_led & powerup_reset_n & hard_reset_n & mem_ready & hdmi_audio_en) xor "111111";
+        led <= ext_tube_ctrl  when IncludeCoProExt                          else
+               multiboot_leds when G_CORE_ID >= 0 and powerup_reset_n = '0' else
+               monitor_leds   when IncludeMonitor                           else
+               normal_leds;
+        uart_tx    <= avr_tx  when IncludeICEDebugger and jumper(5) = '1' else serial_tx;
+        serial_rx  <= '1'     when IncludeICEDebugger and jumper(5) = '1' else uart_rx;
+        serial_cts <= '1';
+        avr_rx     <= uart_rx when IncludeICEDebugger and jumper(5) = '1' else '1';
+    end generate;
 
     process(clock_16)
     begin
@@ -1229,9 +1293,5 @@ begin
                    x"FF";
 
     ws2812_din <= '0';
-
-    uart_tx   <= avr_tx  when IncludeICEDebugger and jumper(5) = '1' else serial_tx;
-    serial_rx <= '0'     when IncludeICEDebugger and jumper(5) = '1' else uart_rx;
-    avr_rx    <= uart_rx when IncludeICEDebugger and jumper(5) = '1' else '1';
 
 end architecture;
