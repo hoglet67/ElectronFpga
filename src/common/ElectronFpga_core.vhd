@@ -127,6 +127,11 @@ entity ElectronFpga_core is
         serial_TxD     : out   std_logic;
         serial_RTS     : out   std_logic;
 
+        -- 6502 tracing outputs
+        trace_data     : out   std_logic_vector(7 downto 0);
+        trace_r_nw     : out   std_logic;
+        trace_sync     : out   std_logic;
+
         phi2           : out   std_logic;
         cpu_rnw        : out   std_logic;
         cpu_addr       : out   std_logic_vector(15 downto 0)
@@ -161,6 +166,7 @@ architecture behavioral of ElectronFpga_core is
 
     signal RSTn              : std_logic;
     signal cpu_R_W_n         : std_logic;
+    signal cpu_sync          : std_logic;
     signal cpu_a             : std_logic_vector (23 downto 0);
     signal cpu_din           : std_logic_vector (7 downto 0);
     signal cpu_dout          : std_logic_vector (7 downto 0);
@@ -226,7 +232,7 @@ begin
                 cpu_clken    => cpu_clken,
                 IRQ_n        => cpu_IRQ_n,
                 NMI_n        => cpu_NMI_n,
-                Sync         => open,
+                Sync         => cpu_sync,
                 Addr         => cpu_a(15 downto 0),
                 R_W_n        => cpu_R_W_n,
                 Din          => cpu_din,
@@ -269,7 +275,7 @@ begin
             IRQ_n           => cpu_IRQ_n,
             NMI_n           => cpu_NMI_n,
             R_W_n           => cpu_R_W_n,
-            Sync            => open,
+            Sync            => cpu_sync,
             A               => cpu_a,
             DI              => cpu_din,
             DO              => cpu_dout
@@ -607,6 +613,25 @@ begin
         serial_IRQ_n <= '1';
         serial_data  <= x"FC";
     end generate;
+
+--------------------------------------------------------
+-- 6502 Tracing
+--------------------------------------------------------
+
+    process(clk_16M00)
+    begin
+        if rising_edge(clk_16M00) then
+            if cpu_clken = '1' then
+                if cpu_R_W_n = '1' then
+                    trace_data <= cpu_Din;
+                else
+                    trace_data <= cpu_Dout;
+                end if;
+                trace_r_nw <= cpu_R_W_n;
+                trace_sync <= cpu_sync;
+            end if;
+        end if;
+    end process;
 
 --------------------------------------------------------
 -- External 1MHz Bus
