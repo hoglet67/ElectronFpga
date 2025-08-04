@@ -123,7 +123,7 @@ entity ElectronFpga_core is
 
         -- Serial Port
         serial_RxD     : in    std_logic := '1'; -- TTL Levels - idle line state = 1
-        serial_CTS     : in    std_logic := '0'; -- TTL Levels - clear to send = 0
+        serial_CTS     : in    std_logic := '1'; -- TTL Levels - clear to send = 1
         serial_TxD     : out   std_logic;
         serial_RTS     : out   std_logic;
 
@@ -601,9 +601,9 @@ begin
                 intr_n  => serial_IRQ_n
                 );
         Serial_TxD <= txa;
-        Serial_RTS <= not op_n(0);
+        Serial_RTS <= op_n(0);
         rxa <= Serial_RxD;
-        ip_n <= "1111" & not Serial_CTS & "11";
+        ip_n <= "1111" & Serial_CTS & "11";
 
     end generate;
 
