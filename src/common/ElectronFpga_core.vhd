@@ -20,6 +20,7 @@ use ieee.numeric_std.all;
 
 entity ElectronFpga_core is
     generic (
+        UseRomSlot9        : boolean := false;  -- alias of keyboard
         IncludeHDMI        : boolean := false;
         IncludeICEDebugger : boolean := false;
         IncludeABRRegs     : boolean := false;
@@ -381,7 +382,7 @@ begin
                   -- Non screen main memory access (0000-2FFF)
                   cpu_a(15 downto 13) = "000" or cpu_a(15 downto 12) = "0010" or
                   -- Sideways RAM Access
-                  (cpu_a(15 downto 14) = "10" and rom_latch(3 downto 1) /= "100") else '0';
+                  (cpu_a(15 downto 14) = "10" and rom_latch /= "1000" and (rom_latch /= "1001" or UseRomSlot9)) else '0';
 
     cpu_din <= ext_Dout          when ext_enable = '1' else
                ula_data          when ula_enable = '1' else
