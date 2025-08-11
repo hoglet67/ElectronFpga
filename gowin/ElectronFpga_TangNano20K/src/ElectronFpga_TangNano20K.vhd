@@ -48,6 +48,7 @@ use work.version_config_pack.all;
 
 entity ElectronFpga_TangNano20K is
     generic (
+        UseRomSlot9            : boolean := true; -- allow use of ROMs in slot 9 (the keyboard alias)
         IncludeHDMI            : boolean := true;
         IncludeICEDebugger     : boolean := G_CONFIG_DEBUGGER;
         IncludeABRRegs         : boolean := true;
@@ -456,6 +457,7 @@ begin
 
     electron_core : entity work.ElectronFpga_core
     generic map (
+        UseRomSlot9        => UseRomSlot9,
         IncludeHDMI        => IncludeHDMI,
         IncludeICEDebugger => IncludeICEDebugger,
         IncludeABRRegs     => IncludeABRRegs,
