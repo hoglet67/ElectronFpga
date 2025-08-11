@@ -600,7 +600,7 @@ begin
         ram_we <= '1' when (addr(15 downto 12) = "0011" or addr(15 downto 14) = "01") and R_W_n = '0' and cpu_clken = '1' else '0';
     end generate;
 
-    sound <= sound_bit;
+    sound <= sound_bit when comms_mode = "01" else '0';
 
     -- The external ROM is enabled:
     -- - When the address is C000-FBFF and FF00-FFFF (i.e. OS Rom)
@@ -742,7 +742,7 @@ begin
                 elsif (comms_mode = "01") then
                     -- Sound Mode - Frequency = 1MHz / [16 * (S + 1)]
                     if (general_counter = 0) then
-                        general_counter <= counter & "00000000";
+                        general_counter <= counter & "11111111";
                         sound_bit <= not sound_bit;
                     else
                         general_counter <= general_counter - 1;
