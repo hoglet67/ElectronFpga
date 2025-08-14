@@ -127,6 +127,22 @@ end;
 
 architecture behavioral of ElectronULA is
 
+   component SPI_Port is
+      port (
+         nRST    : in  std_logic;
+         clk     : in  std_logic;
+         clken   : in  std_logic;
+         enable  : in  std_logic;
+         nwe     : in  std_logic;
+         datain  : in  std_logic_vector (7 downto 0);
+         dataout : out std_logic_vector (7 downto 0);
+         SDMISO  : in  std_logic;
+         SDMOSI  : out std_logic;
+         SDSS    : out std_logic;
+         SDCLK   : out std_logic
+     );
+  end component;
+
   signal hsync_int      : std_logic;
   signal hsync_int_last : std_logic;
   signal vsync_int      : std_logic;
@@ -321,24 +337,9 @@ architecture behavioral of ElectronULA is
   signal cpu_clk        : std_logic := '1';
   signal clk_counter    : std_logic_vector(2 downto 0) := (others => '0');
 
-  signal mc6522_enable     : std_logic;
-  signal mc6522_data       : std_logic_vector(7 downto 0);
-  signal mc6522_data_r     : std_logic_vector(7 downto 0);
-  signal mc6522_irq_n      : std_logic;
-  -- Port A is not really used, so signals directly loop back out to in
-  signal mc6522_ca2        : std_logic;
-  signal mc6522_porta      : std_logic_vector(7 downto 0);
-  -- Port B is used for the MMBEEB style SDCard Interface
-  signal mc6522_cb1_in     : std_logic;
-  signal mc6522_cb1_out    : std_logic;
-  signal mc6522_cb1_oe_l   : std_logic;
-  signal mc6522_cb2_in     : std_logic;
-  signal mc6522_portb_in   : std_logic_vector(7 downto 0);
-  signal mc6522_portb_out  : std_logic_vector(7 downto 0);
-  signal mc6522_portb_oe_l : std_logic_vector(7 downto 0);
-  signal sdclk_int         : std_logic;
-
-  signal ula_irq_n         : std_logic;
+  -- SPI SD Card
+  signal spisd_do       : std_logic_vector(7 downto 0);
+  signal spisd_enable   : std_logic;
 
 -- Helper function to cast an std_logic value to an integer
 function sl2int (x: std_logic) return integer is
@@ -618,7 +619,7 @@ begin
                 data_shift                when addr(15 downto 8) = x"FE" and addr(3 downto 0) = x"4" else
                 crtc_do                   when crtc_enable = '1' and IncludeJafaMode7 else
                 status_do                 when status_enable = '1' and IncludeJafaMode7 else
-                mc6522_data_r             when mc6522_enable = '1' and IncludeMMC else
+                spisd_do                  when spisd_enable = '1' and IncludeMMC else
                 x"F1"; -- todo FIXEME
 
     data_en  <= '1'                       when addr(15) = '0' else
@@ -626,7 +627,7 @@ begin
                 '1'                       when addr(15 downto 8) = x"FE" else
                 '1'                       when crtc_enable = '1' and IncludeJafaMode7 else
                 '1'                       when status_enable = '1' and IncludeJafaMode7 else
-                '1'                       when mc6522_enable = '1' and IncludeMMC else
+                '1'                       when spisd_enable = '1' and IncludeMMC else
                 '0';
 
     -- Register FEx0 is the Interrupt Status Register (Read Only)
@@ -640,7 +641,7 @@ begin
                   (isr(3) and ier(3)) or
                   (isr(2) and ier(2));
 
-    ula_irq_n  <= not master_irq;
+    IRQ_n      <= not master_irq;
 
     isr_data   <= '1' & isr(6 downto 2) & power_on_reset & master_irq;
 
@@ -1504,79 +1505,36 @@ begin
     cpu_clk_out    <= cpu_clk;
 
 --------------------------------------------------------
--- Optional MMC Filing System
+-- Optional MMC Filing System (Memory Mapped SPI)
 --------------------------------------------------------
 
     MMCIncluded: if IncludeMMC generate
 
-        mc6522_enable  <= '1' when addr(15 downto 4) = x"fcb" else '0';
+        spisd_enable  <= '1' when cpu_clken = '1' and addr = x"fc8c" else '0';
 
-        via : entity work.M6522 port map(
-            I_RS       => addr(3 downto 0),
-            I_DATA     => data_in(7 downto 0),
-            O_DATA     => mc6522_data(7 downto 0),
-            I_RW_L     => R_W_n,
-            I_CS1      => mc6522_enable,
-            I_CS2_L    => '0',
-            O_IRQ_L    => mc6522_irq_n,
-            I_CA1      => '0',
-            I_CA2      => mc6522_ca2,
-            O_CA2      => mc6522_ca2,
-            O_CA2_OE_L => open,
-            I_PA       => mc6522_porta,
-            O_PA       => mc6522_porta,
-            O_PA_OE_L  => open,
-            I_CB1      => mc6522_cb1_in,
-            O_CB1      => mc6522_cb1_out,
-            O_CB1_OE_L => mc6522_cb1_oe_l,
-            I_CB2      => mc6522_cb2_in,
-            O_CB2      => open,
-            O_CB2_OE_L => open,
-            I_PB       => mc6522_portb_in,
-            O_PB       => mc6522_portb_out,
-            O_PB_OE_L  => mc6522_portb_oe_l,
-            RESET_L    => RST_n,
-            I_P2_H     => via1_clken,
-            ENA_4      => via4_clken,
-            CLK        => clk_16M00);
-
-        -- This is needed as in v003 of the 6522 data out is only valid while I_P2_H is asserted
-        -- I_P2_H is driven from via1_clken
-        data_latch: process(clk_16M00)
-        begin
-            if rising_edge(clk_16M00) then
-                if via1_clken = '1' then
-                    mc6522_data_r <= mc6522_data;
-                end if;
-            end if;
-        end process;
-
-        -- loop back data port
-        mc6522_portb_in <= mc6522_portb_out;
-
-        -- SDCLK is driven from either PB1 or CB1 depending on the SR Mode
-        sdclk_int     <= mc6522_portb_out(1) when mc6522_portb_oe_l(1) = '0' else
-                         mc6522_cb1_out      when mc6522_cb1_oe_l = '0' else
-                         '1';
-        SDCLK         <= sdclk_int;
-        mc6522_cb1_in <= sdclk_int;
-
-        -- SDMOSI is always driven from PB0
-        SDMOSI        <= mc6522_portb_out(0) when mc6522_portb_oe_l(0) = '0' else
-                     '1';
-        -- SDMISO is always read from CB2
-        mc6522_cb2_in <= SDMISO;
-
-        -- SDSS is hardwired to 0 (always selected) as there is only one slave attached
-        SDSS          <= '0';
-
-        IRQ_n <= ula_irq_n and mc6522_irq_n;
+        Inst_SPI_Port: entity work.SPI_Port
+            port map (
+                nRST    => RST_n,
+                clk     => clk_16M00,
+                clken   => '1',  -- needs to be 16MHz or less (SPI clock is half this rate)
+                enable  => spisd_enable,
+                nwe     => R_W_n,
+                datain  => data_in,
+                dataout => spisd_do,
+                SDMISO  => SDMISO,
+                SDMOSI  => SDMOSI,
+                SDSS    => SDSS,
+                SDCLK   => SDCLK
+                );
 
     end generate;
 
     MMCNotIncluded: if not IncludeMMC generate
 
-        IRQ_n <= ula_irq_n;
+        SDCLK    <= '1';
+        SDMOSI   <= '1';
+        SDSS     <= '1';
+        spisd_do <= x"FE";
 
     end generate;
 
