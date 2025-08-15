@@ -53,6 +53,8 @@ entity ElectronFpga_TangNano20K is
         IncludeICEDebugger     : boolean := G_CONFIG_DEBUGGER;
         IncludeABRRegs         : boolean := true;
         IncludeSerial          : boolean := true;
+        IncludeUserPort        : boolean := true;
+        IncludeAmxMouse        : boolean := true;
         IncludeJafaMode7       : boolean := true;
 
         IncludeFullRS423       : boolean := false; -- Overrides PiTube
@@ -462,6 +464,8 @@ begin
         IncludeICEDebugger => IncludeICEDebugger,
         IncludeABRRegs     => IncludeABRRegs,
         IncludeSerial      => IncludeSerial,
+        IncludeUserPort    => IncludeUserPort,
+        IncludeAmxMouse    => IncludeAmxMouse,
         IncludeJafaMode7   => IncludeJafaMode7
     )
     port map (
@@ -477,6 +481,9 @@ begin
         -- Keyboard
         ps2_clk           => ps2_clk,
         ps2_data          => ps2_data,
+        -- Mouse
+        ps2_mouse_clk     => ps2_mouse_clk,
+        ps2_mouse_data    => ps2_mouse_data,
         -- Digital Joystick
         joystick1         => joystick1,
         joystick2         => joystick2,
