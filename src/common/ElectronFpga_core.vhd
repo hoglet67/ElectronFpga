@@ -25,6 +25,8 @@ entity ElectronFpga_core is
         IncludeICEDebugger : boolean := false;
         IncludeABRRegs     : boolean := false;
         IncludeSerial      : boolean := false;
+        IncludeAMXMouse    : boolean := false;
+        IncludeUserPort    : boolean := false;
         IncludeJafaMode7   : boolean := false
     );
     port (
@@ -42,6 +44,10 @@ entity ElectronFpga_core is
         -- Keyboard
         ps2_clk        : in  std_logic;
         ps2_data       : in  std_logic;
+
+        -- Mouse
+        ps2_mouse_clk        : inout std_logic;
+        ps2_mouse_data       : inout std_logic;
 
         -- Digital Joysticks
         -- Bit 0 - Up (active low)
@@ -128,6 +134,24 @@ entity ElectronFpga_core is
         serial_TxD     : out   std_logic;
         serial_RTS     : out   std_logic;
 
+        -- User Port
+        mc6522_ca1_in     : in  std_logic := '1';
+        mc6522_ca2_in     : in  std_logic := '1';
+        mc6522_ca2_out    : out std_logic;
+        mc6522_ca2_oe_l   : out std_logic;
+        mc6522_porta_in   : in  std_logic_vector(7 downto 0) := (others => '1');
+        mc6522_porta_out  : out std_logic_vector(7 downto 0);
+        mc6522_porta_oe_l : out std_logic_vector(7 downto 0);
+        mc6522_cb1_in     : in  std_logic := '1';
+        mc6522_cb1_out    : out std_logic;
+        mc6522_cb1_oe_l   : out std_logic;
+        mc6522_cb2_in     : in  std_logic := '1';
+        mc6522_cb2_out    : out std_logic;
+        mc6522_cb2_oe_l   : out std_logic;
+        mc6522_portb_in   : in  std_logic_vector(7 downto 0) := (others => '1');
+        mc6522_portb_out  : out std_logic_vector(7 downto 0);
+        mc6522_portb_oe_l : out std_logic_vector(7 downto 0);
+
         -- 6502 tracing outputs
         trace_data     : out   std_logic_vector(7 downto 0);
         trace_r_nw     : out   std_logic;
@@ -165,7 +189,8 @@ architecture behavioral of ElectronFpga_core is
             );
     end component;
 
-    signal RSTn              : std_logic;
+    signal reset_n           : std_logic;
+    signal reset             : std_logic;
     signal cpu_R_W_n         : std_logic;
     signal cpu_sync          : std_logic;
     signal cpu_a             : std_logic_vector (23 downto 0);
@@ -186,7 +211,8 @@ architecture behavioral of ElectronFpga_core is
     signal sound             : std_logic;
     signal kbd_data          : std_logic_vector(3 downto 0);
 
-    signal io_clken         : std_logic;
+    signal mhz1_clken        : std_logic;
+    signal mhz4_clken        : std_logic;
     signal cpu_clken         : std_logic;
     signal cpu_clken_r       : std_logic;
 
@@ -202,6 +228,23 @@ architecture behavioral of ElectronFpga_core is
     signal serial_IRQ_n      : std_logic := '1';
     signal serial_data       : std_logic_vector(7 downto 0) := (others => '0');
 
+    signal mouse_read        :   std_logic;
+    signal mouse_err         :   std_logic;
+    signal mouse_rx_data     :   std_logic_vector(7 downto 0);
+    signal mouse_write       :   std_logic;
+    signal mouse_tx_data     :   std_logic_vector(7 downto 0);
+    signal mouse_x_a         :   std_logic;
+    signal mouse_x_b         :   std_logic;
+    signal mouse_y_a         :   std_logic;
+    signal mouse_y_b         :   std_logic;
+    signal mouse_left        :   std_logic;
+    signal mouse_middle      :   std_logic;
+    signal mouse_right       :   std_logic;
+
+    signal mc6522_enable     : std_logic := '0';
+    signal mc6522_IRQ_n      : std_logic := '1';
+    signal mc6522_data       : std_logic_vector(7 downto 0) := (others => '0');
+
     signal video_vsync_int   : std_logic;
     signal video_hsync_int   : std_logic;
     signal video_blank_int   : std_logic;
@@ -210,6 +253,8 @@ architecture behavioral of ElectronFpga_core is
     signal video_blue_int    : std_logic_vector(3 downto 0);
 
 begin
+
+    reset       <= not reset_n;
 
     video_vsync <= video_vsync_int;
     video_hsync <= video_hsync_int;
@@ -239,7 +284,7 @@ begin
                 Din          => cpu_din,
                 Dout         => cpu_dout,
                 SO_n         => '1',
-                Res_n        => RSTn,
+                Res_n        => reset_n,
                 Rdy          => '1',
                 trig         => "00",
                 avr_RxD      => avr_RxD,
@@ -269,7 +314,7 @@ begin
             Mode            => "00",
             Abort_n         => '1',
             SO_n            => '1',
-            Res_n           => RSTn,
+            Res_n           => reset_n,
             Enable          => cpu_clken,
             Clk             => clk_16M00,
             Rdy             => '1',
@@ -308,7 +353,7 @@ begin
         data_out  => ula_data,
         data_en   => ula_enable,
         R_W_n     => cpu_R_W_n,
-        RST_n     => RSTn,
+        RST_n     => reset_n,
         IRQ_n     => ula_IRQ_n,
         NMI_n     => cpu_NMI_n,
 
@@ -350,7 +395,8 @@ begin
 
         -- Clock Generation
         cpu_clken_out  => cpu_clken,
-        io_clken_out   => io_clken,
+        mhz1_clken_out => mhz1_clken,
+        mhz4_clken_out => mhz4_clken,
         cpu_clk_out    => phi2,
         turbo          => key_turbo
 
@@ -368,9 +414,9 @@ begin
     );
 
     cpu_NMI_n <= ext_1mhz_nmi_n;
-    cpu_IRQ_n <= not((not ext_1mhz_irq_n) or (not ula_IRQ_n) or (not serial_IRQ_n));
+    cpu_IRQ_n <= not((not ext_1mhz_irq_n) or (not ula_IRQ_n) or (not serial_IRQ_n) or (not mc6522_irq_n));
 
-    RSTn    <= hard_reset_n and key_break;
+    reset_n    <= hard_reset_n and key_break;
     audio_l <= sound;
     audio_r <= sound;
 
@@ -387,6 +433,7 @@ begin
     cpu_din <= ext_Dout          when ext_enable = '1' else
                ula_data          when ula_enable = '1' else
                serial_data       when serial_enable = '1' else
+               mc6522_data       when mc6522_enable = '1' and IncludeUserPort else
                "000" & (joystick1 xor "11111") when io_fred = '1' and cpu_a(7 downto 4) = x"C" else
                "000" & (joystick2 xor "11111") when io_fred = '1' and cpu_a(7 downto 4) = x"D" else
                ext_1mhz_do       when io_fred = '1' or io_jim = '1' else
@@ -541,9 +588,9 @@ begin
 
     ABRIncluded: if IncludeABRRegs generate
         abr_enable <= '1' when cpu_a(15 downto 2) & "00" = x"fcdc" else '0';
-        process(clk_16M00, RSTn)
+        process(clk_16M00, reset_n)
         begin
-            if RSTn = '0' then
+            if reset_n = '0' then
                 abr_lo_bank_lock <= '1';
                 abr_hi_bank_lock <= '1';
             elsif rising_edge(clk_16M00) then
@@ -572,12 +619,10 @@ begin
     SerialIncluded: if IncludeSerial generate
         signal ip_n  : std_logic_vector(6 downto 0);
         signal op_n  : std_logic_vector(7 downto 0);
-        signal reset : std_logic;
         signal we    : std_logic;
         signal txa   : std_logic;
         signal rxa   : std_logic;
     begin
-        reset <= not RSTn;
         we <= not cpu_rnw;
 
         inst_d2681 : D2681
@@ -616,6 +661,158 @@ begin
     end generate;
 
 --------------------------------------------------------
+-- User Port
+--------------------------------------------------------
+
+    mc6522_enable  <= '1' when cpu_addr(15 downto 4) = x"fcb" else '0';
+
+    UserPortIncluded: if IncludeUserPort generate
+
+        signal portb_in        : std_logic_vector(7 downto 0);
+        signal cb1_in          : std_logic;
+        signal cb2_in          : std_logic;
+        signal mc6522_data_tmp : std_logic_vector(7 downto 0) := (others => '0');
+
+    begin
+        cb1_in      <= mc6522_cb1_in      and mouse_x_a;
+        cb2_in      <= mc6522_cb2_in      and mouse_y_a;
+        portb_in(7) <= mc6522_portb_in(7) and mouse_right;
+        portb_in(6) <= mc6522_portb_in(6) and mouse_middle;
+        portb_in(5) <= mc6522_portb_in(5) and mouse_left;
+        portb_in(4) <= mc6522_portb_in(4);
+        portb_in(3) <= mc6522_portb_in(3);
+        portb_in(2) <= mc6522_portb_in(2) and mouse_y_b;
+        portb_in(1) <= mc6522_portb_in(1);
+        portb_in(0) <= mc6522_portb_in(0) and mouse_x_b;
+
+        via : entity work.M6522 port map(
+            I_RS       => cpu_addr(3 downto 0),
+            I_DATA     => cpu_dout,
+            O_DATA     => mc6522_data_tmp,
+            I_RW_L     => cpu_rnw,
+            I_CS1      => mc6522_enable,
+            I_CS2_L    => '0',
+            O_IRQ_L    => mc6522_irq_n,
+            I_CA1      => mc6522_ca1_in,
+            I_CA2      => mc6522_ca2_in,
+            O_CA2      => mc6522_ca2_out,
+            O_CA2_OE_L => mc6522_ca2_oe_l,
+            I_PA       => mc6522_porta_in,
+            O_PA       => mc6522_porta_out,
+            O_PA_OE_L  => mc6522_porta_oe_l,
+            I_CB1      => cb1_in,
+            O_CB1      => mc6522_cb1_out,
+            O_CB1_OE_L => mc6522_cb1_oe_l,
+            I_CB2      => cb2_in,
+            O_CB2      => mc6522_cb2_out,
+            O_CB2_OE_L => mc6522_cb2_oe_l,
+            I_PB       => portb_in,
+            O_PB       => mc6522_portb_out,
+            O_PB_OE_L  => mc6522_portb_oe_l,
+            RESET_L    => reset_n,
+            I_P2_H     => mhz1_clken,
+            ENA_4      => mhz4_clken,
+            CLK        => clk_16M00
+            );
+
+        -- This is needed as in v003 of the 6522 data out is only valid while I_P2_H is asserted
+        -- I_P2_H is driven from via1_clken
+        data_latch: process(clk_16M00)
+        begin
+            if rising_edge(clk_16M00) then
+                if mhz1_clken = '1' then
+                    mc6522_data <= mc6522_data_tmp;
+                end if;
+            end if;
+        end process;
+    end generate;
+
+    UserPortNotIncluded: if not IncludeUserPort generate
+        mc6522_ca2_out    <= '1';
+        mc6522_ca2_oe_l   <= '1';
+        mc6522_porta_out  <= (others => '1');
+        mc6522_porta_oe_l <= (others => '1');
+        mc6522_cb1_out    <= '1';
+        mc6522_cb1_oe_l   <= '1';
+        mc6522_cb2_out    <= '1';
+        mc6522_cb2_oe_l   <= '1';
+        mc6522_portb_out  <= (others => '1');
+        mc6522_portb_oe_l <= (others => '1');
+        mc6522_irq_n      <= '1';
+        mc6522_data       <= x"FC";
+    end generate;
+
+--------------------------------------------------------
+-- AMX Mouse
+--------------------------------------------------------
+
+    MouseIncluded: if IncludeAMXMouse generate
+        signal mse_clk_in   : std_logic;
+        signal mse_clk_out  : std_logic;
+        signal mse_data_in  : std_logic;
+        signal mse_data_out : std_logic;
+    begin
+
+        ps2_mouse_clk  <= '0' when mse_clk_out = '0' else 'Z';
+        mse_clk_in     <= ps2_mouse_clk;
+        ps2_mouse_data <= '0' when mse_data_out = '0' else 'Z';
+        mse_data_in    <= ps2_mouse_data;
+
+        mouse_ps2interface: entity work.ps2interface
+        generic map(
+            MainClockSpeed => 16000000
+        )
+        port map(
+           ps2_clk      => mse_clk_in,
+           ps2_clk_out  => mse_clk_out,
+           ps2_data     => mse_data_in,
+           ps2_data_out => mse_data_out,
+           clk          => clk_16M00,
+           rst          => reset,
+           tx_data      => mouse_tx_data,
+           write        => mouse_write,
+           rx_data      => mouse_rx_data,
+           read         => mouse_read,
+           busy         => open,
+           err          => mouse_err
+        );
+        -- BBC Micro User Port (Mouse use)
+        --  2 - CB1 - X Axis
+        --  6 - D0  - X Dir
+        --  4 - CB2 - Y Axis
+        -- 10 - D2  - Y Dir
+        -- 16 - D5  - Left button
+        -- 18 - D6  - Middle button
+        -- 20 - D7  - Right button
+        mouse_controller: entity work.quadrature_controller port map(
+           clk      => clk_16M00,
+           rst      => reset,
+           read     => mouse_read,
+           err      => mouse_err,
+           rx_data  => mouse_rx_data,
+           write    => mouse_write,
+           tx_data  => mouse_tx_data,
+           x_a      => mouse_x_a,
+           x_b      => mouse_x_b,
+           y_a      => mouse_y_a,
+           y_b      => mouse_y_b,
+           left     => mouse_left,
+           middle   => mouse_middle,
+           right    => mouse_right
+        );
+    end generate;
+
+    MouseNotIncluded: if not IncludeAMXMouse generate
+        mouse_x_a    <= '1';
+        mouse_x_b    <= '1';
+        mouse_y_a    <= '1';
+        mouse_y_b    <= '1';
+        mouse_left   <= '1';
+        mouse_middle <= '1';
+        mouse_right  <= '1';
+    end generate;
+
+--------------------------------------------------------
 -- 6502 Tracing
 --------------------------------------------------------
 
@@ -643,8 +840,8 @@ begin
    io_fred <= '1' when cpu_a(15 downto 8) = x"FC" else '0';
    io_jim  <= '1' when cpu_a(15 downto 8) = x"FD" else '0';
 
-   ext_1mhz_clken  <= io_clken;
-   ext_1mhz_nrst   <= RSTn;
+   ext_1mhz_clken  <= mhz1_clken;
+   ext_1mhz_nrst   <= reset_n;
 
    ext_1mhz_pgfc_n <= not io_fred;
    ext_1mhz_pgfd_n <= not io_jim;
