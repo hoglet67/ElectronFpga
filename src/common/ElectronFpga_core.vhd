@@ -27,6 +27,7 @@ entity ElectronFpga_core is
         IncludeSerial      : boolean := false;
         IncludeAMXMouse    : boolean := false;
         IncludeUserPort    : boolean := false;
+        IncludeMRB         : boolean := false;
         IncludeJafaMode7   : boolean := false
     );
     port (
@@ -196,6 +197,8 @@ architecture behavioral of ElectronFpga_core is
     signal cpu_a             : std_logic_vector (23 downto 0);
     signal cpu_din           : std_logic_vector (7 downto 0);
     signal cpu_dout          : std_logic_vector (7 downto 0);
+    signal ula_a             : std_logic_vector (15 downto 0);
+
     signal ula_IRQ_n         : std_logic;
     signal cpu_IRQ_n         : std_logic;
     signal cpu_NMI_n         : std_logic;
@@ -216,11 +219,13 @@ architecture behavioral of ElectronFpga_core is
     signal cpu_clken         : std_logic;
     signal cpu_clken_r       : std_logic;
 
+    signal shadow            : std_logic;
+    signal mrb_mode          : std_logic_vector(1 downto 0) := "11"; -- 00 = normal, 10 = turbo; 11 = shadow
+
     signal rom_latch         : std_logic_vector(3 downto 0);
 
     signal ext_enable        : std_logic;
 
-    signal abr_enable        : std_logic;
     signal abr_lo_bank_lock  : std_logic;
     signal abr_hi_bank_lock  : std_logic;
 
@@ -333,7 +338,7 @@ begin
     ula : entity work.ElectronULA
     generic map (
         IncludeMMC       => true,
-        Include32KRAM    => false,
+        Include32KRAM    => IncludeMRB,
         IncludeVGA       => true,
         IncludeJafaMode7 => IncludeJafaMode7,
         LimitROMSpeed    => false,
@@ -348,7 +353,7 @@ begin
         hard_reset_n => hard_reset_n,
 
         -- CPU Interface
-        addr      => cpu_a(15 downto 0),
+        addr      => ula_a,   -- top bits forced to 110 when MRB shaddow access
         data_in   => cpu_dout,
         data_out  => ula_data,
         data_en   => ula_enable,
@@ -425,8 +430,8 @@ begin
     ext_enable <= '1' when
                   -- ROM accrss
                   ROM_n = '0' or
-                  -- Non screen main memory access (0000-2FFF)
-                  cpu_a(15 downto 13) = "000" or cpu_a(15 downto 12) = "0010" or
+                  -- Shadow memory access (0000-7FFF)
+                  shadow = '1' or
                   -- Sideways RAM Access
                   (cpu_a(15 downto 14) = "10" and rom_latch /= "1000" and (rom_latch /= "1001" or UseRomSlot9)) else '0';
 
@@ -514,6 +519,131 @@ begin
     ext_nCS <= '0';
 
 --------------------------------------------------------
+-- MRB (Master RAM Board)
+--------------------------------------------------------
+
+    -- FC7F=&80 :
+    -- 0000-2fff = normal RAM
+    -- 3000-7fff = normal RAM
+    --
+    -- FC7F=&00, MRB in 'turbo' mode :
+    -- 0000-2fff = shadow RAM
+    -- 3000-7fff = normal RAM
+    --
+    -- FC7F=&00, MRB in 'shadow' mode :
+    -- 0000-2fff = shadow RAM
+    -- 3000-7fff = shadow RAM, EXCEPT when accessed by code at &C000-&DFFF (OS VDU drivers)
+
+    -- JGH: The MOS code suggests that code executing at &C000-&DFFF
+    -- always accesses video RAM, code elsewhere accesses the RAM
+    -- specified by bit 7 of &FC7F.
+
+    -- ThomasHarte: Yep, I found some old notes and that's exactly
+    -- what I used to know. The MSB of FC7F selects entire-range RAM
+    -- visibility; the exception is that operations with their first
+    -- byte in C000–DFFF that address 3000–7FFF always see the
+    -- ordinary built-in memory.
+
+    -- &027F   fx239   &EF   Shadow RAM flag
+    --   &00 indicates no shadow screen or shadow screen not selected
+    --   &01 indicates Electron Master RAM Turbo mode
+    --   &80 indicates Electron Master RAM 64K mode
+
+    -- F0B5 : AD FF 7F : LDA $7FFF   ; Save top byte of main memory
+    -- F0B8 : 48       : PHA
+    -- F0B9 : A9 80    : LDA #$80    ; A = 80
+    -- F0BB : 8D FF 7F : STA $7FFF   ; Write 80 to main memory from address not in C000-DFFF
+    -- F0BE : 0A       : ASL A       ; A = 00
+    -- F0BF : 20 2A D0 : JSR $D02A   ; Write 00 to screen memory from address in C000-DFFF
+    -- F0C2 : AD FF 7F : LDA $7FFF   ; Returns 80 (64K mode) if shadow / screen are distict, otherwise 00
+    -- F0C5 : 30 0C    : BMI $F0D3
+    -- F0C7 : A2 D8    : LDX #$D8
+    -- F0C9 : A0 01    : LDY #$01
+    -- F0CB : 84 D8    : STY $D8     ; 00D8 = 01 (Turbo mode)
+    -- F0CD : A8       : TAY         ; A = 0; Y = 0
+    -- F0CE : 20 F7 FB : JSR $FBF7   ; Test if turbo mode is enabled
+    -- F0D1 : A5 D8    : LDA $D8
+    -- F0D3 : 8D 7F 02 : STA $027F   ; 80 = shadow mode
+    -- F0D6 : 68       : PLA
+    -- F0D7 : 8D FF 7F : STA $7FFF   ; Restore top byte of main memory
+    -- F0DA : 60       : RTS
+    --
+    -- FBF7 : 2C D2 D8 : BIT $D8D2   ; In MRB OS 3.0 D8D2 = 11111111; In ELK OS 1.0 D8D2 = 10101001
+    -- FBFA : 70 01    : BVS $FBFD
+    -- FBFC : B8       : CLV         ; superfluous as V=0 anyway
+    -- FBFD : 4C DB F0 : JMP $F0DB   ; V=1 indicates MRB OS; V=0 indicates ELK OS
+    --
+    -- F0DB : 08       : PHP         ; Save flags inc IRQ status
+    -- F0DC : 78       : SEI         ; disable interrupts
+    -- F0DD : 38       : SEC
+    -- F0DE : 6A       : ROR A       ; A = 80
+    -- F0DF : 8D 7F FC : STA $FC7F   ; disable MRB
+    -- F0E2 : 2A       : ROL A       ; A = 00
+    -- F0E3 : 86 D6    : STX $D6     ; D7/D6 = 00D8
+    -- F0E5 : 84 D7    : STY $D7
+    -- F0E7 : A0 00    : LDY #$00
+    -- F0E9 : 70 02    : BVS $F0ED   ; V=1 if MRB OS; V=0 for ELK OS
+    -- F0EB : B1 D6    : LDA ($D6),Y ; executed if Elk OS: don't change 00D8
+    -- F0ED : 91 D6    : STA ($D6),Y ; 00D8 = 0 - this always writes normal memory as MRB disable
+    -- F0EF : A4 D7    : LDY $D7     ; restore Y
+    -- F0F1 : 18       : CLC
+    -- F0F2 : 6A       : ROR A       ; A = 00
+    -- F0F3 : 8D 7F FC : STA $FC7F   ; enable MRB
+    -- F0F6 : 2A       : ROL A       ; C -> A; A=01 if turbo mode; A=00 if normal mode
+    -- F0F7 : 28       : PLP
+    -- F0F8 : 60       : RTS
+
+    MRBIncluded: if IncludeMRB generate
+        signal mrb_enabled : std_logic; -- register at FC7C bit 7
+        signal vdu_op      : std_logic; -- flag to indicate instruction address in C000-DFFF (VDU driver)
+    begin
+        -- Note: mrb_mode has the following values: 00 = normal, 10 = turbo; 11 = shadow
+        shadow <=
+            -- Normal memory when address >= 0x8000
+            '0' when cpu_a(15) = '1'   else
+            -- Normal memory when mrb_mode is "NORMAL"
+            '0' when mrb_mode(1) = '0' else
+            -- Normal memory when mrb is disabled with the FC7F register
+            '0' when mrb_enabled = '0' else
+            -- Normal memory when an access to screen memory (3000-7FFF) from either a VDU op or in turbo mode
+            '0' when (cpu_a(15 downto 12) = "0011" or cpu_a(15 downto 14) = "01") and (vdu_op = '1' or mrb_mode(0) = '0')  else
+            -- Otherwise use shadow memory
+            '1';
+
+        ula_a  <= "110" & cpu_a(12 downto 0) when shadow = '1' else cpu_a(15 downto 0);
+
+        process(clk_16M00, reset_n)
+        begin
+            if reset_n = '0' then
+                mrb_enabled <= '1'; -- enabled on reset
+                vdu_op <= '0';
+            elsif rising_edge(clk_16M00) then
+                if cpu_clken = '1' then
+                    -- The setting the MSB of FC7F disabled all MRB functionality
+                    if io_fred = '1' and cpu_a(7 downto 0) = x"7f" and cpu_R_W_n = '0' then
+                        mrb_enabled <= not cpu_dout(7);
+                    end if;
+                    -- Flag to indicate the current instruction address is C000..DFFF
+                    if cpu_sync = '1' then
+                        if cpu_a(15 downto 13) = "110" then
+                            vdu_op <= '1';
+                        else
+                            vdu_op <= '0';
+                        end if;
+                    end if;
+                end if;
+            end if;
+        end process;
+    end generate;
+
+    MRBNotIncluded: if not IncludeMRB generate
+        -- This retains the existing behaviour where 0000-2FFF used external RAM, allowing
+        -- the ULA to contain just 20KB of screen memory
+        shadow <= '1' when cpu_a(15 downto 13) = "000" or cpu_a(15 downto 12) = "0010" else '0';
+        ula_a  <= cpu_a(15 downto 0);
+    end generate;
+
+--------------------------------------------------------
 -- HDMI
 --------------------------------------------------------
 
@@ -587,7 +717,9 @@ begin
 --------------------------------------------------------
 
     ABRIncluded: if IncludeABRRegs generate
-        abr_enable <= '1' when cpu_a(15 downto 2) & "00" = x"fcdc" else '0';
+        signal abr_enable : std_logic;
+    begin
+        abr_enable <= '1' when io_fred = '1' and cpu_a(7 downto 2) & "00" = x"dc" else '0';
         process(clk_16M00, reset_n)
         begin
             if reset_n = '0' then
@@ -664,7 +796,7 @@ begin
 -- User Port
 --------------------------------------------------------
 
-    mc6522_enable  <= '1' when cpu_addr(15 downto 4) = x"fcb" else '0';
+    mc6522_enable  <= '1' when io_fred = '1' and cpu_addr(7 downto 4) = x"b" else '0';
 
     UserPortIncluded: if IncludeUserPort generate
 
