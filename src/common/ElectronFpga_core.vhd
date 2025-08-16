@@ -212,6 +212,7 @@ architecture behavioral of ElectronFpga_core is
 
     signal key_break         : std_logic;
     signal key_turbo         : std_logic_vector(1 downto 0);
+    signal cpu_turbo         : std_logic_vector(1 downto 0);
     signal sound             : std_logic;
     signal kbd_data          : std_logic_vector(3 downto 0);
 
@@ -221,7 +222,7 @@ architecture behavioral of ElectronFpga_core is
     signal cpu_clken_r       : std_logic;
 
     signal shadow            : std_logic;
-    signal mrb_mode          : std_logic_vector(1 downto 0) := "11"; -- 00 = normal, 10 = turbo; 11 = shadow
+    signal mrb_mode          : std_logic_vector(1 downto 0); -- 00 = normal, 10 = turbo; 11 = shadow
 
     signal sp64_ram_enable   : std_logic := '0';
     signal sp64_rom_select   : std_logic := '0';
@@ -407,7 +408,7 @@ begin
         mhz1_clken_out => mhz1_clken,
         mhz4_clken_out => mhz4_clken,
         cpu_clk_out    => phi2,
-        turbo          => key_turbo
+        turbo          => cpu_turbo
 
     );
 
@@ -420,7 +421,7 @@ begin
         row        => cpu_a(13 downto 0),
         break      => key_break,
         turbo      => key_turbo
-    );
+        );
 
     cpu_NMI_n <= ext_1mhz_nmi_n;
     cpu_IRQ_n <= not((not ext_1mhz_irq_n) or (not ula_IRQ_n) or (not serial_IRQ_n) or (not mc6522_irq_n));
@@ -436,7 +437,7 @@ begin
                   ROM_n = '0' or
                   -- Shadow memory access (0000-7FFF)
                   shadow = '1' or
-                  -- Sideways RAM Access
+                  -- Sideways ROM Access
                   (cpu_a(15 downto 14) = "10" and rom_latch /= "1000" and (rom_latch /= "1001" or UseRomSlot9)) else '0';
 
     cpu_din <= ext_Dout          when ext_enable = '1' else
@@ -453,7 +454,6 @@ begin
      -- External addresses 40000-7FFFF are routed to SRAM
     -- Note: the bottom 32K of CPU address space is mapped to SRAM, 20K of this is overlaid by the ULA
 
-
     process(clk_16M00,hard_reset_n)
     begin
 
@@ -469,23 +469,22 @@ begin
                 -- exteral main memory access
                 ext_A <= "1" & "111" & cpu_a(14 downto 0);
             elsif cpu_a(15 downto 14) = "11" then
-                 -- The OS rom image lives in slot 8 as on the Elk this is where the
-                 -- keyboard appears, which keeps the external memory image down to 256KB.
-                ext_A <= "0" & "1000" & cpu_a(13 downto 0);
+                 -- The OS rom images lives in slot 0/1 as these are overlaid by sideway RAM
+                ext_A <= "0" & "000" & mrb_mode(1) & cpu_a(13 downto 0);
             elsif cpu_a(15 downto 14) = "10" and rom_latch(3 downto 2) = "00" then
                 -- Slots 0..3 are mapped to SRAM
                 ext_A <= "1" & rom_latch & cpu_a(13 downto 0);
             elsif cpu_a(15 downto 14) = "10" and rom_latch(3 downto 0) = "0100" and cpu_a(13 downto 8) >= "110111" then
                 -- Slots 4 (MMFS) has B700 onwards as writeable for private workspace so mapped to SRAM
                 ext_A <= "1" & rom_latch & cpu_a(13 downto 0);
-            elsif IncludeSP64 and cpu_a(15 downto 14) = "10" and rom_latch = "1010" then
+            elsif IncludeSP64 and cpu_a(15 downto 14) = "10" and rom_latch = "1010" and mrb_mode(1) = '1' then
                 -- Slot 10 (Stop Press 64) has special behavior if this is included
                 if cpu_a(13) = '1' and sp64_ram_enable = '1' then
                     -- There is a switchable 8KB RAM overlay from A000-BFFF
                     ext_A <= "1" & rom_latch & cpu_a(13 downto 0);
                 else
-                    -- There are two ROMs images which we preload into ROMs 0 and 1
-                    ext_A <= "0" & "000" & sp64_rom_select & cpu_a(13 downto 0);
+                    -- There are two ROMs images which we preload into ROMs 2 and 3
+                    ext_A <= "0" & "001" & (not sp64_rom_select) & cpu_a(13 downto 0);
                 end if;
             else
                 -- everyting else is ROM
@@ -546,13 +545,13 @@ begin
         begin
             if reset_n = '0' then
                 sp64_ram_enable <= '0';
-                sp64_rom_select  <= '1';
+                sp64_rom_select  <= '0';
             elsif rising_edge(clk_16M00) then
                 if cpu_clken = '1' then
                     -- Bits 0 and 7 of FCFA control the Stop Press 64 RAM/ROM overlay in slot 10
                     if io_fred = '1' and cpu_a(7 downto 0) = x"fa" and cpu_R_W_n = '0' then
                         sp64_ram_enable <= cpu_dout(7); -- '1' overlays 8KB RAM at A000-BFFF
-                        sp64_rom_select <= not cpu_dout(0); -- '1' selects the lower ROM, so this is inverted
+                        sp64_rom_select <= cpu_dout(0); -- '1' selects the lower ROM
                     end if;
                 end if;
             end if;
@@ -653,6 +652,18 @@ begin
 
         ula_a  <= "110" & cpu_a(12 downto 0) when shadow = '1' else cpu_a(15 downto 0);
 
+        -- F1: 2MHz Mode  (OS 1.00)
+        -- F2: MRB Off    (OS 1.00) - Normal Electron
+        -- F3: MRB Turbo  (OS 3.10)
+        -- F4: MRB Shadow (OS 3.10)
+
+        cpu_turbo <= "10" when key_turbo = "01" else
+                     "01";
+
+        mrb_mode  <= "10" when key_turbo = "10" else
+                     "11" when key_turbo = "11" else
+                     "00";
+
         process(clk_16M00, reset_n)
         begin
             if reset_n = '0' then
@@ -681,7 +692,18 @@ begin
         -- This retains the existing behaviour where 0000-2FFF used external RAM, allowing
         -- the ULA to contain just 20KB of screen memory
         shadow <= '1' when cpu_a(15 downto 13) = "000" or cpu_a(15 downto 12) = "0010" else '0';
+
         ula_a  <= cpu_a(15 downto 0);
+
+        -- F1: 1MHz No Contention        (OS 1.00)
+        -- F2: 1MHz/2MHz Mode/Contention (OS 1.00) - Normal Electron
+        -- F3: 2MHz No Contention        (OS 1.00)
+        -- F4: 4MHz No Contention        (OS 1.00)
+
+        cpu_turbo <= key_turbo;
+
+        mrb_mode <= "00";
+
     end generate;
 
 --------------------------------------------------------
