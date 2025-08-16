@@ -657,7 +657,7 @@ begin
         -- F3: MRB Turbo  (OS 3.10)
         -- F4: MRB Shadow (OS 3.10)
 
-        cpu_turbo <= "10" when key_turbo = "01" else
+        cpu_turbo <= "10" when key_turbo = "00" else
                      "01";
 
         mrb_mode  <= "10" when key_turbo = "10" else
