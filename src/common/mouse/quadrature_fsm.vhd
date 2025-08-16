@@ -29,7 +29,7 @@ type quad_state is
 signal state   : quad_state := idle;
 signal dir     : std_logic;
 signal count   : std_logic_vector(7 downto 0);
-signal delay   : std_logic_vector(15 downto 0);
+signal delay   : std_logic_vector(12 downto 0);
 signal a       : std_logic;
 signal b       : std_logic;
 begin
@@ -59,7 +59,7 @@ begin
                             a <= not a;
                             -- inc is positive, so decrease
                             count <= count - 1;
-                        end if;                        
+                        end if;
                         state <= count2;
                     end if;
                 when count2 =>
@@ -69,7 +69,7 @@ begin
                             a <= not a;
                         else
                             b <= not b;
-                        end if;                        
+                        end if;
                         if count = x"00" then
                             state <= idle;
                         else
