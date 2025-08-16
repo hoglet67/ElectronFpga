@@ -28,6 +28,7 @@ entity ElectronFpga_core is
         IncludeAMXMouse    : boolean := false;
         IncludeUserPort    : boolean := false;
         IncludeMRB         : boolean := false;
+        IncludeSP64        : boolean := false;
         IncludeJafaMode7   : boolean := false
     );
     port (
@@ -221,6 +222,9 @@ architecture behavioral of ElectronFpga_core is
 
     signal shadow            : std_logic;
     signal mrb_mode          : std_logic_vector(1 downto 0) := "11"; -- 00 = normal, 10 = turbo; 11 = shadow
+
+    signal sp64_ram_enable   : std_logic := '0';
+    signal sp64_rom_select   : std_logic := '0';
 
     signal rom_latch         : std_logic_vector(3 downto 0);
 
@@ -447,7 +451,9 @@ begin
     -- Pipeline external memory interface
      -- External addresses 00000-3FFFF are routed to FLASH 80000-DFFFFF
      -- External addresses 40000-7FFFF are routed to SRAM
-     -- Note: the bottom 32K of CPU address space is mapped to SRAM, 20K of this is overlaid by the ULA
+    -- Note: the bottom 32K of CPU address space is mapped to SRAM, 20K of this is overlaid by the ULA
+
+
     process(clk_16M00,hard_reset_n)
     begin
 
@@ -461,7 +467,7 @@ begin
             cpu_clken_r <= cpu_clken;
             if cpu_a(15) = '0' then
                 -- exteral main memory access
-                ext_A <= "1" & "000" & cpu_a(14 downto 0);
+                ext_A <= "1" & "111" & cpu_a(14 downto 0);
             elsif cpu_a(15 downto 14) = "11" then
                  -- The OS rom image lives in slot 8 as on the Elk this is where the
                  -- keyboard appears, which keeps the external memory image down to 256KB.
@@ -472,6 +478,15 @@ begin
             elsif cpu_a(15 downto 14) = "10" and rom_latch(3 downto 0) = "0100" and cpu_a(13 downto 8) >= "110111" then
                 -- Slots 4 (MMFS) has B700 onwards as writeable for private workspace so mapped to SRAM
                 ext_A <= "1" & rom_latch & cpu_a(13 downto 0);
+            elsif IncludeSP64 and cpu_a(15 downto 14) = "10" and rom_latch = "1010" then
+                -- Slot 10 (Stop Press 64) has special behavior if this is included
+                if cpu_a(13) = '1' and sp64_ram_enable = '1' then
+                    -- There is a switchable 8KB RAM overlay from A000-BFFF
+                    ext_A <= "1" & rom_latch & cpu_a(13 downto 0);
+                else
+                    -- There are two ROMs images which we preload into ROMs 0 and 1
+                    ext_A <= "0" & "000" & sp64_rom_select & cpu_a(13 downto 0);
+                end if;
             else
                 -- everyting else is ROM
                 ext_A <= "0" & rom_latch & cpu_a(13 downto 0);
@@ -499,6 +514,10 @@ begin
                 -- Slots 4 (MMFS) has B600 onwards as writeable for private workspace
                 ext_nWE_long <= '0';
                 ext_nWE <= cpu_clken_r;
+            elsif cpu_a(14) = '0' and rom_latch(3 downto 0) = "1010" and cpu_a(13) = '1' and sp64_ram_enable = '1' and IncludeSP64 then
+                -- Slot 10 (Stop Press 64) has a switchable 8KB RAM overlay from A000-BFFF
+                ext_nWE_long <= '0';
+                ext_nWE <= cpu_clken_r;
             else
                 -- Other slots are read only
                 ext_nWE_long <= '1';
@@ -517,6 +536,28 @@ begin
 
     -- Always enabled
     ext_nCS <= '0';
+
+--------------------------------------------------------
+-- Stop Press 64
+--------------------------------------------------------
+
+    SP64Included: if IncludeSP64 generate
+        process(clk_16M00, reset_n)
+        begin
+            if reset_n = '0' then
+                sp64_ram_enable <= '0';
+                sp64_rom_select  <= '1';
+            elsif rising_edge(clk_16M00) then
+                if cpu_clken = '1' then
+                    -- Bits 0 and 7 of FCFA control the Stop Press 64 RAM/ROM overlay in slot 10
+                    if io_fred = '1' and cpu_a(7 downto 0) = x"fa" and cpu_R_W_n = '0' then
+                        sp64_ram_enable <= cpu_dout(7); -- '1' overlays 8KB RAM at A000-BFFF
+                        sp64_rom_select <= not cpu_dout(0); -- '1' selects the lower ROM, so this is inverted
+                    end if;
+                end if;
+            end if;
+        end process;
+    end generate;
 
 --------------------------------------------------------
 -- MRB (Master RAM Board)
