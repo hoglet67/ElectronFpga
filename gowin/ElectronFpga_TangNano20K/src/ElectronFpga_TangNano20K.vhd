@@ -55,6 +55,8 @@ entity ElectronFpga_TangNano20K is
         IncludeSerial          : boolean := true;
         IncludeUserPort        : boolean := true;
         IncludeAmxMouse        : boolean := true;
+        IncludeMRB             : boolean := true;
+        IncludeSP64            : boolean := true;
         IncludeJafaMode7       : boolean := true;
 
         IncludeFullRS423       : boolean := false; -- Overrides PiTube
@@ -466,6 +468,8 @@ begin
         IncludeSerial      => IncludeSerial,
         IncludeUserPort    => IncludeUserPort,
         IncludeAmxMouse    => IncludeAmxMouse,
+        IncludeMRB         => IncludeMRB,
+        IncludeSP64        => IncludeSP64,
         IncludeJafaMode7   => IncludeJafaMode7
     )
     port map (
