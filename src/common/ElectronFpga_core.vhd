@@ -818,7 +818,7 @@ begin
         signal txa   : std_logic;
         signal rxa   : std_logic;
     begin
-        we <= not cpu_rnw;
+        we <= not CPU_R_W_n;
 
         inst_d2681 : D2681
             generic map (
@@ -830,7 +830,7 @@ begin
                 clken   => cpu_clken,
                 enable  => serial_enable,
                 we      => we,
-                addr    => cpu_addr(3 downto 0),
+                addr    => cpu_a(3 downto 0),
                 di      => cpu_dout,
                 do      => serial_data,
                 ip_n    => ip_n,
@@ -859,7 +859,7 @@ begin
 -- User Port
 --------------------------------------------------------
 
-    mc6522_enable  <= '1' when io_fred = '1' and cpu_addr(7 downto 4) = x"b" else '0';
+    mc6522_enable  <= '1' when io_fred = '1' and cpu_a(7 downto 4) = x"b" else '0';
 
     UserPortIncluded: if IncludeUserPort generate
 
@@ -881,10 +881,10 @@ begin
         portb_in(0) <= mc6522_portb_in(0) and mouse_x_b;
 
         via : entity work.M6522 port map(
-            I_RS       => cpu_addr(3 downto 0),
+            I_RS       => cpu_a(3 downto 0),
             I_DATA     => cpu_dout,
             O_DATA     => mc6522_data_tmp,
-            I_RW_L     => cpu_rnw,
+            I_RW_L     => CPU_R_W_n,
             I_CS1      => mc6522_enable,
             I_CS2_L    => '0',
             O_IRQ_L    => mc6522_irq_n,
