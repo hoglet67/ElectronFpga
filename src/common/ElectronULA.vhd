@@ -724,6 +724,17 @@ begin
                        ((intr_counter = 255744 + disp_skew or intr_counter = 576256 + disp_skew) and mode_text = '1') then
                         isr(2) <= '1';
                     end if;
+                    -- Memory Contention exact timing
+                    if (intr_counter(9 downto 0) >= 640 or
+                        (mode_text = '0' and intr_counter(19 downto 10) >= 256 and intr_counter(19 downto 10) <= 311) or
+                        (mode_text = '0' and intr_counter(19 downto 10) >= 568 and intr_counter(19 downto 10) <= 624) or
+                        (mode_text = '1' and intr_counter(19 downto 10) >= 250 and intr_counter(19 downto 10) <= 311) or
+                        (mode_text = '1' and intr_counter(19 downto 10) >= 562 and intr_counter(19 downto 10) <= 624) or
+                        char_row >= 8) then
+                        contention2 <= '0';
+                    else
+                        contention2 <= not mode_40;
+                    end if;
                 else
                     -- Generate the rtc interrupt on the rising edge (line 100 of the screen)
                     if (rtc_intr2 = '0' and rtc_intr1 = '1') then
@@ -733,6 +744,9 @@ begin
                     if display_intr2 = '0' and display_intr1 = '1' then
                         isr(2) <= '1';
                     end if;
+                    -- Generate the display memory signal
+                    contention1 <= contention;
+                    contention2 <= contention1;
                 end if;
                 if (comms_mode = "00") then
                     -- Cassette In Mode
@@ -1149,16 +1163,27 @@ begin
                 screen_addr <= byte_addr & char_row(2 downto 0);
             end if;
 
+            -- Indicate possible memory contention on active scan
+            -- lines. The scan doubled version is not quite right: 216
+            -- might need increasing a bit (thanks to Domininc for
+            -- help with this)
+            if (is_scandoubled = '0' and (h_count1 >= h_active)) or
+               (is_scandoubled = '1' and (h_count1 >= 216 and v_count(0) = '1')) or
+               (mode_text = '0' and v_count >= v_active_gph) or
+               (mode_text = '1' and v_count >= v_active_txt) or
+               (char_row >= 8) then
+                contention <= '0';
+            else
+                contention <= not mode_40;
+            end if;
+
             -- RGB Data
             if (h_count1 >= h_active or (mode_text = '0' and v_count >= v_active_gph) or (mode_text = '1' and v_count >= v_active_txt) or char_row >= 8) then
                 -- blanking and border are always black
                 red_int   <= (others => '0');
                 green_int <= (others => '0');
                 blue_int  <= (others => '0');
-                contention <= '0';
             else
-                -- Indicate possible memory contention on active scan lines
-                contention <= not mode_40;
                 -- rendering an actual pixel
                 if (mode_bpp = 0) then
                     -- 1 bit per pixel, map to colours 0 and 8 for the palette lookup
@@ -1365,10 +1390,6 @@ begin
             if clken_counter = "1111" then
                 turbo_sync <= turbo;
             end if;
-
-            -- Synchronize contention signal
-            contention1 <= contention;
-            contention2 <= contention1;
 
             -- clken counter
             clken_counter <= clken_counter + 1;
