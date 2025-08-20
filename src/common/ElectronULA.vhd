@@ -101,8 +101,8 @@ entity ElectronULA is
         rom_latch : out std_logic_vector(3 downto 0);
 
         -- Format of Video
-        -- 00 - sRGB - interlaced
-        -- 01 - sRGB - non interlaced
+        -- 00 - sRGB - non interlaced
+        -- 01 - sRGB - interlaced (perfect electron timing)
         -- 10 - 576p - 50Hz (27MHz pixel clock for 720x576 50Hz HDMI timings)
         -- 11 - 600p - 60Hz (40MHz pixel clock for 800x600 60Hz SVGA timings)
         mode_init      : in  std_logic_vector(1 downto 0);

@@ -102,8 +102,8 @@ entity ElectronFpga_core is
         cassette_out   : out std_logic;
 
         -- Format of Video
-        -- 00 - sRGB - interlaced
-        -- 01 - sRGB - non interlaced
+        -- 00 - sRGB - non interlaced
+        -- 01 - sRGB - interlaced
         -- 10 - 576p - 50Hz (27MHz pixel clock for 720x576 50Hz HDMI timings)
         -- 11 - 600p - 60Hz (40MHz pixel clock for 800x600 60Hz SVGA timings)
         vid_mode       : in  std_logic_vector(1 downto 0);
@@ -719,6 +719,7 @@ begin
         signal hdmi_blank : std_logic;
         signal hdmi_audio : std_logic_vector (15 downto 0);
     begin
+
         process(clk_27M00)
         begin
             if rising_edge(clk_27M00) then
