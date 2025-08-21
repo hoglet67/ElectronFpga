@@ -98,6 +98,9 @@
         <File path="../../../src/common/mode7/saa5050.vhd" type="file.vhdl" enable="1"/>
         <File path="../../../src/common/mode7/saa5050_rom_dual_port_uninitialized.vhd" type="file.vhdl" enable="1"/>
         <File path="../../../src/common/mode7/retimer.vhd" type="file.vhdl" enable="1"/>
+        <File path="../../../src/common/scandoubler/rgb2vga_scandoubler.vhd" type="file.vhdl" enable="1"/>
+        <File path="../../../src/common/scandoubler/rgb2vga_dpram.vhd" type="file.vhdl" enable="1"/>
+        <File path="../../../src/common/scandoubler/linedelay.vhd" type="file.vhdl" enable="1"/>
         <File path="../../../src/common/mouse/ps2interface.vhd" type="file.vhdl" enable="1"/>
         <File path="../../../src/common/mouse/quadrature_controller.vhd" type="file.vhdl" enable="1"/>
         <File path="../../../src/common/mouse/quadrature_fsm.vhd" type="file.vhdl" enable="1"/>

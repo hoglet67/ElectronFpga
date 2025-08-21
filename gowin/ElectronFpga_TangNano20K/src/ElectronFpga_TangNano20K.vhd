@@ -564,7 +564,7 @@ begin
     audio_l <= x"10000" when audio_l_tmp = '1' else x"F0000";
     audio_r <= x"10000" when audio_r_tmp = '1' else x"F0000";
 
-    vid_mode <= "10"; -- Force 50Hz VGA mode for now
+    vid_mode <= "01"; -- Hack: Force Electron interlaced timimg
 
     --------------------------------------------------------
     -- Clock Generation
@@ -791,28 +791,30 @@ begin
         dac_l_in <= (not audio_l(19)) & audio_l(18 downto 10);
         dac_r_in <= (not audio_r(19)) & audio_r(18 downto 10);
 
-        dac_l : entity work.pwm_sddac
-            generic map (
-                msbi_g => 9
-                )
-            port map (
-                clk_i => clock_16,
-                reset => '0',
-                dac_i => dac_l_in,
-                dac_o => audiol
-                );
+        -- dac_l : entity work.pwm_sddac
+        --     generic map (
+        --         msbi_g => 9
+        --         )
+        --     port map (
+        --         clk_i => clock_16,
+        --         reset => '0',
+        --         dac_i => dac_l_in,
+        --         dac_o => audiol
+        --         );
 
-        dac_r : entity work.pwm_sddac
-            generic map (
-                msbi_g => 9
-                )
-            port map (
-                clk_i => clock_16,
-                reset => '0',
-                dac_i => dac_r_in,
-                dac_o => audior
-                );
+        -- dac_r : entity work.pwm_sddac
+        --     generic map (
+        --         msbi_g => 9
+        --         )
+        --     port map (
+        --         clk_i => clock_16,
+        --         reset => '0',
+        --         dac_i => dac_r_in,
+        --         dac_o => audior
+        --         );
 
+    audiol <= test(0);
+    audior <= test(5);
     --------------------------------------------------------
     -- HDMI Output
     --------------------------------------------------------

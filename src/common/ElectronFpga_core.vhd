@@ -258,6 +258,7 @@ architecture behavioral of ElectronFpga_core is
     signal video_vsync_int   : std_logic;
     signal video_hsync_int   : std_logic;
     signal video_blank_int   : std_logic;
+    signal video_field_int   : std_logic;
     signal video_red_int     : std_logic_vector(3 downto 0);
     signal video_green_int   : std_logic_vector(3 downto 0);
     signal video_blue_int    : std_logic_vector(3 downto 0);
@@ -377,6 +378,7 @@ begin
         vsync     => video_vsync_int,
         hsync     => video_hsync_int,
         blank     => video_blank_int,
+        fld       => video_field_int,
 
         -- Audio
         sound     => sound,
@@ -711,6 +713,16 @@ begin
 --------------------------------------------------------
 
     GenHDMI: if IncludeHDMI generate
+        signal rgb_in     : std_logic_vector(2 downto 0);
+        signal rgb_tmp    : std_logic_vector(2 downto 0);
+        signal rgb_out    : std_logic_vector(2 downto 0);
+        signal bypass     : std_logic;
+        signal hsync0     : std_logic;
+        signal hsync1     : std_logic;
+        signal vsync0     : std_logic;
+        signal vsync1     : std_logic;
+        signal hcnt       : std_logic_vector(9 downto 0);
+        signal vcnt       : std_logic_vector(9 downto 0);
         signal hdmi_red   : std_logic_vector(7 downto 0);
         signal hdmi_green : std_logic_vector(7 downto 0);
         signal hdmi_blue  : std_logic_vector(7 downto 0);
@@ -720,7 +732,43 @@ begin
         signal hdmi_audio : std_logic_vector (15 downto 0);
     begin
 
+        rgb_in <= video_red_int(0) & video_green_int(0) & video_blue_int(0);
+
+        inst_rgb2vga_scandoubler: entity work.rgb2vga_scandoubler
+            generic map (
+                WIDTH => 3
+                )
+            port map (
+                clock => clk_16M00,
+                clken => '1',
+                clk25 => clk_27M00,
+                mode => '0',
+                rgbi_in => rgb_in,
+                hSync_in => video_hsync_int,
+                vSync_in => video_vsync_int,
+                rgbi_out => rgb_tmp,
+                hSync_out => hsync0,
+                vSync_out => vsync0
+                );
+
+        bypass <= not video_field_int;
+
+        inst_linedelay : entity work.linedelay
+            generic map (
+                WIDTH => 3,
+                DEPTH => 864
+                )
+            port map (
+                clock  => clk_27M00,
+                clken  => '1',
+                bypass => bypass,
+                din    => rgb_tmp,
+                dout   => rgb_out
+                );
+
         process(clk_27M00)
+            variable voffset : integer;
+            variable vsize   : integer;
         begin
             if rising_edge(clk_27M00) then
                 if sound = '1' then
@@ -728,13 +776,47 @@ begin
                 else
                     hdmi_audio <= x"F000";
                 end if;
-                hdmi_red   <= video_red_int   & "0000";
-                hdmi_green <= video_green_int & "0000";
-                hdmi_blue  <= video_blue_int  & "0000";
-                hdmi_hsync <= video_hsync_int;
-                hdmi_vsync <= video_vsync_int;
-                hdmi_blank <= video_blank_int;
+                hsync1 <= hsync0;
+                if hsync1 = '0' and hsync0 = '1' then
+                    hcnt <= (others => '0');
+                    vsync1 <= vsync0;
+                    if vsync1 = '0' and vsync0 = '1' then
+                        vcnt <= (others => '0');
+                    else
+                        vcnt <= vcnt + 1;
+                    end if;
+                else
+                    hcnt <= hcnt + 1;
                 end if;
+                if hdmi_audio_en = '1' then
+                    voffset := 39;
+                    vsize   := 576;
+                else
+                    voffset := 55;
+                    vsize   := 540;
+                end if;
+                if hcnt < 68 or hcnt >= 68 + 720 or vcnt < voffset or vcnt >= voffset + vsize then
+                    hdmi_blank <= '1';
+                    hdmi_red   <= (others => '0');
+                    hdmi_green <= (others => '0');
+                    hdmi_blue  <= (others => '0');
+                else
+                    hdmi_blank <= '0';
+                    hdmi_red   <= (others => rgb_out(2));
+                    hdmi_green <= (others => rgb_out(1));
+                    hdmi_blue  <= (others => rgb_out(0));
+                end if;
+                if hcnt >= 732 + 68 then -- 800
+                    hdmi_hsync <= '0';
+                    if vcnt >= 581 + 39 then -- 620
+                        hdmi_vsync <= '0';
+                    else
+                        hdmi_vsync <= '1';
+                    end if;
+                else
+                    hdmi_hsync <= '1';
+                end if;
+            end if;
         end process;
 
         inst_hdmi: entity work.hdmi

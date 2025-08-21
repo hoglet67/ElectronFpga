@@ -76,6 +76,7 @@ entity ElectronULA is
         vsync     : out std_logic;
         hsync     : out std_logic;
         blank     : out std_logic;
+        fld       : out std_logic;
 
         -- Audio
         sound     : out std_logic;
@@ -1167,7 +1168,7 @@ begin
             -- lines. The scan doubled version is not quite right: 216
             -- might need increasing a bit (thanks to Domininc for
             -- help with this)
-            if (is_scandoubled = '0' and (h_count1 >= h_active)) or
+            if (is_scandoubled = '0' and (h_count1 >= 640 - 16)) or
                (is_scandoubled = '1' and (h_count1 >= 216 and v_count(0) = '1')) or
                (mode_text = '0' and v_count >= v_active_gph) or
                (mode_text = '1' and v_count >= v_active_txt) or
@@ -1354,12 +1355,14 @@ begin
     blank <= not ttxt_de_out        when mode7_enable = '1' else
              blank_int;
 
+    fld   <= field;
+
     vsync <= ttxt_vs_out when mode7_enable = '1' else
-             '1' when is_scandoubled = '0' else
+-- HACK             '1' when is_scandoubled = '0' else
              vsync_int;
 
     hsync <= ttxt_hs_out when mode7_enable = '1' else
-             hsync_int and vsync_int when is_scandoubled = '0' else
+-- HACK             hsync_int and vsync_int when is_scandoubled = '0' else
              hsync_int;
 
 
