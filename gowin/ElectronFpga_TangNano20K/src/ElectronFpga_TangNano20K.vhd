@@ -49,6 +49,9 @@ use work.version_config_pack.all;
 entity ElectronFpga_TangNano20K is
     generic (
         UseRomSlot9            : boolean := true; -- allow use of ROMs in slot 9 (the keyboard alias)
+
+        IncludeSRGB            : boolean := G_CONFIG_VGA; -- output when jumper(3) on
+        IncludeVGA             : boolean := G_CONFIG_VGA; -- output when jumper(3) off
         IncludeHDMI            : boolean := true;
         IncludeICEDebugger     : boolean := G_CONFIG_DEBUGGER;
         IncludeABRRegs         : boolean := true;
@@ -388,14 +391,21 @@ architecture rtl of ElectronFpga_TangNano20K is
     signal caps_led        : std_logic;
     signal motor_led       : std_logic;
 
-    signal i_VGA_R         : std_logic_vector(3 downto 0);
-    signal i_VGA_G         : std_logic_vector(3 downto 0);
-    signal i_VGA_B         : std_logic_vector(3 downto 0);
-    signal vga_r_int       : std_logic;
-    signal vga_g_int       : std_logic;
-    signal vga_b_int       : std_logic;
-    signal vga_hs_int      : std_logic;
-    signal vga_vs_int      : std_logic;
+    -- Analog video
+    signal rgb_red         : std_logic_vector(3 downto 0);
+    signal rgb_green       : std_logic_vector(3 downto 0);
+    signal rgb_blue        : std_logic_vector(3 downto 0);
+    signal rgb_csync       : std_logic;
+    signal vga_red         : std_logic_vector(3 downto 0);
+    signal vga_green       : std_logic_vector(3 downto 0);
+    signal vga_blue        : std_logic_vector(3 downto 0);
+    signal vga_hsync       : std_logic;
+    signal vga_vsync       : std_logic;
+    signal dac_red         : std_logic_vector(3 downto 0);
+    signal dac_green       : std_logic_vector(3 downto 0);
+    signal dac_blue        : std_logic_vector(3 downto 0);
+    signal dac_hsync       : std_logic;
+    signal dac_vsync       : std_logic;
 
     -- HDMI
     signal hdmi_aspect     : std_logic_vector(1 downto 0) := "11";
@@ -462,6 +472,8 @@ begin
     electron_core : entity work.ElectronFpga_core
     generic map (
         UseRomSlot9        => UseRomSlot9,
+        IncludeSRGB        => IncludeSRGB,
+        IncludeVGA         => IncludeVGA,
         IncludeHDMI        => IncludeHDMI,
         IncludeICEDebugger => IncludeICEDebugger,
         IncludeABRRegs     => IncludeABRRegs,
@@ -477,9 +489,9 @@ begin
         clk_16M00         => clock_16,
         clk_24M00         => clock_24,
         clk_27M00         => clock_27,
-        clk_32M00         => clock_32,
-        clk_33M33         => clock_27,
-        clk_40M00         => clock_40,
+        -- ULA Core Timing
+        fake_timing       => '0',
+        interlace         => '1',
         -- Hard reset (active low)
         hard_reset_n      => hard_reset_n,
         -- Keyboard
@@ -491,12 +503,17 @@ begin
         -- Digital Joystick
         joystick1         => joystick1,
         joystick2         => joystick2,
+        -- SRGB Video
+        rgb_red           => rgb_red,
+        rgb_green         => rgb_green,
+        rgb_blue          => rgb_blue,
+        rgb_csync         => rgb_csync,
         -- VGA Video
-        video_red         => i_VGA_R,
-        video_green       => i_VGA_G,
-        video_blue        => i_VGA_B,
-        video_hsync       => vga_hs_int,
-        video_vsync       => vga_vs_int,
+        vga_red           => vga_red,
+        vga_green         => vga_green,
+        vga_blue          => vga_blue,
+        vga_hsync         => vga_hsync,
+        vga_vsync         => vga_vsync,
         -- HDMI Video
         hdmi_audio_en     => hdmi_audio_en,
         tmds_r            => tmds_r,
@@ -525,13 +542,6 @@ begin
         -- Casette Port
         cassette_in       => '0',
         cassette_out      => open,
-        -- Format of Video
-        -- 00 - sRGB - non interlaced
-        -- 01 - sRGB - interlaced (perfect electron timing)
-        -- 10 - 576p - 50Hz (27MHz pixel clock for 720x576 50Hz HDMI timings)
-        -- 11 - 600p - 60Hz (40MHz pixel clock for 800x600 60Hz SVGA timings)
-        vid_mode          => vid_mode,
-        fake_timing       => not jumper(3),
         -- Test outputs
         test              => test,
         -- External 1MHz bus
@@ -563,8 +573,6 @@ begin
 
     audio_l <= x"10000" when audio_l_tmp = '1' else x"F0000";
     audio_r <= x"10000" when audio_r_tmp = '1' else x"F0000";
-
-    vid_mode <= "01"; -- Hack: Force Electron interlaced timimg
 
     --------------------------------------------------------
     -- Clock Generation
@@ -791,30 +799,28 @@ begin
         dac_l_in <= (not audio_l(19)) & audio_l(18 downto 10);
         dac_r_in <= (not audio_r(19)) & audio_r(18 downto 10);
 
-        -- dac_l : entity work.pwm_sddac
-        --     generic map (
-        --         msbi_g => 9
-        --         )
-        --     port map (
-        --         clk_i => clock_16,
-        --         reset => '0',
-        --         dac_i => dac_l_in,
-        --         dac_o => audiol
-        --         );
+        dac_l : entity work.pwm_sddac
+            generic map (
+                msbi_g => 9
+                )
+            port map (
+                clk_i => clock_16,
+                reset => '0',
+                dac_i => dac_l_in,
+                dac_o => audiol
+                );
 
-        -- dac_r : entity work.pwm_sddac
-        --     generic map (
-        --         msbi_g => 9
-        --         )
-        --     port map (
-        --         clk_i => clock_16,
-        --         reset => '0',
-        --         dac_i => dac_r_in,
-        --         dac_o => audior
-        --         );
+        dac_r : entity work.pwm_sddac
+            generic map (
+                msbi_g => 9
+                )
+            port map (
+                clk_i => clock_16,
+                reset => '0',
+                dac_i => dac_r_in,
+                dac_o => audior
+                );
 
-    audiol <= test(0);
-    audior <= test(5);
     --------------------------------------------------------
     -- HDMI Output
     --------------------------------------------------------
@@ -1059,12 +1065,33 @@ begin
         );
 
 --------------------------------------------------------
--- VGA outputs
+-- VGA / SRGB output
 --------------------------------------------------------
 
     -- Note: It's a build error if both IncludeVGADAC and IncludeCoProExt are both set
 
+    -- Mux to select between SRGB and VGA using jumper(3) if both are included
+
+    dac_red   <= vga_red   when IncludeVGA  and (jumper(3) = '1' or not IncludeSRGB) else
+                 rgb_red   when IncludeSRGB and (jumper(3) = '0' or not IncludeVGA)  else
+                 (others => '0');
+    dac_green <= vga_green when IncludeVGA  and (jumper(3) = '1' or not IncludeSRGB) else
+                 rgb_green when IncludeSRGB and (jumper(3) = '0' or not IncludeVGA)  else
+                 (others => '0');
+    dac_blue  <= vga_blue  when IncludeVGA  and (jumper(3) = '1' or not IncludeSRGB) else
+                 rgb_blue  when IncludeSRGB and (jumper(3) = '0' or not IncludeVGA)  else
+                 (others => '0');
+    dac_hsync <= vga_hsync when IncludeVGA  and (jumper(3) = '1' or not IncludeSRGB) else
+                 rgb_csync when IncludeSRGB and (jumper(3) = '0' or not IncludeVGA)  else
+                 '0';
+    dac_vsync <= vga_vsync when IncludeVGA  and (jumper(3) = '1' or not IncludeSRGB) else
+                 '1'       when IncludeSRGB and (jumper(3) = '0' or not IncludeVGA)  else
+                 '0';
+
     vga_1bit_dac : if IncludeVGADAC generate
+        signal vga_r_int       : std_logic;
+        signal vga_g_int       : std_logic;
+        signal vga_b_int       : std_logic;
     begin
 
         e_vidr:entity work.dac1_oser
@@ -1073,7 +1100,7 @@ begin
                 clk_sample_i        => clock_27,
                 clk_dac_px_i        => clock_81,
                 clk_dac_i           => clock_405,
-                sample_i            => unsigned(i_VGA_r),
+                sample_i            => unsigned(dac_red),
                 bitstream_o         => vga_r_int
                 );
         e_vidg:entity work.dac1_oser
@@ -1082,7 +1109,7 @@ begin
                 clk_sample_i        => clock_27,
                 clk_dac_px_i        => clock_81,
                 clk_dac_i           => clock_405,
-                sample_i            => unsigned(i_VGA_g),
+                sample_i            => unsigned(dac_green),
                 bitstream_o         => vga_g_int
                 );
         e_vidb:entity work.dac1_oser
@@ -1091,7 +1118,7 @@ begin
                 clk_sample_i        => clock_27,
                 clk_dac_px_i        => clock_81,
                 clk_dac_i           => clock_405,
-                sample_i            => unsigned(i_VGA_b),
+                sample_i            => unsigned(dac_blue),
                 bitstream_o         => vga_b_int
                 );
 
@@ -1119,8 +1146,8 @@ begin
                 OB => vga_b_n
              );
 
-        vga_hs <= vga_hs_int;
-        vga_vs <= vga_vs_int;
+        vga_hs <= dac_hsync;
+        vga_vs <= dac_vsync;
 
     end generate;
 
@@ -1131,27 +1158,27 @@ begin
 
         OBUFDS_r : ELVDS_OBUF
             port map (
-                I  => i_VGA_R(i_VGA_R'high),
+                I  => dac_red(dac_red'high),
                 O  => vga_r,
                 OB => vga_r_n
              );
 
         OBUFDS_g : ELVDS_OBUF
             port map (
-                I  => i_VGA_G(i_VGA_G'high),
+                I  => dac_green(dac_green'high),
                 O  => vga_g,
                 OB => vga_g_n
              );
 
         OBUFDS_b : ELVDS_OBUF
             port map (
-                I  => i_VGA_B(i_VGA_B'high),
+                I  => dac_blue(dac_blue'high),
                 O  => vga_b,
                 OB => vga_b_n
                 );
 
-        vga_hs <= vga_hs_int;
-        vga_vs <= vga_vs_int;
+        vga_hs <= dac_hsync;
+        vga_vs <= dac_vsync;
 
     end generate;
 

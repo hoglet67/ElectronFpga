@@ -21,6 +21,8 @@ use ieee.numeric_std.all;
 entity ElectronFpga_core is
     generic (
         UseRomSlot9        : boolean := false;  -- alias of keyboard
+        IncludeSRGB        : boolean := false;
+        IncludeVGA         : boolean := false;
         IncludeHDMI        : boolean := false;
         IncludeICEDebugger : boolean := false;
         IncludeABRRegs     : boolean := false;
@@ -33,12 +35,13 @@ entity ElectronFpga_core is
     );
     port (
         -- Clocks
-        clk_16M00      : in  std_logic;
-        clk_24M00      : in  std_logic; -- for Jafa Mode7
-        clk_32M00      : in  std_logic := '0'; -- no longer used
-        clk_33M33      : in  std_logic;
-        clk_40M00      : in  std_logic;
-        clk_27M00      : in  std_logic := '0';
+        clk_16M00      : in  std_logic;        -- system clock
+        clk_24M00      : in  std_logic := '0'; -- used for Jafa Mode7
+        clk_27M00      : in  std_logic := '0'; -- used for HDMI and VGA
+
+        -- ULA Core Timing
+        fake_timing    : in  std_logic := '0';
+        interlace      : in  std_logic := '1';
 
         -- Hard reset (active low)
         hard_reset_n   : in  std_logic;
@@ -60,14 +63,20 @@ entity ElectronFpga_core is
         joystick1      : in    std_logic_vector(4 downto 0) := (others => '1');
         joystick2      : in    std_logic_vector(4 downto 0) := (others => '1');
 
-        -- VGA Video
-        video_red      : out std_logic_vector (3 downto 0);
-        video_green    : out std_logic_vector (3 downto 0);
-        video_blue     : out std_logic_vector (3 downto 0);
-        video_vsync    : out std_logic;
-        video_hsync    : out std_logic;
+        -- Optional SCART/RGB Video (from the basic ULA)
+        rgb_red        : out std_logic_vector(3 downto 0);
+        rgb_green      : out std_logic_vector(3 downto 0);
+        rgb_blue       : out std_logic_vector(3 downto 0);
+        rgb_csync      : out std_logic;
 
-        -- HDMI Video
+        -- Optional VGA Video (uses HDMI pixel clock)
+        vga_red        : out std_logic_vector(3 downto 0);
+        vga_green      : out std_logic_vector(3 downto 0);
+        vga_blue       : out std_logic_vector(3 downto 0);
+        vga_vsync      : out std_logic;
+        vga_hsync      : out std_logic;
+
+        -- Optional HDMI Video
         hdmi_audio_en  : in    std_logic := '0';
         tmds_r         : out   std_logic_vector(9 downto 0);
         tmds_g         : out   std_logic_vector(9 downto 0);
@@ -100,16 +109,6 @@ entity ElectronFpga_core is
         -- Casette Port
         cassette_in    : in  std_logic;
         cassette_out   : out std_logic;
-
-        -- Format of Video
-        -- 00 - sRGB - non interlaced
-        -- 01 - sRGB - interlaced
-        -- 10 - 576p - 50Hz (27MHz pixel clock for 720x576 50Hz HDMI timings)
-        -- 11 - 600p - 60Hz (40MHz pixel clock for 800x600 60Hz SVGA timings)
-        vid_mode       : in  std_logic_vector(1 downto 0);
-
-        -- Fake the RTC and Display interrupt timing (useful in 60Hz modes)
-        fake_timing    : in  std_logic := '0';
 
         -- Test outputs
         test           : out std_logic_vector(7 downto 0);
@@ -255,23 +254,9 @@ architecture behavioral of ElectronFpga_core is
     signal mc6522_IRQ_n      : std_logic := '1';
     signal mc6522_data       : std_logic_vector(7 downto 0) := (others => '0');
 
-    signal video_vsync_int   : std_logic;
-    signal video_hsync_int   : std_logic;
-    signal video_blank_int   : std_logic;
-    signal video_field_int   : std_logic;
-    signal video_red_int     : std_logic_vector(3 downto 0);
-    signal video_green_int   : std_logic_vector(3 downto 0);
-    signal video_blue_int    : std_logic_vector(3 downto 0);
-
 begin
 
     reset       <= not reset_n;
-
-    video_vsync <= video_vsync_int;
-    video_hsync <= video_hsync_int;
-    video_red   <= video_red_int;
-    video_green <= video_green_int;
-    video_blue  <= video_blue_int;
 
     GenDebug: if IncludeICEDebugger generate
         signal cpu_clken1 : std_logic;
@@ -340,70 +325,86 @@ begin
         avr_TxD <= avr_RxD;
     end generate;
 
-
-    ula : entity work.ElectronULA
+    ula : entity work.ElectronULAEnhanced
     generic map (
         IncludeMMC       => true,
         Include32KRAM    => IncludeMRB,
-        IncludeVGA       => true,
+        IncludeSRGB      => IncludeSRGB,
+        IncludeVGA       => IncludeVGA,
+        IncludeHDMI      => IncludeHDMI,
         IncludeJafaMode7 => IncludeJafaMode7,
         LimitROMSpeed    => false,
-        LimitIOSpeed     => false
+        LimitIOSpeed     => false,
+        TTxtClockSpeed   => 24,
+        IncludeTTxtROM   => true
     )
     port map (
-        clk_16M00 => clk_16M00,
-        clk_24M00 => clk_24M00,
-        clk_33M33 => clk_33M33,
-        clk_40M00 => clk_40M00,
+        -- System clock: should be 16MHz
+        clk_16M00      => clk_16M00,
 
-        hard_reset_n => hard_reset_n,
+        -- Power on reset
+        hard_reset_n   => hard_reset_n,
+        -- Teletext clock
+
+        ttxt_clk       => clk_24M00,
 
         -- CPU Interface
-        addr      => ula_a,   -- top bits forced to 110 when MRB shaddow access
-        data_in   => cpu_dout,
-        data_out  => ula_data,
-        data_en   => ula_enable,
-        R_W_n     => cpu_R_W_n,
-        RST_n     => reset_n,
-        IRQ_n     => ula_IRQ_n,
-        NMI_n     => cpu_NMI_n,
+        addr           => ula_a,   -- top bits forced to 110 when MRB shaddow access
+        data_in        => cpu_dout,
+        data_out       => ula_data,
+        data_en        => ula_enable,
+        R_W_n          => cpu_R_W_n,
+        RST_n          => reset_n,
+        IRQ_n          => ula_IRQ_n,
+        NMI_n          => cpu_NMI_n,
 
         -- Rom Enable
-        ROM_n     => ROM_n,
+        ROM_n          => ROM_n,
 
-        -- Video
-        red       => video_red_int,
-        green     => video_green_int,
-        blue      => video_blue_int,
-        vsync     => video_vsync_int,
-        hsync     => video_hsync_int,
-        blank     => video_blank_int,
-        fld       => video_field_int,
+        -- Optional SCART/RGB Video (from the basic ULA)
+        interlace      => interlace,
+        rgb_red        => rgb_red,
+        rgb_green      => rgb_green,
+        rgb_blue       => rgb_blue,
+        rgb_csync      => rgb_csync,
+
+        -- Optional VGA Video (uses HDMI pixel clock)
+        vga_red        => vga_red,
+        vga_green      => vga_green,
+        vga_blue       => vga_blue,
+        vga_vsync      => vga_vsync,
+        vga_hsync      => vga_hsync,
+
+        -- Optional HDMI Video
+        hdmi_clk       => clk_27M00,
+        hdmi_audio_en  => hdmi_audio_en,
+        tmds_r         => tmds_r,
+        tmds_g         => tmds_g,
+        tmds_b         => tmds_b,
 
         -- Audio
-        sound     => sound,
+        sound          => sound,
 
         -- SD Card
-        SDMISO    => SDMISO,
-        SDSS      => SDSS,
-        SDCLK     => SDCLK,
-        SDMOSI    => SDMOSI,
+        SDMISO         => SDMISO,
+        SDSS           => SDSS,
+        SDCLK          => SDCLK,
+        SDMOSI         => SDMOSI,
 
         -- Casette
-        casIn     => cassette_in,
-        casOut    => cassette_out,
+        casIn          => cassette_in,
+        casOut         => cassette_out,
 
         -- Keyboard
-        kbd       => kbd_data,
+        kbd            => kbd_data,
 
         -- MISC
-        caps      => caps_led,
-        motor     => motor_led,
+        caps           => caps_led,
+        motor          => motor_led,
 
-        rom_latch => rom_latch,
+        rom_latch      => rom_latch,
 
-        mode_init => vid_mode,
-        fake_timing => fake_timing,
+        fake_timing    => fake_timing,
 
         -- Clock Generation
         cpu_clken_out  => cpu_clken,
@@ -583,7 +584,7 @@ begin
     -- ThomasHarte: Yep, I found some old notes and that's exactly
     -- what I used to know. The MSB of FC7F selects entire-range RAM
     -- visibility; the exception is that operations with their first
-    -- byte in C000–DFFF that address 3000–7FFF always see the
+    -- byte in C000-DFFF that address 3000-7FFF always see the
     -- ordinary built-in memory.
 
     -- &027F   fx239   &EF   Shadow RAM flag
@@ -706,156 +707,6 @@ begin
 
         mrb_mode <= "00";
 
-    end generate;
-
---------------------------------------------------------
--- HDMI
---------------------------------------------------------
-
-    GenHDMI: if IncludeHDMI generate
-        signal rgb_in     : std_logic_vector(2 downto 0);
-        signal rgb_tmp    : std_logic_vector(2 downto 0);
-        signal rgb_out    : std_logic_vector(2 downto 0);
-        signal bypass     : std_logic;
-        signal hsync0     : std_logic;
-        signal hsync1     : std_logic;
-        signal vsync0     : std_logic;
-        signal vsync1     : std_logic;
-        signal hcnt       : std_logic_vector(9 downto 0);
-        signal vcnt       : std_logic_vector(9 downto 0);
-        signal hdmi_red   : std_logic_vector(7 downto 0);
-        signal hdmi_green : std_logic_vector(7 downto 0);
-        signal hdmi_blue  : std_logic_vector(7 downto 0);
-        signal hdmi_hsync : std_logic;
-        signal hdmi_vsync : std_logic;
-        signal hdmi_blank : std_logic;
-        signal hdmi_audio : std_logic_vector (15 downto 0);
-    begin
-
-        rgb_in <= video_red_int(0) & video_green_int(0) & video_blue_int(0);
-
-        inst_rgb2vga_scandoubler: entity work.rgb2vga_scandoubler
-            generic map (
-                WIDTH => 3
-                )
-            port map (
-                clock => clk_16M00,
-                clken => '1',
-                clk25 => clk_27M00,
-                mode => '0',
-                rgbi_in => rgb_in,
-                hSync_in => video_hsync_int,
-                vSync_in => video_vsync_int,
-                rgbi_out => rgb_tmp,
-                hSync_out => hsync0,
-                vSync_out => vsync0
-                );
-
-        bypass <= not video_field_int;
-
-        inst_linedelay : entity work.linedelay
-            generic map (
-                WIDTH => 3,
-                DEPTH => 864
-                )
-            port map (
-                clock  => clk_27M00,
-                clken  => '1',
-                bypass => bypass,
-                din    => rgb_tmp,
-                dout   => rgb_out
-                );
-
-        process(clk_27M00)
-            variable voffset : integer;
-            variable vsize   : integer;
-        begin
-            if rising_edge(clk_27M00) then
-                if sound = '1' then
-                    hdmi_audio <= x"1000";
-                else
-                    hdmi_audio <= x"F000";
-                end if;
-                hsync1 <= hsync0;
-                if hsync1 = '0' and hsync0 = '1' then
-                    hcnt <= (others => '0');
-                    vsync1 <= vsync0;
-                    if vsync1 = '0' and vsync0 = '1' then
-                        vcnt <= (others => '0');
-                    else
-                        vcnt <= vcnt + 1;
-                    end if;
-                else
-                    hcnt <= hcnt + 1;
-                end if;
-                if hdmi_audio_en = '1' then
-                    voffset := 39;
-                    vsize   := 576;
-                else
-                    voffset := 55;
-                    vsize   := 540;
-                end if;
-                if hcnt < 68 or hcnt >= 68 + 720 or vcnt < voffset or vcnt >= voffset + vsize then
-                    hdmi_blank <= '1';
-                    hdmi_red   <= (others => '0');
-                    hdmi_green <= (others => '0');
-                    hdmi_blue  <= (others => '0');
-                else
-                    hdmi_blank <= '0';
-                    hdmi_red   <= (others => rgb_out(2));
-                    hdmi_green <= (others => rgb_out(1));
-                    hdmi_blue  <= (others => rgb_out(0));
-                end if;
-                if hcnt >= 732 + 68 then -- 800
-                    hdmi_hsync <= '0';
-                    if vcnt >= 581 + 39 then -- 620
-                        hdmi_vsync <= '0';
-                    else
-                        hdmi_vsync <= '1';
-                    end if;
-                else
-                    hdmi_hsync <= '1';
-                end if;
-            end if;
-        end process;
-
-        inst_hdmi: entity work.hdmi
-            generic map (
-                FREQ => 27000000,  -- pixel clock frequency
-                FS   => 48000,     -- audio sample rate - should be 32000, 44100 or 48000
-                CTS  => 27000,     -- CTS = Freq(pixclk) * N / (128 * Fs)
-                N    => 6144       -- N = 128 * Fs /1000,  128 * Fs /1500 <= N <= 128 * Fs /300
-                --FS   => 32000,   -- audio sample rate - should be 32000, 44100 or 48000
-                --CTS  => 27000,   -- CTS = Freq(pixclk) * N / (128 * Fs)
-                --N    => 4096     -- N = 128 * Fs /1000,  128 * Fs /1500 <= N <= 128 * Fs /300
-                )
-            port map (
-                -- clocks
-                I_CLK_PIXEL      => clk_27M00,
-                -- components
-                I_R              => hdmi_red,
-                I_G              => hdmi_green,
-                I_B              => hdmi_blue,
-                I_BLANK          => hdmi_blank,
-                I_HSYNC          => hdmi_hsync,
-                I_VSYNC          => hdmi_vsync,
-                I_ASPECT_169     => '0',
-                -- PCM audio
-                I_AUDIO_ENABLE   => hdmi_audio_en,
-                I_AUDIO_PCM_L    => hdmi_audio,
-                I_AUDIO_PCM_R    => hdmi_audio,
-                -- TMDS parallel pixel synchronous outputs (serialize LSB first)
-                O_RED            => tmds_r,
-                O_GREEN          => tmds_g,
-                O_BLUE           => tmds_b
-                );
-
-    end generate;
-
-    GenNotHDMI: if not IncludeHDMI generate
-        tmds_r <= (others => '0');
-        tmds_g <= (others => '0');
-        tmds_b <= (others => '0');
     end generate;
 
 --------------------------------------------------------
@@ -1130,6 +981,6 @@ begin
    cpu_addr <= cpu_a(15 downto 0);
    cpu_rnw <= CPU_R_W_n;
 
-   test <= video_vsync_int & video_hsync_int & video_blue_int(3) & video_green_int(3) & video_red_int(3)  & "00" & cpu_IRQ_n;
+   test <= (others => '0');
 
 end behavioral;

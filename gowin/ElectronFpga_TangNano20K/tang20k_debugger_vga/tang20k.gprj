@@ -77,10 +77,10 @@
         <File path="../../../AtomBusMon/src/oho_dy1/OhoPack.vhd" type="file.vhdl" enable="1"/>
         <File path="../../../src/common/AlanD/R65Cx2.vhd" type="file.vhdl" enable="1"/>
         <File path="../../../src/common/ElectronFpga_core.vhd" type="file.vhdl" enable="1"/>
+        <File path="../../../src/common/ElectronULAEnhanced.vhd" type="file.vhdl" enable="1"/>
         <File path="../../../src/common/ElectronULA.vhd" type="file.vhdl" enable="1"/>
         <File path="../../../src/common/MC6522/m6522.vhd" type="file.vhdl" enable="1"/>
-        <File path="../../../src/common/RAM/RAM_20K_DualPort.vhd" type="file.vhdl" enable="1"/>
-        <File path="../../../src/common/RAM/RAM_32K_DualPort.vhd" type="file.vhdl" enable="1"/>
+        <File path="../../../src/common/RAM/RAM_DualPort.vhd" type="file.vhdl" enable="1"/>
         <File path="../../../src/common/ROM/RomBasic2.vhd" type="file.vhdl" enable="1"/>
         <File path="../../../src/common/ROM/RomOS100.vhd" type="file.vhdl" enable="1"/>
         <File path="../../../src/common/ROM/RomSmelk3006.vhd" type="file.vhdl" enable="1"/>
@@ -94,6 +94,7 @@
         <File path="../../../src/common/hdmi/hdmi.vhd" type="file.vhdl" enable="1"/>
         <File path="../../../src/common/hdmi/hdmidelay.vhd" type="file.vhdl" enable="1"/>
         <File path="../../../src/common/library/common.vhd" type="file.vhdl" enable="1"/>
+        <File path="../../../src/common/mode7/jafamode7.vhd" type="file.vhdl" enable="1"/>
         <File path="../../../src/common/mode7/mc6845.vhd" type="file.vhdl" enable="1"/>
         <File path="../../../src/common/mode7/saa5050.vhd" type="file.vhdl" enable="1"/>
         <File path="../../../src/common/mode7/saa5050_rom_dual_port_uninitialized.vhd" type="file.vhdl" enable="1"/>

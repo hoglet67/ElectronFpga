@@ -2,25 +2,30 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.std_logic_unsigned.all;
 
-entity RAM_32K_DualPort is
-
+entity RAM_DualPort is
+    generic (
+        DEPTH : integer;
+        AWIDTH : integer;
+        DWIDTH : integer
+        );
     port (
         clka  : in  std_logic;
         wea   : in  std_logic;
-        addra : in  std_logic_vector(14 downto 0);
-        dina  : in  std_logic_vector(7 downto 0);
-        douta : out std_logic_vector(7 downto 0);
+        addra : in  std_logic_vector(AWIDTH - 1 downto 0);
+        dina  : in  std_logic_vector(DWIDTH - 1 downto 0);
+        douta : out std_logic_vector(DWIDTH - 1 downto 0);
         clkb  : in  std_logic;
         web   : in  std_logic;
-        addrb : in  std_logic_vector(14 downto 0);
-        dinb  : in  std_logic_vector(7 downto 0);
-        doutb : out std_logic_vector(7 downto 0)
+        addrb : in  std_logic_vector(AWIDTH - 1 downto 0);
+        dinb  : in  std_logic_vector(DWIDTH - 1 downto 0);
+        doutb : out std_logic_vector(DWIDTH - 1 downto 0)
         );
 end;
 
-architecture behavioral of RAM_32K_DualPort is
+architecture behavioral of RAM_DualPort is
 
-    type ram_type is array (32767 downto 0) of std_logic_vector (7 downto 0);
+	 -- FIXME
+    type ram_type is array (0 to DEPTH - 1) of std_logic_vector (DWIDTH - 1 downto 0);
     shared variable RAM : ram_type;
 
 begin

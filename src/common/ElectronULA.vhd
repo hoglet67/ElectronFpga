@@ -1,5 +1,5 @@
 --------------------------------------------------------------------------------
--- Copyright (c) 2020 David Banks
+-- Copyright (c) 2025 David Banks
 --------------------------------------------------------------------------------
 --   ____  ____
 --  /   /\/   /
@@ -7,54 +7,34 @@
 -- \   \   \/
 --  \   \
 --  /   /         Filename  : ElectronULA.vhd
--- /___/   /\     Timestamp : 27/06/2020
+-- /___/   /\     Timestamp : 21/08/2025
 -- \   \  /  \
 --  \___\/\___\
 --
 --Design Name: ElectronULA
+--
+-- TODO:
+--  Tidy additional brackets in IF () conditionals
+--  Tidy superfluous _out signals
+--  Turbo out possibly doesn't belong here
 
 library ieee;
 use ieee.std_logic_1164.all;
-use ieee.std_logic_unsigned.all;
 use ieee.numeric_std.all;
+use ieee.std_logic_unsigned.all;
 
 entity ElectronULA is
     generic (
-        IncludeMMC       : boolean := true;
         Include32KRAM    : boolean := true;
-        IncludeVGA       : boolean := true;
-        IncludeJafaMode7 : boolean := false;
         LimitROMSpeed    : boolean := true;   -- true to limit ROM speed to 2MHz
-        LimitIOSpeed     : boolean := true;   -- true to limit IO speed to 1MHz
-        UseClockMux      : boolean := false;  -- false for Xilinx, true for Altera
-        UseTTxtClock     : boolean := false;  -- true to use clk_ttxt/clken_ttxt_12M, false to use clk_24M00
-        IncludeTTxtROM   : boolean := true    -- false if the SAA5050 character ROM needs loading
-    );
+        LimitIOSpeed     : boolean := true    -- true to limit IO speed to 1MHz
+        );
     port (
-        -- TODO: Rationalize clocks
-        --    clk33M33  => clk_576p
-        --    clk40M00  => clk_600p
-        --    clk_16M00 => clk_sys (+add clken)
-        --    clk_24M00 => drop (use clk_ttxt instead)
-
         -- System clock: should be 16MHz
         clk_16M00 : in  std_logic;
 
         -- Power on reset
         hard_reset_n : in std_logic := '1';
-
-        -- Teletext clocks
-        clk_24M00 : in  std_logic := '0';
-        clk_ttxt  : in  std_logic := '0';
-
-        -- Pixel clock used when mode=10 (576p)
-        clk_33M33 : in  std_logic;
-
-        -- Pixel clock used when mode=11 (600p)
-        clk_40M00 : in  std_logic;
-
-        -- Clock enable for clk_ttxt
-        clken_ttxt_12M : in std_logic := '0';
 
         -- CPU Interface
         addr      : in  std_logic_vector(15 downto 0);
@@ -69,26 +49,22 @@ entity ElectronULA is
         -- Rom Enable
         ROM_n     : out std_logic;
 
-        -- Video
-        red       : out std_logic_vector(3 downto 0);
-        green     : out std_logic_vector(3 downto 0);
-        blue      : out std_logic_vector(3 downto 0);
+        -- RGB Video
+        interlace : in  std_logic := '1';
+        red       : out std_logic;
+        green     : out std_logic;
+        blue      : out std_logic;
         vsync     : out std_logic;
         hsync     : out std_logic;
+        csync     : out std_logic;
         blank     : out std_logic;
-        fld       : out std_logic;
+        field     : out std_logic;
 
         -- Audio
         sound     : out std_logic;
 
         -- Keyboard
         kbd       : in  std_logic_vector(3 downto 0);  -- Async
-
-        -- SD Card
-        SDMISO    : in  std_logic;
-        SDSS      : out std_logic;
-        SDCLK     : out std_logic;
-        SDMOSI    : out std_logic;
 
         -- Casette
         casIn     : in  std_logic;
@@ -101,13 +77,6 @@ entity ElectronULA is
         -- 4-bit ROM latch
         rom_latch : out std_logic_vector(3 downto 0);
 
-        -- Format of Video
-        -- 00 - sRGB - non interlaced
-        -- 01 - sRGB - interlaced (perfect electron timing)
-        -- 10 - 576p - 50Hz (27MHz pixel clock for 720x576 50Hz HDMI timings)
-        -- 11 - 600p - 60Hz (40MHz pixel clock for 800x600 60Hz SVGA timings)
-        mode_init      : in  std_logic_vector(1 downto 0);
-
         -- Fake the RTC and Display interrupt timing (useful in 60Hz modes)
         fake_timing    : in  std_logic := '0';
 
@@ -117,344 +86,168 @@ entity ElectronULA is
         mhz4_clken_out : out std_logic;
         cpu_clk_out    : out std_logic;
         turbo          : in std_logic_vector(1 downto 0);
-        turbo_out      : out std_logic_vector(1 downto 0) := "01";
-
-        -- SAA5050 character ROM loading
-        char_rom_we   : in std_logic := '0';
-        char_rom_addr : in std_logic_vector(11 downto 0) := (others => '0');
-        char_rom_data : in std_logic_vector(7 downto 0) := (others => '0')
+        turbo_out      : out std_logic_vector(1 downto 0) := "01"
 
         );
 end;
 
 architecture behavioral of ElectronULA is
 
-   component SPI_Port is
-      port (
-         nRST    : in  std_logic;
-         clk     : in  std_logic;
-         clken   : in  std_logic;
-         enable  : in  std_logic;
-         nwe     : in  std_logic;
-         datain  : in  std_logic_vector (7 downto 0);
-         dataout : out std_logic_vector (7 downto 0);
-         SDMISO  : in  std_logic;
-         SDMOSI  : out std_logic;
-         SDSS    : out std_logic;
-         SDCLK   : out std_logic
-     );
-  end component;
+    signal hsync_int      : std_logic;
+    signal hsync_int_last : std_logic;
+    signal vsync_int      : std_logic;
 
-  signal hsync_int      : std_logic;
-  signal hsync_int_last : std_logic;
-  signal vsync_int      : std_logic;
+    signal ram_we         : std_logic;
+    signal ram_data       : std_logic_vector(7 downto 0);
 
-  signal ram_we         : std_logic;
-  signal ram_data       : std_logic_vector(7 downto 0);
+    signal master_irq     : std_logic;
 
-  signal master_irq     : std_logic;
+    signal power_on_reset : std_logic := '1';
+    signal delayed_clear_reset : std_logic := '0';
 
-  signal power_on_reset : std_logic := '1';
-  signal delayed_clear_reset : std_logic := '0';
+    signal intr_counter   : std_logic_vector(19 downto 0);
+    signal general_counter: std_logic_vector(15 downto 0);
+    signal sound_bit      : std_logic;
+    signal isr_data       : std_logic_vector(7 downto 0);
 
-  signal intr_counter   : std_logic_vector(19 downto 0);
-  signal general_counter: std_logic_vector(15 downto 0);
-  signal sound_bit      : std_logic;
-  signal isr_data       : std_logic_vector(7 downto 0);
+    -- ULA Registers
+    signal isr            : std_logic_vector(6 downto 2);
+    signal ier            : std_logic_vector(6 downto 2);
+    signal screen_base    : std_logic_vector(14 downto 6);
+    signal data_shift     : std_logic_vector(7 downto 0);
+    signal page_enable    : std_logic;
+    signal page           : std_logic_vector(2 downto 0);
+    signal counter        : std_logic_vector(7 downto 0);
+    signal display_mode   : std_logic_vector(2 downto 0);
+    signal comms_mode     : std_logic_vector(1 downto 0);
 
-  -- ULA Registers
-  signal isr            : std_logic_vector(6 downto 2);
-  signal ier            : std_logic_vector(6 downto 2);
-  signal screen_base    : std_logic_vector(14 downto 6);
-  signal data_shift     : std_logic_vector(7 downto 0);
-  signal page_enable    : std_logic;
-  signal page           : std_logic_vector(2 downto 0);
-  signal counter        : std_logic_vector(7 downto 0);
-  signal display_mode   : std_logic_vector(2 downto 0);
-  signal comms_mode     : std_logic_vector(1 downto 0);
+    type palette_type is array (0 to 7) of std_logic_vector (7 downto 0);
+    signal palette        : palette_type;
 
-  type palette_type is array (0 to 7) of std_logic_vector (7 downto 0);
-  signal palette        : palette_type;
+    signal hsync_start    : std_logic_vector(10 downto 0);
+    signal hsync_end      : std_logic_vector(10 downto 0);
+    signal hblank_start   : std_logic_vector(10 downto 0);
+    signal hblank_end     : std_logic_vector(10 downto 0);
+    signal h_active       : std_logic_vector(10 downto 0);
+    signal h_total        : std_logic_vector(10 downto 0);
+    signal h_count        : std_logic_vector(10 downto 0);
+    signal h_count1       : std_logic_vector(10 downto 0);
 
-  signal hsync_start    : std_logic_vector(10 downto 0);
-  signal hsync_end      : std_logic_vector(10 downto 0);
-  signal hblank_start   : std_logic_vector(10 downto 0);
-  signal hblank_end     : std_logic_vector(10 downto 0);
-  signal h_active       : std_logic_vector(10 downto 0);
-  signal h_total        : std_logic_vector(10 downto 0);
-  signal h_count        : std_logic_vector(10 downto 0);
-  signal h_count1       : std_logic_vector(10 downto 0);
+    signal vsync_start    : std_logic_vector(9 downto 0);
+    signal vsync_end      : std_logic_vector(9 downto 0);
+    signal vblank_start   : std_logic_vector(9 downto 0);
+    signal vblank_end     : std_logic_vector(9 downto 0);
+    signal v_active_gph   : std_logic_vector(9 downto 0);
+    signal v_active_txt   : std_logic_vector(9 downto 0);
+    signal v_total        : std_logic_vector(9 downto 0);
+    signal v_count        : std_logic_vector(9 downto 0);
 
-  signal vsync_start    : std_logic_vector(9 downto 0);
-  signal vsync_end      : std_logic_vector(9 downto 0);
-  signal vblank_start   : std_logic_vector(9 downto 0);
-  signal vblank_end     : std_logic_vector(9 downto 0);
-  signal v_active_gph   : std_logic_vector(9 downto 0);
-  signal v_active_txt   : std_logic_vector(9 downto 0);
-  signal v_total        : std_logic_vector(9 downto 0);
-  signal v_count        : std_logic_vector(9 downto 0);
+    signal v_rtc          : std_logic_vector(9 downto 0);
+    signal v_disp_gph     : std_logic_vector(9 downto 0);
+    signal v_disp_txt     : std_logic_vector(9 downto 0);
 
-  signal v_rtc          : std_logic_vector(9 downto 0);
-  signal v_disp_gph     : std_logic_vector(9 downto 0);
-  signal v_disp_txt     : std_logic_vector(9 downto 0);
+    signal char_row       : std_logic_vector(3 downto 0);
+    signal col_offset     : std_logic_vector(9 downto 0);
 
-  signal char_row       : std_logic_vector(3 downto 0);
-  signal col_offset     : std_logic_vector(9 downto 0);
+    signal screen_addr    : std_logic_vector(14 downto 0);
+    signal screen_data    : std_logic_vector(7 downto 0);
 
-  signal screen_addr    : std_logic_vector(14 downto 0);
-  signal screen_data    : std_logic_vector(7 downto 0);
+    -- Screen Mode Registers
 
-  -- Screen Mode Registers
+    signal is_interlaced  : std_logic;
 
-  signal mode           : std_logic_vector(1 downto 0);
-  signal is_interlaced  : std_logic;
-  signal is_scandoubled : std_logic;
+    -- bits 6..3 the of the 256 byte page that the mode starts at
+    signal mode_base      : std_logic_vector(6 downto 3);
 
-  -- bits 6..3 the of the 256 byte page that the mode starts at
-  signal mode_base      : std_logic_vector(6 downto 3);
+    -- the number of bits per pixel (0 = 1BPP, 1 = 2BPP, 2=4BPP)
+    signal mode_bpp       : std_logic_vector(1 downto 0);
 
-  -- the number of bits per pixel (0 = 1BPP, 1 = 2BPP, 2=4BPP)
-  signal mode_bpp       : std_logic_vector(1 downto 0);
+    -- a '1' indicates a text mode (modes 3 and 6)
+    signal mode_text      : std_logic;
 
-   -- a '1' indicates a text mode (modes 3 and 6)
-  signal mode_text      : std_logic;
+    -- a '1' indicates a 40-col mode (modes 4, 5 and 6)
+    signal mode_40        : std_logic;
 
-  -- a '1' indicates a 40-col mode (modes 4, 5 and 6)
-  signal mode_40        : std_logic;
+    signal last_line      : std_logic;
 
-  signal last_line      : std_logic;
+    signal display_intr   : std_logic;
+    signal display_intr1  : std_logic;
+    signal display_intr2  : std_logic;
 
-  signal display_intr   : std_logic;
-  signal display_intr1  : std_logic;
-  signal display_intr2  : std_logic;
+    signal rtc_intr       : std_logic;
+    signal rtc_intr1      : std_logic;
+    signal rtc_intr2      : std_logic;
 
-  signal rtc_intr       : std_logic;
-  signal rtc_intr1      : std_logic;
-  signal rtc_intr2      : std_logic;
+    signal ctrl_caps      : std_logic;
 
-  signal clk_video      : std_logic;
+    signal field_int      : std_logic;
+    signal field1         : std_logic;
+    signal field2         : std_logic;
+    signal field3         : std_logic;
+    signal is_int_field   : std_logic; -- field qualified by is_interlaced
 
-  signal ctrl_caps      : std_logic;
+    signal caps_int       : std_logic;
+    signal motor_int      : std_logic;
 
-  signal field          : std_logic;
-  signal field1         : std_logic;
-  signal field2         : std_logic;
-  signal field3         : std_logic;
-  signal is_int_field   : std_logic; -- field qualified by is_interlaced
+    -- Supports changing the jumpers
+    signal mode_init_copy : std_logic_vector(1 downto 0);
 
-  signal caps_int       : std_logic;
-  signal motor_int      : std_logic;
+    -- Tape Interface
+    signal cintone        : std_logic;
+    signal cindat         : std_logic;
+    signal cinbits        : std_logic_vector(3 downto 0);
+    signal coutbits       : std_logic_vector(3 downto 0);
+    signal casIn1         : std_logic;
+    signal casIn2         : std_logic;
+    signal casIn3         : std_logic;
+    signal ignore_next    : std_logic;
 
-  -- Supports changing the jumpers
-  signal mode_init_copy : std_logic_vector(1 downto 0);
+    signal ROM_n_int      :   std_logic;
 
-  -- Tape Interface
-  signal cintone        : std_logic;
-  signal cindat         : std_logic;
-  signal cinbits        : std_logic_vector(3 downto 0);
-  signal coutbits       : std_logic_vector(3 downto 0);
-  signal casIn1         : std_logic;
-  signal casIn2         : std_logic;
-  signal casIn3         : std_logic;
-  signal ignore_next    : std_logic;
+    -- clock enable generation
+    signal clken_counter  : std_logic_vector (3 downto 0) := (others => '0');
+    signal turbo_sync     : std_logic_vector (1 downto 0);
 
-  -- internal RGB signals before final mux
-  signal red_int        : std_logic_vector(3 downto 0);
-  signal green_int      : std_logic_vector(3 downto 0);
-  signal blue_int       : std_logic_vector(3 downto 0);
-  signal blank_int      : std_logic;
+    signal contention     : std_logic;
+    signal contention1    : std_logic;
+    signal contention2    : std_logic;
+    signal io_access      : std_logic; -- always at 1MHz, no contention
+    signal rom_access     : std_logic; -- always at 2MHz, no contention
+    signal ram_access     : std_logic; -- 1MHz/2MHz/Stopped
 
-  -- CRTC signals (only used when Jafa Mode 7 is enabled)
-  signal crtc_enable    :   std_logic;
-  signal crtc_clken     :   std_logic;
-  signal crtc_do        :   std_logic_vector(7 downto 0);
-  signal crtc_vsync     :   std_logic;
-  signal crtc_vsync_n   :   std_logic;
-  signal crtc_hsync     :   std_logic;
-  signal crtc_hsync_n   :   std_logic;
-  signal crtc_de        :   std_logic;
-  signal crtc_cursor    :   std_logic;
-  signal crtc_cursor1   :   std_logic;
-  signal crtc_cursor2   :   std_logic;
-  signal crtc_ma        :   std_logic_vector(13 downto 0);
-  signal crtc_ra        :   std_logic_vector(4 downto 0);
-  signal status_enable  :   std_logic;
-  signal status_do      :   std_logic_vector(7 downto 0);
+    signal kbd_access     : std_logic;
 
-  -- SAA5050 signals (only used when Jafa Mode 7 is enabled)
-  signal ttxt_clock     :   std_logic;
-  signal ttxt_clken     :   std_logic;
-  signal ttxt_glr       :   std_logic;
-  signal ttxt_dew       :   std_logic;
-  signal ttxt_crs       :   std_logic;
-  signal ttxt_lose      :   std_logic;
-  signal ttxt_r_int     :   std_logic;
-  signal ttxt_g_int     :   std_logic;
-  signal ttxt_b_int     :   std_logic;
-  signal ttxt_de_int    :   std_logic;
-  signal ttxt_r         :   std_logic;
-  signal ttxt_g         :   std_logic;
-  signal ttxt_b         :   std_logic;
-  signal ttxt_de        :   std_logic;
-  signal ttxt_r_out     :   std_logic;
-  signal ttxt_g_out     :   std_logic;
-  signal ttxt_b_out     :   std_logic;
-  signal ttxt_hs_out    :   std_logic;
-  signal ttxt_vs_out    :   std_logic;
-  signal ttxt_de_out    :   std_logic;
+    signal clk_stopped    : std_logic_vector(1 downto 0) := "00";
 
-  signal mode7_enable   :   std_logic;
-
-  -- internal signals to generate the video clock
-  signal clk_16M00_a    :   std_logic;
-  signal clk_16M00_b    :   std_logic;
-  signal clk_16M00_c    :   std_logic;
-  signal clk_33M33_a    :   std_logic;
-  signal clk_33M33_b    :   std_logic;
-  signal clk_33M33_c    :   std_logic;
-  signal clk_40M00_a    :   std_logic;
-  signal clk_40M00_b    :   std_logic;
-  signal clk_40M00_c    :   std_logic;
-
-  signal ROM_n_int      :   std_logic;
-
-  -- clock enable generation
-  signal clken_counter  : std_logic_vector (3 downto 0) := (others => '0');
-  signal turbo_sync     : std_logic_vector (1 downto 0);
-
-  signal contention     : std_logic;
-  signal contention1    : std_logic;
-  signal contention2    : std_logic;
-  signal io_access      : std_logic; -- always at 1MHz, no contention
-  signal rom_access     : std_logic; -- always at 2MHz, no contention
-  signal ram_access     : std_logic; -- 1MHz/2MHz/Stopped
-
-  signal kbd_access     : std_logic;
-
-  signal clk_stopped    : std_logic_vector(1 downto 0) := "00";
-
-  signal cpu_clken      : std_logic;
-  signal via1_clken     : std_logic;
-  signal via4_clken     : std_logic;
-  signal cpu_clk        : std_logic := '1';
-  signal clk_counter    : std_logic_vector(2 downto 0) := (others => '0');
-
-  -- SPI SD Card
-  signal spisd_do       : std_logic_vector(7 downto 0);
-  signal spisd_enable   : std_logic;
+    signal cpu_clken      : std_logic;
+    signal mhz1_clken     : std_logic;
+    signal mhz4_clken     : std_logic;
+    signal cpu_clk        : std_logic := '1';
+    signal clk_counter    : std_logic_vector(2 downto 0) := (others => '0');
 
 -- Helper function to cast an std_logic value to an integer
-function sl2int (x: std_logic) return integer is
-begin
-    if x = '1' then
-        return 1;
-    else
-        return 0;
-    end if;
-end;
+    function sl2int (x: std_logic) return integer is
+    begin
+        if x = '1' then
+            return 1;
+        else
+            return 0;
+        end if;
+    end;
 
 -- Helper function to cast an std_logic_vector value to an integer
-function slv2int (x: std_logic_vector) return integer is
-begin
-    return to_integer(unsigned(x));
-end;
+    function slv2int (x: std_logic_vector) return integer is
+    begin
+        return to_integer(unsigned(x));
+    end;
 
 begin
 
-    -- Decode mode into more friendly form
-    is_interlaced  <= '1' when mode = "01" else '0';
-    is_scandoubled <= '1' when IncludeVGA and (mode = "10" or mode = "11") else '0';
-    is_int_field   <= '1' when field = '1' and is_interlaced = '1' else '0';
+    is_int_field <= '1' when field_int = '1' and interlace = '1' else '0';
 
-    -- video timing constants
-    -- mode 00 - RGB/s @ 50Hz non-interlaced
-    -- mode 01 - RGB/s @ 50Hz interlaced
-    -- mode 10 - SVGA  @ 50Hz
-    -- mode 11 - SVGA  @ 60Hz
-
-    gen_clk_mux : if UseClockMux generate
-
-        -- A simple clock mux causes lots of warnings from the Xilinx tool,
-        -- but is OK with Quartus.
-
-        clk_video    <= clk_40M00 when mode = "11" else
-                        clk_33M33 when mode = "10" else
-                        clk_16M00;
-
-    end generate;
-
-
-    gen_clk_with_flops : if not UseClockMux generate
-
-        -- Regenerate the clock using edge triggered flip flops on Xilinx.
-
-        process(clk_16M00)
-        begin
-            if rising_edge(clk_16M00) then
-                clk_16M00_a <= not clk_16M00_a;
-            end if;
-        end process;
-
-        process(clk_16M00)
-        begin
-            if falling_edge(clk_16M00) then
-                clk_16M00_b <= not clk_16M00_b;
-            end if;
-        end process;
-
-        clk_16M00_c <= clk_16M00_a xor clk_16M00_b;
-
-        process(clk_33M33)
-        begin
-            if rising_edge(clk_33M33) then
-                clk_33M33_a <= not clk_33M33_a;
-            end if;
-        end process;
-
-        process(clk_33M33)
-        begin
-            if falling_edge(clk_33M33) then
-                clk_33M33_b <= not clk_33M33_b;
-            end if;
-        end process;
-
-        clk_33M33_c <= clk_33M33_a xor clk_33M33_b;
-
-        process(clk_40M00)
-        begin
-            if rising_edge(clk_40M00) then
-                clk_40M00_a <= not clk_40M00_a;
-            end if;
-        end process;
-
-        process(clk_40M00)
-        begin
-            if falling_edge(clk_40M00) then
-                clk_40M00_b <= not clk_40M00_b;
-            end if;
-        end process;
-
-        clk_40M00_c <= clk_40M00_a xor clk_40M00_b;
-
-
-        clk_video    <= clk_40M00_c when mode = "11" and IncludeVGA else
-                        clk_33M33_c when mode = "10" and IncludeVGA else
-                        clk_16M00_c;
-
-    end generate;
-
-    hsync_start  <= std_logic_vector(to_unsigned(759, 11)) when mode = "11" and IncludeVGA else
-                    std_logic_vector(to_unsigned(692, 11)) when mode = "10" and IncludeVGA else
-                    std_logic_vector(to_unsigned(768, 11));
-
-    hsync_end    <= std_logic_vector(to_unsigned(887, 11)) when mode = "11" and IncludeVGA else
-                    std_logic_vector(to_unsigned(756, 11)) when mode = "10" and IncludeVGA else
-                    std_logic_vector(to_unsigned(832, 11));
-
-    h_total      <= std_logic_vector(to_unsigned(1055, 11)) when mode = "11" and IncludeVGA else
-                    std_logic_vector(to_unsigned( 863, 11)) when mode = "10" and IncludeVGA else
-                    std_logic_vector(to_unsigned(1023, 11));
-
+    hsync_start  <= std_logic_vector(to_unsigned(768, 11));
+    hsync_end    <= std_logic_vector(to_unsigned(832, 11));
+    h_total      <= std_logic_vector(to_unsigned(1023, 11));
     h_active     <= std_logic_vector(to_unsigned(640, 11));
 
     -- Note: The real ULA uses line 281->283/4 for VSYNC, but on both
@@ -463,50 +256,32 @@ begin
     -- as it doesn't affect the timing of the display or RTC
     -- interrupts. I'm happy to rever this is anyone complains!
 
-    vsync_start  <= std_logic_vector(to_unsigned(556, 10)) when mode = "11" and IncludeVGA else
-                    std_logic_vector(to_unsigned(549, 10)) when mode = "10" and IncludeVGA else
-                    std_logic_vector(to_unsigned(274, 10));
+    vsync_start  <= std_logic_vector(to_unsigned(274, 10));
 
-    vsync_end    <= std_logic_vector(to_unsigned(560, 10)) when mode = "11" and IncludeVGA else
-                    std_logic_vector(to_unsigned(554, 10)) when mode = "10" and IncludeVGA else
-                    std_logic_vector(to_unsigned(276, 10)) when is_int_field = '0'         else
+    vsync_end    <= std_logic_vector(to_unsigned(276, 10)) when is_int_field = '0' else
                     std_logic_vector(to_unsigned(277, 10));
 
-    v_total      <= std_logic_vector(to_unsigned(627, 10)) when mode = "11" and IncludeVGA else
-                    std_logic_vector(to_unsigned(624, 10)) when mode = "10" and IncludeVGA else
-                    std_logic_vector(to_unsigned(311, 10)) when is_int_field = '0'         else
+    v_total      <= std_logic_vector(to_unsigned(311, 10)) when is_int_field = '0' else
                     std_logic_vector(to_unsigned(312, 10));
 
-    v_active_gph <= std_logic_vector(to_unsigned(512, 10)) when mode = "11" and IncludeVGA else
-                    std_logic_vector(to_unsigned(512, 10)) when mode = "10" and IncludeVGA else
-                    std_logic_vector(to_unsigned(256, 10));
+    v_active_gph <= std_logic_vector(to_unsigned(256, 10));
 
-    v_active_txt <= std_logic_vector(to_unsigned(500, 10)) when mode = "11" and IncludeVGA else
-                    std_logic_vector(to_unsigned(500, 10)) when mode = "10" and IncludeVGA else
-                    std_logic_vector(to_unsigned(250, 10));
+    v_active_txt <= std_logic_vector(to_unsigned(250, 10));
 
-    v_disp_gph   <= std_logic_vector(to_unsigned(513, 10)) when mode = "11"                 and IncludeVGA else
-                    std_logic_vector(to_unsigned(510, 10)) when mode = "10" and field = '0' and IncludeVGA else
-                    std_logic_vector(to_unsigned(511, 10)) when mode = "10" and field = '1' and IncludeVGA else
-                    std_logic_vector(to_unsigned(255, 10));
+    v_disp_gph   <= std_logic_vector(to_unsigned(255, 10));
 
-    v_disp_txt   <= std_logic_vector(to_unsigned(501, 10)) when mode = "11"                 and IncludeVGA else
-                    std_logic_vector(to_unsigned(498, 10)) when mode = "10" and field = '0' and IncludeVGA else
-                    std_logic_vector(to_unsigned(499, 10)) when mode = "10" and field = '1' and IncludeVGA else
-                    std_logic_vector(to_unsigned(249, 10));
+    v_disp_txt   <= std_logic_vector(to_unsigned(249, 10));
 
-    v_rtc        <= std_logic_vector(to_unsigned(201, 10)) when mode = "11" and IncludeVGA else
-                    std_logic_vector(to_unsigned(198, 10)) when mode = "10" and IncludeVGA else
-                    std_logic_vector(to_unsigned( 99, 10));
+    v_rtc        <= std_logic_vector(to_unsigned( 99, 10));
 
     -- Precise blanking is quite tricky, because the 640x512 active part of the screen is at 0,0
     --
     -- The code is:
     --
     --   if h_count1 = hblank_start then
-    --       blank_int <= '1';
+    --       blank <= '1';
     --   elsif h_count1 = hblank_end and (v_count < vblank_start or v_count >= vblank_end) then
-    --       blank_int <= '0';
+    --       blank <= '0';
     --   end if;
     --
     -- 720x576p50 example (864x625 total)
@@ -547,58 +322,67 @@ begin
     --
     -- Hence: vblank_start = 512+32-1 and vblank_end = 625-32-1
 
-    hblank_start <= std_logic_vector(to_unsigned(  640+80, 11)) when mode = "11" and IncludeVGA else
-                    std_logic_vector(to_unsigned(  640+40, 11)) when mode = "10" and IncludeVGA else
-                    std_logic_vector(to_unsigned(  640+48, 11));
+    hblank_start <= std_logic_vector(to_unsigned(  640+48, 11));
 
-    hblank_end   <= std_logic_vector(to_unsigned( 1056-80, 11)) when mode = "11" and IncludeVGA else
-                    std_logic_vector(to_unsigned(  864-40, 11)) when mode = "10" and IncludeVGA else
-                    std_logic_vector(to_unsigned( 1024-48, 11));
+    hblank_end   <= std_logic_vector(to_unsigned( 1024-48, 11));
 
-    vblank_start <= std_logic_vector(to_unsigned(512+44-1, 10)) when mode = "11" and IncludeVGA else
-                    std_logic_vector(to_unsigned(512+32-1, 10)) when mode = "10" and IncludeVGA else
-                    std_logic_vector(to_unsigned(256+16-1, 10));
+    vblank_start <= std_logic_vector(to_unsigned(256+16-1, 10));
 
-    vblank_end   <= std_logic_vector(to_unsigned(628-44-1, 10)) when mode = "11" and IncludeVGA else
-                    std_logic_vector(to_unsigned(625-32-1, 10)) when mode = "10" and IncludeVGA else
-                    std_logic_vector(to_unsigned(312-16-1, 10)) when is_int_field = '0'         else
+    vblank_end   <= std_logic_vector(to_unsigned(312-16-1, 10)) when is_int_field = '0' else
                     std_logic_vector(to_unsigned(313-16-1, 10));
 
     -- All of main memory (0x0000-0x7fff) is dual port RAM in the ULA
     ram_32k_gen: if Include32KRAM generate
-        ram_32k : entity work.RAM_32K_DualPort port map(
-            -- Port A is the 6502 port
-            clka  => clk_16M00,
-            wea   => ram_we,
-            addra => addr(14 downto 0),
-            dina  => data_in,
-            douta => ram_data,
-            -- Port B is the VGA Port
-            clkb  => clk_video,
-            web   => '0',
-            addrb => screen_addr,
-            dinb  => x"00",
-            doutb => screen_data
+        ram_32k : entity work.RAM_DualPort
+            generic map (
+                DEPTH => 32768,
+                AWIDTH => 15,
+                DWIDTH => 8
+                )
+            port map (
+                -- Port A is the 6502 port
+                clka  => clk_16M00,
+                wea   => ram_we,
+                addra => addr(14 downto 0),
+                dina  => data_in,
+                douta => ram_data,
+                -- Port B is the video port
+                clkb  => clk_16M00,
+                web   => '0',
+                addrb => screen_addr,
+                dinb  => x"00",
+                doutb => screen_data
             );
         ram_we <= '1' when addr(15) = '0' and R_W_n = '0' and cpu_clken = '1' else '0';
     end generate;
 
     -- Just screen memory (0x3000-0x7fff) is dual port RAM in the ULA
     ram_20k_gen: if not Include32KRAM generate
+        signal addra : std_logic_vector(14 downto 0);
+        signal addrb : std_logic_vector(14 downto 0);
+    begin
+        addra <= addr(14 downto 0) xor "111000000000000";
+        addrb <= screen_addr       xor "111000000000000";
         -- xor'ing with 7000 maps 3000-7fff into range 0000-4fff
-        ram_20k : entity work.RAM_20K_DualPort port map(
-            -- Port A is the 6502 port
-            clka  => clk_16M00,
-            wea   => ram_we,
-            addra => addr(14 downto 0) xor "111000000000000",
-            dina  => data_in,
-            douta => ram_data,
-            -- Port B is the VGA Port
-            clkb  => clk_video,
-            web   => '0',
-            addrb => screen_addr xor "111000000000000",
-            dinb  => x"00",
-            doutb => screen_data
+        ram_20k : entity work.RAM_DualPort
+            generic map (
+                DEPTH => 20480,
+                AWIDTH => 15,
+                DWIDTH => 8
+                )
+            port map (
+                -- Port A is the 6502 port
+                clka  => clk_16M00,
+                wea   => ram_we,
+                addra => addra,
+                dina  => data_in,
+                douta => ram_data,
+                -- Port B is the video port
+                clkb  => clk_16M00,
+                web   => '0',
+                addrb => addrb,
+                dinb  => x"00",
+                doutb => screen_data
             );
         ram_we <= '1' when (addr(15 downto 12) = "0011" or addr(15 downto 14) = "01") and R_W_n = '0' and cpu_clken = '1' else '0';
     end generate;
@@ -619,17 +403,11 @@ begin
                 "0000" & (kbd xor "1111") when kbd_access = '1' else
                 isr_data                  when addr(15 downto 8) = x"FE" and addr(3 downto 0) = x"0" else
                 data_shift                when addr(15 downto 8) = x"FE" and addr(3 downto 0) = x"4" else
-                crtc_do                   when crtc_enable = '1' and IncludeJafaMode7 else
-                status_do                 when status_enable = '1' and IncludeJafaMode7 else
-                spisd_do                  when spisd_enable = '1' and IncludeMMC else
                 x"F1"; -- todo FIXEME
 
     data_en  <= '1'                       when addr(15) = '0' else
                 '1'                       when kbd_access = '1' else
                 '1'                       when addr(15 downto 8) = x"FE" else
-                '1'                       when crtc_enable = '1' and IncludeJafaMode7 else
-                '1'                       when status_enable = '1' and IncludeJafaMode7 else
-                '1'                       when spisd_enable = '1' and IncludeMMC else
                 '0';
 
     -- Register FEx0 is the Interrupt Status Register (Read Only)
@@ -657,39 +435,32 @@ begin
         if rising_edge(clk_16M00) then
 
             if hard_reset_n = '0' then
-               mode                <= mode_init;
-               mode_init_copy      <= mode_init;
-               power_on_reset      <= '1';
-               delayed_clear_reset <= '0';
+                power_on_reset      <= '1';
+                delayed_clear_reset <= '0';
             end if;
 
             if RST_n = '0' then
 
-               isr             <= (others => '0');
-               ier             <= (others => '0');
-               screen_base     <= (others => '0');
-               data_shift      <= (others => '0');
-               page_enable     <= '0';
-               page            <= (others => '0');
-               counter         <= (others => '0');
-               comms_mode      <= "00";
-               motor_int       <= '0';
-               caps_int        <= '0';
-               intr_counter    <= (others => '0');
-               general_counter <= (others => '0');
-               sound_bit       <= '0';
-               ctrl_caps       <= '0';
-               cindat          <= '0';
-               cintone         <= '0';
+                isr             <= (others => '0');
+                ier             <= (others => '0');
+                screen_base     <= (others => '0');
+                data_shift      <= (others => '0');
+                page_enable     <= '0';
+                page            <= (others => '0');
+                counter         <= (others => '0');
+                comms_mode      <= "00";
+                motor_int       <= '0';
+                caps_int        <= '0';
+                intr_counter    <= (others => '0');
+                general_counter <= (others => '0');
+                sound_bit       <= '0';
+                ctrl_caps       <= '0';
+                cindat          <= '0';
+                cintone         <= '0';
 
             else
-                -- Detect Jumpers being changed
-                if (mode_init_copy /= mode_init) then
-                    mode <= mode_init;
-                    mode_init_copy <= mode_init;
-                end if;
                 -- Synchronize the field signal from the VGA clock domain
-                field1 <= field;
+                field1 <= field_int;
                 field2 <= field1;
                 field3 <= field2;
                 -- This 20 bit-counter counts two fields in 16MHz cycles (0 to approx 639999)
@@ -722,7 +493,7 @@ begin
                     end if;
                     -- Display interrupt exact timing (from logic analyzer captures in 16MHz cycles)
                     if ((intr_counter = 261888 + disp_skew or intr_counter = 582400 + disp_skew) and mode_text = '0') or
-                       ((intr_counter = 255744 + disp_skew or intr_counter = 576256 + disp_skew) and mode_text = '1') then
+                        ((intr_counter = 255744 + disp_skew or intr_counter = 576256 + disp_skew) and mode_text = '1') then
                         isr(2) <= '1';
                     end if;
                     -- Memory Contention exact timing
@@ -774,7 +545,6 @@ begin
                         general_counter <= general_counter - x"001";
                     end if;
                 end if;
-
 
                 -- Tape Interface Receive
                 casIn1 <= casIn;
@@ -848,8 +618,8 @@ begin
                                 cinbits <= (others => '0');
                                 -- Generate the high tone detect interrupt
                                 isr(6) <= '1';
-                           end if;
-                       end if;
+                            end if;
+                        end if;
                     end if;
                 else
                     cindat      <= '0';
@@ -889,48 +659,32 @@ begin
                 end if;
 
                 -- ULA Writes
-                if (cpu_clken = '1') then
+                if cpu_clken = '1' then
                     if delayed_clear_reset = '1' then
                         power_on_reset <= '0';
                     end if;
                     ---- Detect control+caps 1...4 and change video format
-                    if (addr = x"9fff" and page_enable = '1' and page(2 downto 1) = "00") then
-                        if (kbd(2 downto 1) = "00") then
+                    if addr = x"9fff" and page_enable = '1' and page(2 downto 1) = "00" then
+                        if kbd(2 downto 1) = "00" then
                             ctrl_caps <= '1';
                         else
                             ctrl_caps <= '0';
                         end if;
                     end if;
-                    -- Detect "1" being pressed: RGB non-interlaced (default)
+                    -- Detect "1" being pressed: 1MHz
                     if (addr = x"afff" and page_enable = '1' and page(2 downto 1) = "00" and ctrl_caps = '1' and kbd(0) = '0') then
-                        mode <= "00";
-                    end if;
-                    -- Detect "2" being pressed: RGB interlaced
-                    if (addr = x"b7ff" and page_enable = '1' and page(2 downto 1) = "00" and ctrl_caps = '1' and kbd(0) = '0') then
-                        mode <= "01";
-                    end if;
-                    -- Detect "3" being pressed: SVGA @ 50 Hz (33 MHz clock)
-                    if (addr = x"bbff" and page_enable = '1' and page(2 downto 1) = "00" and ctrl_caps = '1' and kbd(0) = '0' and IncludeVGA) then
-                        mode <= "10";
-                    end if;
-                    -- Detect "4" being pressed: SVGA @ 60 Hz (40 MHz clock)
-                    if (addr = x"bdff" and page_enable = '1' and page(2 downto 1) = "00" and ctrl_caps = '1' and kbd(0) = '0' and IncludeVGA) then
-                        mode <= "11";
-                    end if;
-                    -- Detect "5" being pressed: 1MHz
-                    if (addr = x"beff" and page_enable = '1' and page(2 downto 1) = "00" and ctrl_caps = '1' and kbd(0) = '0') then
                         turbo_out <= "00";
                     end if;
-                    -- Detect "6" being pressed: 2MHz with contention (default)
-                    if (addr = x"bf7f" and page_enable = '1' and page(2 downto 1) = "00" and ctrl_caps = '1' and kbd(0) = '0') then
+                    -- Detect "2" being pressed: 2MHz with contention
+                    if (addr = x"b7ff" and page_enable = '1' and page(2 downto 1) = "00" and ctrl_caps = '1' and kbd(0) = '0') then
                         turbo_out <= "01";
                     end if;
-                    -- Detect "7" being pressed: 2MHz no contention
-                    if (addr = x"bfbf" and page_enable = '1' and page(2 downto 1) = "00" and ctrl_caps = '1' and kbd(0) = '0') then
+                    -- Detect "3" being pressed: 2MHz no contention
+                    if (addr = x"bbff" and page_enable = '1' and page(2 downto 1) = "00" and ctrl_caps = '1' and kbd(0) = '0') then
                         turbo_out <= "10";
                     end if;
-                    -- Detect "8" being pressed: 4MHz
-                    if (addr = x"bfdf" and page_enable = '1' and page(2 downto 1) = "00" and ctrl_caps = '1' and kbd(0) = '0') then
+                    -- Detect "4" being pressed: 4MHz
+                    if (addr = x"bdff" and page_enable = '1' and page(2 downto 1) = "00" and ctrl_caps = '1' and kbd(0) = '0') then
                         turbo_out <= "11";
                     end if;
                     if (addr(15 downto 8) = x"FE") then
@@ -945,103 +699,103 @@ begin
                             end if;
                         else
                             case addr(3 downto 0) is
-                            when x"0" =>
-                                ier(6 downto 2) <= data_in(6 downto 2);
-                            when x"1" =>
-                            when x"2" =>
-                                screen_base(8 downto 6) <= data_in(7 downto 5);
-                            when x"3" =>
-                                screen_base(14 downto 9) <= data_in(5 downto 0);
-                            when x"4" =>
-                                data_shift <= data_in;
-                                -- Clear the TDEmpty interrupt on writing the
-                                -- data_shift register
-                                isr(5) <= '0';
-                            when x"5" =>
-                                if (data_in(6) = '1') then
-                                    -- Clear High Tone Detect IRQ
-                                    isr(6) <= '0';
-                                end if;
-                                if (data_in(5) = '1') then
-                                    -- Clear Real Time Clock IRQ
-                                    isr(3) <= '0';
-                                end if;
-                                if (data_in(4) = '1') then
-                                    -- Clear Display End IRQ
-                                    isr(2) <= '0';
-                                end if;
-                                if (page_enable = '1' and page(2) = '0') then
-                                    -- Roms 8-11 currently selected, so only selecting 8-15 will be honoured
-                                    if (data_in(3) = '1') then
+                                when x"0" =>
+                                    ier(6 downto 2) <= data_in(6 downto 2);
+                                when x"1" =>
+                                when x"2" =>
+                                    screen_base(8 downto 6) <= data_in(7 downto 5);
+                                when x"3" =>
+                                    screen_base(14 downto 9) <= data_in(5 downto 0);
+                                when x"4" =>
+                                    data_shift <= data_in;
+                                    -- Clear the TDEmpty interrupt on writing the
+                                    -- data_shift register
+                                    isr(5) <= '0';
+                                when x"5" =>
+                                    if (data_in(6) = '1') then
+                                        -- Clear High Tone Detect IRQ
+                                        isr(6) <= '0';
+                                    end if;
+                                    if (data_in(5) = '1') then
+                                        -- Clear Real Time Clock IRQ
+                                        isr(3) <= '0';
+                                    end if;
+                                    if (data_in(4) = '1') then
+                                        -- Clear Display End IRQ
+                                        isr(2) <= '0';
+                                    end if;
+                                    if (page_enable = '1' and page(2) = '0') then
+                                        -- Roms 8-11 currently selected, so only selecting 8-15 will be honoured
+                                        if (data_in(3) = '1') then
+                                            page_enable <= data_in(3);
+                                            page <= data_in(2 downto 0);
+                                        end if;
+                                    else
+                                        -- Roms 0-7 or 12-15 currently selected, so anything goes
                                         page_enable <= data_in(3);
                                         page <= data_in(2 downto 0);
                                     end if;
-                                else
-                                    -- Roms 0-7 or 12-15 currently selected, so anything goes
-                                    page_enable <= data_in(3);
-                                    page <= data_in(2 downto 0);
-                                end if;
-                            when x"6" =>
-                                counter <= data_in;
-                            when x"7" =>
-                                caps_int     <= data_in(7);
-                                motor_int    <= data_in(6);
-                                case (data_in(5 downto 3)) is
-                                when "000" =>
-                                    mode_base    <= "0110"; -- 0x3000
-                                    mode_bpp     <= "00";
-                                    mode_40      <= '0';
-                                    mode_text    <= '0';
-                                when "001" =>
-                                    mode_base    <= "0110"; -- 0x3000
-                                    mode_bpp     <= "01";
-                                    mode_40      <= '0';
-                                    mode_text    <= '0';
-                                when "010" =>
-                                    mode_base    <= "0110"; -- 0x3000
-                                    mode_bpp     <= "10";
-                                    mode_40      <= '0';
-                                    mode_text    <= '0';
-                                when "011" =>
-                                    mode_base    <= "1000"; -- 0x4000
-                                    mode_bpp     <= "00";
-                                    mode_40      <= '0';
-                                    mode_text    <= '1';
-                                when "100" =>
-                                    mode_base    <= "1011"; -- 0x5800
-                                    mode_bpp     <= "00";
-                                    mode_40      <= '1';
-                                    mode_text    <= '0';
-                                when "101" =>
-                                    mode_base    <= "1011"; -- 0x5800
-                                    mode_bpp     <= "01";
-                                    mode_40      <= '1';
-                                    mode_text    <= '0';
-                                when "110" =>
-                                    mode_base    <= "1100"; -- 0x6000
-                                    mode_bpp     <= "00";
-                                    mode_40      <= '1';
-                                    mode_text    <= '1';
-                                when "111" =>
-                                    -- mode 7 seems to default to mode 4
-                                    mode_base    <= "1011"; -- 0x5800
-                                    mode_bpp     <= "00";
-                                    mode_40      <= '1';
-                                    mode_text    <= '0';
+                                when x"6" =>
+                                    counter <= data_in;
+                                when x"7" =>
+                                    caps_int  <= data_in(7);
+                                    motor_int <= data_in(6);
+                                    case (data_in(5 downto 3)) is
+                                        when "000" =>
+                                            mode_base    <= "0110"; -- 0x3000
+                                            mode_bpp     <= "00";
+                                            mode_40      <= '0';
+                                            mode_text    <= '0';
+                                        when "001" =>
+                                            mode_base    <= "0110"; -- 0x3000
+                                            mode_bpp     <= "01";
+                                            mode_40      <= '0';
+                                            mode_text    <= '0';
+                                        when "010" =>
+                                            mode_base    <= "0110"; -- 0x3000
+                                            mode_bpp     <= "10";
+                                            mode_40      <= '0';
+                                            mode_text    <= '0';
+                                        when "011" =>
+                                            mode_base    <= "1000"; -- 0x4000
+                                            mode_bpp     <= "00";
+                                            mode_40      <= '0';
+                                            mode_text    <= '1';
+                                        when "100" =>
+                                            mode_base    <= "1011"; -- 0x5800
+                                            mode_bpp     <= "00";
+                                            mode_40      <= '1';
+                                            mode_text    <= '0';
+                                        when "101" =>
+                                            mode_base    <= "1011"; -- 0x5800
+                                            mode_bpp     <= "01";
+                                            mode_40      <= '1';
+                                            mode_text    <= '0';
+                                        when "110" =>
+                                            mode_base    <= "1100"; -- 0x6000
+                                            mode_bpp     <= "00";
+                                            mode_40      <= '1';
+                                            mode_text    <= '1';
+                                        when "111" =>
+                                            -- mode 7 seems to default to mode 4
+                                            mode_base    <= "1011"; -- 0x5800
+                                            mode_bpp     <= "00";
+                                            mode_40      <= '1';
+                                            mode_text    <= '0';
+                                        when others =>
+                                    end case;
+                                    comms_mode   <= data_in(2 downto 1);
+                                    -- A quirk of the Electron ULA is that RxFull
+                                    -- interrupt fires when tape output mode is
+                                    -- entered. Games like Southen Belle rely on
+                                    -- this quirk.
+                                    if data_in(2 downto 1) = "10" then
+                                        isr(4) <= '1';
+                                    end if;
                                 when others =>
-                                end case;
-                                comms_mode   <= data_in(2 downto 1);
-                                -- A quirk of the Electron ULA is that RxFull
-                                -- interrupt fires when tape output mode is
-                                -- entered. Games like Southen Belle rely on
-                                -- this quirk.
-                                if data_in(2 downto 1) = "10" then
-                                    isr(4) <= '1';
-                                end if;
-                            when others =>
-                                -- A '1' in the palatte data means disable the colour
-                                -- Invert the stored palette, to make the palette logic simpler
-                                palette(slv2int(addr(2 downto 0))) <= data_in xor "11111111";
+                                    -- A '1' in the palatte data means disable the colour
+                                    -- Invert the stored palette, to make the palette logic simpler
+                                    palette(slv2int(addr(2 downto 0))) <= data_in xor "11111111";
                             end case;
                         end if;
                     end if;
@@ -1050,25 +804,14 @@ begin
         end if;
     end process;
 
-    -- SGVA timing at 60Hz with a 40.000MHz Pixel Clock
-    -- Horizontal 800 + 40 + 128 + 88 = total 1056
-    -- Vertical   600 +  1 +   4 + 23 = total 628
-    -- Within the the 640x512 is centred so starts at 80,44
-    -- Horizontal 640 + (80 + 40) + 128 + (88 + 80) = total 1056
-    -- Vertical   512 + (44 +  1) +   4 + (23 + 44) = total 628
-
-    -- RGBs timing at 50Hz with a 16.000MHz Pixel Clock
-    -- Horizontal 640 + (96 + 26) +  75 + (91 + 96) = total 1024
-    -- Vertical   256 + (16 +  2) +   3 + (19 + 16) = total 312
-
-    process (clk_video)
+    process (clk_16M00)
         variable pixel : std_logic_vector(3 downto 0);
         -- start address of current row block (8-10 lines)
         variable row_addr  : std_logic_vector(14 downto 6);
         -- address within current line
         variable byte_addr : std_logic_vector(14 downto 3);
     begin
-        if rising_edge(clk_video) then
+        if rising_edge(clk_16M00) then
 
             -- Horizontal counter, clocked at the pixel clock rate
             if h_count = h_total then
@@ -1091,7 +834,7 @@ begin
 
             -- Field; field=0 is the (first) odd field, field=1 is the even field
             if h_count = h_total and v_count = v_total then
-                field <= not field;
+                field_int <= not field_int;
             end if;
 
             -- Char_row counts 0..7 or 0..9 depending on the mode.
@@ -1100,12 +843,10 @@ begin
             if hsync_int = '1' and hsync_int_last = '0'  then
                 if v_count = v_total then
                     char_row <= (others => '0');
-                elsif v_count(0) = '1' or is_scandoubled = '0' then
-                    if last_line = '1' then
-                        char_row <= (others => '0');
-                    else
-                        char_row <= char_row + 1;
-                    end if;
+                elsif last_line = '1' then
+                    char_row <= (others => '0');
+                else
+                    char_row <= char_row + 1;
                 end if;
             elsif mode_text = '0' then
                 -- From the ULA schematics sheet 7, VA3 is a T-type Latch
@@ -1116,7 +857,7 @@ begin
             end if;
 
             -- Determine last line of a row
-            if ((mode_text = '0' and char_row = 7) or (mode_text = '1' and char_row = 9)) and (v_count(0) = '1' or is_scandoubled = '0') then
+            if ((mode_text = '0' and char_row = 7) or (mode_text = '1' and char_row = 9)) then
                 last_line <= '1';
             else
                 last_line <= '0';
@@ -1147,7 +888,7 @@ begin
             -- Every 8 or 16 pixels depending on mode/repeats
             if h_count < h_active then
                 if (mode_40 = '0' and h_count(2 downto 0) = "111") or
-                   (mode_40 = '1' and h_count(3 downto 0) = "1111") then
+                    (mode_40 = '1' and h_count(3 downto 0) = "1111") then
                     byte_addr := byte_addr + 1;
                 end if;
             end if;
@@ -1158,18 +899,13 @@ begin
             end if;
 
             -- Screen_addr is the final 15-bit Video RAM address
-            if mode7_enable = '1' then
-                screen_addr <= "11111" & crtc_ma(9 downto 0);
-            else
-                screen_addr <= byte_addr & char_row(2 downto 0);
-            end if;
+            screen_addr <= byte_addr & char_row(2 downto 0);
 
             -- Indicate possible memory contention on active scan
             -- lines. The scan doubled version is not quite right: 216
             -- might need increasing a bit (thanks to Domininc for
             -- help with this)
-            if (is_scandoubled = '0' and (h_count1 >= 640 - 16)) or
-               (is_scandoubled = '1' and (h_count1 >= 216 and v_count(0) = '1')) or
+            if (h_count1 >= 640 - 16) or
                (mode_text = '0' and v_count >= v_active_gph) or
                (mode_text = '1' and v_count >= v_active_txt) or
                (char_row >= 8) then
@@ -1181,9 +917,9 @@ begin
             -- RGB Data
             if (h_count1 >= h_active or (mode_text = '0' and v_count >= v_active_gph) or (mode_text = '1' and v_count >= v_active_txt) or char_row >= 8) then
                 -- blanking and border are always black
-                red_int   <= (others => '0');
-                green_int <= (others => '0');
-                blue_int  <= (others => '0');
+                red   <= '0';
+                green <= '0';
+                blue  <= '0';
             else
                 -- rendering an actual pixel
                 if (mode_bpp = 0) then
@@ -1218,85 +954,75 @@ begin
                 end if;
                 -- Implement Color Palette
                 case (pixel) is
-                when "0000" =>
-                    red_int   <= (others => palette(1)(0));
-                    green_int <= (others => palette(1)(4));
-                    blue_int  <= (others => palette(0)(4));
-                when "0001" =>
-                    red_int   <= (others => palette(7)(0));
-                    green_int <= (others => palette(7)(4));
-                    blue_int  <= (others => palette(6)(4));
-                when "0010" =>
-                    red_int   <= (others => palette(1)(1));
-                    green_int <= (others => palette(1)(5));
-                    blue_int  <= (others => palette(0)(5));
-                when "0011" =>
-                    red_int   <= (others => palette(7)(1));
-                    green_int <= (others => palette(7)(5));
-                    blue_int  <= (others => palette(6)(5));
-                when "0100" =>
-                    red_int   <= (others => palette(3)(0));
-                    green_int <= (others => palette(3)(4));
-                    blue_int  <= (others => palette(2)(4));
-                when "0101" =>
-                    red_int   <= (others => palette(5)(0));
-                    green_int <= (others => palette(5)(4));
-                    blue_int  <= (others => palette(4)(4));
-                when "0110" =>
-                    red_int   <= (others => palette(3)(1));
-                    green_int <= (others => palette(3)(5));
-                    blue_int  <= (others => palette(2)(5));
-                when "0111" =>
-                    red_int   <= (others => palette(5)(1));
-                    green_int <= (others => palette(5)(5));
-                    blue_int  <= (others => palette(4)(5));
-                when "1000" =>
-                    red_int   <= (others => palette(1)(2));
-                    green_int <= (others => palette(0)(2));
-                    blue_int  <= (others => palette(0)(6));
-                when "1001" =>
-                    red_int   <= (others => palette(7)(2));
-                    green_int <= (others => palette(6)(2));
-                    blue_int  <= (others => palette(6)(6));
-                when "1010" =>
-                    red_int   <= (others => palette(1)(3));
-                    green_int <= (others => palette(0)(3));
-                    blue_int  <= (others => palette(0)(7));
-                when "1011" =>
-                    red_int   <= (others => palette(7)(3));
-                    green_int <= (others => palette(6)(3));
-                    blue_int  <= (others => palette(6)(7));
-                when "1100" =>
-                    red_int   <= (others => palette(3)(2));
-                    green_int <= (others => palette(2)(2));
-                    blue_int  <= (others => palette(2)(6));
-                when "1101" =>
-                    red_int   <= (others => palette(5)(2));
-                    green_int <= (others => palette(4)(2));
-                    blue_int  <= (others => palette(4)(6));
-                when "1110" =>
-                    red_int   <= (others => palette(3)(3));
-                    green_int <= (others => palette(2)(3));
-                    blue_int  <= (others => palette(2)(7));
-                when "1111" =>
-                    red_int   <= (others => palette(5)(3));
-                    green_int <= (others => palette(4)(3));
-                    blue_int  <= (others => palette(4)(7));
-                when others =>
+                    when "0000" =>
+                        red   <= palette(1)(0);
+                        green <= palette(1)(4);
+                        blue  <= palette(0)(4);
+                    when "0001" =>
+                        red   <= palette(7)(0);
+                        green <= palette(7)(4);
+                        blue  <= palette(6)(4);
+                    when "0010" =>
+                        red   <= palette(1)(1);
+                        green <= palette(1)(5);
+                        blue  <= palette(0)(5);
+                    when "0011" =>
+                        red   <= palette(7)(1);
+                        green <= palette(7)(5);
+                        blue  <= palette(6)(5);
+                    when "0100" =>
+                        red   <= palette(3)(0);
+                        green <= palette(3)(4);
+                        blue  <= palette(2)(4);
+                    when "0101" =>
+                        red   <= palette(5)(0);
+                        green <= palette(5)(4);
+                        blue  <= palette(4)(4);
+                    when "0110" =>
+                        red   <= palette(3)(1);
+                        green <= palette(3)(5);
+                        blue  <= palette(2)(5);
+                    when "0111" =>
+                        red   <= palette(5)(1);
+                        green <= palette(5)(5);
+                        blue  <= palette(4)(5);
+                    when "1000" =>
+                        red   <= palette(1)(2);
+                        green <= palette(0)(2);
+                        blue  <= palette(0)(6);
+                    when "1001" =>
+                        red   <= palette(7)(2);
+                        green <= palette(6)(2);
+                        blue  <= palette(6)(6);
+                    when "1010" =>
+                        red   <= palette(1)(3);
+                        green <= palette(0)(3);
+                        blue  <= palette(0)(7);
+                    when "1011" =>
+                        red   <= palette(7)(3);
+                        green <= palette(6)(3);
+                        blue  <= palette(6)(7);
+                    when "1100" =>
+                        red   <= palette(3)(2);
+                        green <= palette(2)(2);
+                        blue  <= palette(2)(6);
+                    when "1101" =>
+                        red   <= palette(5)(2);
+                        green <= palette(4)(2);
+                        blue  <= palette(4)(6);
+                    when "1110" =>
+                        red   <= palette(3)(3);
+                        green <= palette(2)(3);
+                        blue  <= palette(2)(7);
+                    when "1111" =>
+                        red   <= palette(5)(3);
+                        green <= palette(4)(3);
+                        blue  <= palette(4)(7);
+                    when others =>
                 end case;
-                --green_int <= (not ctrl_caps) & "111"; -- DEBUG make screen green
             end if;
             -- Vertical Sync, lasts 160us (2.5 lines; 5 lines when scan doubled)
-            if is_scandoubled = '1' then
-                -- in VGA modes, vsync changes on the leading edge of hsync
-                if h_count1 = hsync_start then
-                    if v_count = vsync_start then
-                        vsync_int <= '0';
-                    elsif v_count = vsync_end then
-                        vsync_int <= '1';
-                    end if;
-                end if;
-            elsif is_int_field = '0' then
+            if is_int_field = '0' then
                 -- first field (odd) of interlaced scanning (or non interlaced)
                 -- vsync starts at the beginning of the line
                 if (h_count1 = 0 and v_count = vsync_start) then
@@ -1319,11 +1045,11 @@ begin
             elsif (h_count1 = hsync_end) then
                 hsync_int <= '1';
             end if;
-             -- Blanking
+            -- Blanking
             if h_count1 = hblank_start then
-                blank_int <= '1';
+                blank <= '1';
             elsif h_count1 = hblank_end and (v_count < vblank_start or v_count >= vblank_end) then
-                blank_int <= '0';
+                blank <= '0';
             end if;
             -- Display Interrupt, this is co-incident with the leading edge
             -- of hsync at the end the last active line of display
@@ -1343,29 +1069,10 @@ begin
         end if;
     end process;
 
-    red   <= (others => ttxt_r_out) when mode7_enable = '1' else
-             red_int;
-
-    green <= (others => ttxt_g_out) when mode7_enable = '1' else
-             green_int;
-
-    blue  <= (others => ttxt_b_out) when mode7_enable = '1' else
-             blue_int;
-
-    blank <= not ttxt_de_out        when mode7_enable = '1' else
-             blank_int;
-
-    fld   <= field;
-
-    vsync <= ttxt_vs_out when mode7_enable = '1' else
--- HACK             '1' when is_scandoubled = '0' else
-             vsync_int;
-
-    hsync <= ttxt_hs_out when mode7_enable = '1' else
--- HACK             hsync_int and vsync_int when is_scandoubled = '0' else
-             hsync_int;
-
-
+    field <= field_int;
+    vsync <= vsync_int;
+    hsync <= hsync_int;
+    csync <= hsync_int and vsync_int;
     caps  <= caps_int;
     motor <= motor_int;
 
@@ -1495,16 +1202,16 @@ begin
             -- Generate clock enables for VIA one cycle before cpu_clken
             if turbo_sync(1) = '0' or LimitIOSpeed then
                 -- 1MHz
-                via1_clken <= clken_counter(3) and clken_counter(2) and clken_counter(1) and not clken_counter(0);
-                via4_clken <=                                           clken_counter(1) and not clken_counter(0);
+                mhz1_clken <= clken_counter(3) and clken_counter(2) and clken_counter(1) and not clken_counter(0);
+                mhz4_clken <=                                           clken_counter(1) and not clken_counter(0);
             elsif turbo_sync(0) = '0' then
                 -- 2MHz
-                via1_clken <= clken_counter(2) and clken_counter(1) and not clken_counter(0);
-                via4_clken <=                                           not clken_counter(0);
+                mhz1_clken <= clken_counter(2) and clken_counter(1) and not clken_counter(0);
+                mhz4_clken <=                                           not clken_counter(0);
             else
                 -- 4MHz
-                via1_clken <= clken_counter(1) and not clken_counter(0);
-                via4_clken <= '1';
+                mhz1_clken <= clken_counter(1) and not clken_counter(0);
+                mhz4_clken <= '1';
             end if;
 
             -- Generate cpu_clk
@@ -1526,228 +1233,8 @@ begin
     end process;
 
     cpu_clken_out  <= cpu_clken;
-    mhz1_clken_out <= via1_clken;
-    mhz4_clken_out <= via4_clken;
+    mhz1_clken_out <= mhz1_clken;
+    mhz4_clken_out <= mhz4_clken;
     cpu_clk_out    <= cpu_clk;
-
---------------------------------------------------------
--- Optional MMC Filing System (Memory Mapped SPI)
---------------------------------------------------------
-
-    MMCIncluded: if IncludeMMC generate
-
-        spisd_enable  <= '1' when cpu_clken = '1' and addr = x"fc8c" else '0';
-
-        Inst_SPI_Port: entity work.SPI_Port
-            port map (
-                nRST    => RST_n,
-                clk     => clk_16M00,
-                clken   => '1',  -- needs to be 16MHz or less (SPI clock is half this rate)
-                enable  => spisd_enable,
-                nwe     => R_W_n,
-                datain  => data_in,
-                dataout => spisd_do,
-                SDMISO  => SDMISO,
-                SDMOSI  => SDMOSI,
-                SDSS    => SDSS,
-                SDCLK   => SDCLK
-                );
-
-    end generate;
-
-    MMCNotIncluded: if not IncludeMMC generate
-
-        SDCLK    <= '1';
-        SDMOSI   <= '1';
-        SDSS     <= '1';
-        spisd_do <= x"FE";
-
-    end generate;
-
---------------------------------------------------------
--- Optional Jafa Mk1 Compatible Mode 7 Implementation
---------------------------------------------------------
-
-    JafaIncluded: if IncludeJafaMode7 generate
-        -- FC1C - Write address register
-        -- FC1D - Write data register
-        -- FC1E - Read status register - only bit 5 (vsync) is implemented
-        -- FC1F - Read data register
-
-        process (clk_16M00)
-        variable counter : std_logic_vector(3 downto 0);
-        begin
-            if rising_edge(clk_16M00) then
-                if counter = "1111" or (is_scandoubled = '1' and counter = "0111") then
-                    crtc_clken <= '1';
-                else
-                    crtc_clken <= '0';
-                end if;
-                counter := counter + 1;
-                -- Generate a cursor signal that is delayed by 2 characters
-                if crtc_clken = '1' then
-                    crtc_cursor1 <= crtc_cursor;
-                    crtc_cursor2 <= crtc_cursor1;
-                end if;
-            end if;
-        end process;
-
-        using_ext_ttxt_clock : if UseTTxtClock generate
-            -- Use external 96 MHz clock / 12 MHz enable
-            ttxt_clock <= clk_ttxt;
-            ttxt_clken <= clken_ttxt_12M;
-        end generate;
-
-        using_24mhz_ttxt_clock : if not UseTTxtClock generate
-            -- Use 24 MHz clock and generate 12 MHz enable
-            ttxt_clock <= clk_24M00;
-            process (clk_24M00)
-            begin
-                if rising_edge(clk_24M00) then
-                    if is_scandoubled = '1' then
-                        ttxt_clken <= '1';
-                    else
-                        ttxt_clken <= not ttxt_clken;
-                    end if;
-                end if;
-            end process;
-        end generate;
-
-        crtc_enable <= '1' when addr(15 downto 0) = x"fc1c" or
-                                addr(15 downto 0) = x"fc1d" or
-                                addr(15 downto 0) = x"fc1f"
-                           else '0';
-
-        status_enable <= '1' when addr(15 downto 0) = x"fc1e" else '0';
-
-        status_do <= "00" & crtc_vsync & "00000";
-
-        crtc : entity work.mc6845 port map (
-            -- inputs
-            CLOCK     => clk_16M00,
-            CLKEN     => crtc_clken,
-            CLKEN_CPU => '1',
-            VGA       => is_scandoubled,
-            nRESET    => RST_n,
-            ENABLE    => crtc_enable,
-            R_nW      => R_W_n,
-            RS        => addr(0),
-            DI        => data_in,
-            LPSTB     => '0',
-            -- outputs
-            DO        => crtc_do,
-            VSYNC     => crtc_vsync,
-            HSYNC     => crtc_hsync,
-            DE        => crtc_de,
-            CURSOR    => crtc_cursor,
-            MA        => crtc_ma,
-            RA        => crtc_ra
-        );
-
-        crtc_hsync_n <= not crtc_hsync;
-        crtc_vsync_n <= not crtc_vsync;
-
-        ttxt_glr <= crtc_hsync_n;
-        ttxt_dew <= crtc_vsync;
-        ttxt_crs <= not crtc_ra(0);
-        ttxt_lose <= crtc_de;
-
-        teletext : entity work.saa5050
-        generic map (
-            IncludeTTxtROM => IncludeTTxtROM
-        )
-        port map (
-            -- inputs
-            CLOCK    => ttxt_clock,
-            CLKEN    => ttxt_clken,
-            nRESET   => RST_n,
-            VGA      => is_scandoubled,
-            DI_CLOCK => clk_16M00,
-            DI_CLKEN => '1',
-            DI       => screen_data(6 downto 0),
-            GLR      => ttxt_glr,
-            DEW      => ttxt_dew,
-            CRS      => ttxt_crs,
-            LOSE     => ttxt_lose,
-            -- outputs
-            R        => ttxt_r_int,
-            G        => ttxt_g_int,
-            B        => ttxt_b_int,
-            PIXDE    => ttxt_de_int,
-
-            -- SAA5050 character ROM loading
-            char_rom_we   => char_rom_we,
-            char_rom_addr => char_rom_addr,
-            char_rom_data => char_rom_data
-        );
-
-        -- make the cursor visible
-        ttxt_r  <= ttxt_r_int xor crtc_cursor2;
-        ttxt_g  <= ttxt_g_int xor crtc_cursor2;
-        ttxt_b  <= ttxt_b_int xor crtc_cursor2;
-        ttxt_de <= ttxt_de_int;
-
-        -- enable mode 7
-        mode7_enable <= crtc_ma(13);
-    end generate;
-
-    JafaAndVGAIncluded: if IncludeJafaMode7 and IncludeVGA generate
-        signal tmp_r     : std_logic;
-        signal tmp_g     : std_logic;
-        signal tmp_b     : std_logic;
-        signal tmp_hs    : std_logic;
-        signal tmp_vs    : std_logic;
-        signal tmp_de    : std_logic;
-    begin
-        -----------------------------------------------
-        -- 24MHz to 27MHz Scan Retimer (by DMB)
-        -----------------------------------------------
-
-        inst_retimer: entity work.retimer
-            generic map (
-                WIDTH => 1
-                )
-            port map (
-                clk_in    => ttxt_clock,
-                clken_in  => ttxt_clken,
-                clk_out   => clk_video,
-                clken_out => '1',
-                hs_in     => crtc_hsync_n,
-                vs_in     => crtc_vsync_n,
-                r_in(0)   => ttxt_r,
-                g_in(0)   => ttxt_g,
-                b_in(0)   => ttxt_b,
-                de_in     => ttxt_de,
-                hs_out    => tmp_hs,
-                vs_out    => tmp_vs,
-                de_out    => tmp_de,
-                r_out(0)  => tmp_r,
-                g_out(0)  => tmp_g,
-                b_out(0)  => tmp_b
-                );
-
-        -- Scan Doubler from the MIST project
-        -- MUX to select sRGB/VGA based on vid_is_scandoubled
-        ttxt_r_out  <= tmp_r  when is_scandoubled = '1' else ttxt_r;
-        ttxt_g_out  <= tmp_g  when is_scandoubled = '1' else ttxt_g;
-        ttxt_b_out  <= tmp_b  when is_scandoubled = '1' else ttxt_b;
-        ttxt_de_out <= tmp_de when is_scandoubled = '1' else ttxt_de;
-        ttxt_vs_out <= tmp_vs when is_scandoubled = '1' else '1';
-        ttxt_hs_out <= tmp_hs when is_scandoubled = '1' else crtc_hsync_n and crtc_vsync_n;
-    end generate;
-
-    JafaAndNotVGAIncluded: if IncludeJafaMode7 and not IncludeVGA generate
-        ttxt_r_out  <= ttxt_r;
-        ttxt_g_out  <= ttxt_g;
-        ttxt_b_out  <= ttxt_b;
-        ttxt_de_out <= ttxt_de;
-        ttxt_vs_out <= '1';
-        ttxt_hs_out <= crtc_hsync_n and crtc_vsync_n;
-    end generate;
-
-    JafaNotIncluded: if not IncludeJafaMode7 generate
-        -- disable mode 7
-        mode7_enable <= '0';
-    end generate;
 
 end behavioral;
