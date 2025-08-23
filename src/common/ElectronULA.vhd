@@ -901,11 +901,8 @@ begin
             -- Screen_addr is the final 15-bit Video RAM address
             screen_addr <= byte_addr & char_row(2 downto 0);
 
-            -- Indicate possible memory contention on active scan
-            -- lines. The scan doubled version is not quite right: 216
-            -- might need increasing a bit (thanks to Domininc for
-            -- help with this)
-            if (h_count1 >= 640 - 16) or
+            -- Indicate possible memory contention on active scans lines.
+            if (h_count1 >= 640) or
                (mode_text = '0' and v_count >= v_active_gph) or
                (mode_text = '1' and v_count >= v_active_txt) or
                (char_row >= 8) then
