@@ -203,7 +203,7 @@ architecture behavioral of ElectronULA is
     signal ROM_n_int      :   std_logic;
 
     -- clock enable generation
-    signal clken_counter  : std_logic_vector (3 downto 0) := (others => '0');
+    signal clken_counter  : std_logic_vector (3 downto 0);
     signal turbo_sync     : std_logic_vector (1 downto 0);
 
     signal contention     : std_logic;
@@ -1049,6 +1049,9 @@ begin
     -- RAM accesses always happen at 1MHz (with contention)
     ram_access <= not addr(15);
 
+    -- clken counter is just the LSB 4 bits of h_counter
+    clken_counter <= h_count(3 downto 0);
+
     clk_gen1 : process(clk_16M00)
     begin
         if rising_edge(clk_16M00) then
@@ -1056,9 +1059,6 @@ begin
             if clken_counter = "1111" then
                 turbo_sync <= turbo;
             end if;
-
-            -- clken counter
-            clken_counter <= clken_counter + 1;
 
             -- video clock enable is always 2MHz
             vid_clken <= clken_counter(2) and clken_counter(1) and not clken_counter(0);
