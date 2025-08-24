@@ -1015,7 +1015,7 @@ begin
             elsif (h_count1 = hsync_end) then
                 display_intr <= '0';
             end if;
-            -- RTC Interrupt, this occurs 8192us (200 lines) after the end of
+            -- RTC Interrupt, this occurs 8192us (128 lines) after the end of
             -- the vsync, and is not co-incident with hsync
             if (v_count = v_rtc) and ((is_int_field = '0' and h_count1 = 0) or (is_int_field = '1' and h_count1 = ('0' & h_total(10 downto 1)))) then
                 rtc_intr <= '1';
