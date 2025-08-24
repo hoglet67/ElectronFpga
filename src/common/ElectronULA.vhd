@@ -150,6 +150,7 @@ architecture behavioral of ElectronULA is
     signal col_offset     : std_logic_vector(9 downto 0);
 
     signal screen_addr    : std_logic_vector(14 downto 0);
+    signal screen_data_tmp: std_logic_vector(7 downto 0);
     signal screen_data    : std_logic_vector(7 downto 0);
 
     -- Screen Mode Registers
@@ -209,8 +210,6 @@ architecture behavioral of ElectronULA is
     signal turbo_sync     : std_logic_vector (1 downto 0);
 
     signal contention     : std_logic;
-    signal contention1    : std_logic;
-    signal contention2    : std_logic;
     signal io_access      : std_logic; -- always at 1MHz, no contention
     signal rom_access     : std_logic; -- always at 2MHz, no contention
     signal ram_access     : std_logic; -- 1MHz/2MHz/Stopped
@@ -353,7 +352,7 @@ begin
                 web   => '0',
                 addrb => screen_addr,
                 dinb  => x"00",
-                doutb => screen_data
+                doutb => screen_data_tmp
             );
         ram_we <= '1' when addr(15) = '0' and R_W_n = '0' and cpu_clken = '1' else '0';
     end generate;
@@ -385,7 +384,7 @@ begin
                 web   => '0',
                 addrb => addrb,
                 dinb  => x"00",
-                doutb => screen_data
+                doutb => screen_data_tmp
             );
         ram_we <= '1' when (addr(15 downto 12) = "0011" or addr(15 downto 14) = "01") and R_W_n = '0' and cpu_clken = '1' else '0';
     end generate;
@@ -499,17 +498,6 @@ begin
                         ((intr_counter = 255744 + disp_skew or intr_counter = 576256 + disp_skew) and mode_text = '1') then
                         isr(2) <= '1';
                     end if;
-                    -- Memory Contention exact timing
-                    if (intr_counter(9 downto 0) >= 640 or
-                        (mode_text = '0' and intr_counter(19 downto 10) >= 256 and intr_counter(19 downto 10) <= 311) or
-                        (mode_text = '0' and intr_counter(19 downto 10) >= 568 and intr_counter(19 downto 10) <= 624) or
-                        (mode_text = '1' and intr_counter(19 downto 10) >= 250 and intr_counter(19 downto 10) <= 311) or
-                        (mode_text = '1' and intr_counter(19 downto 10) >= 562 and intr_counter(19 downto 10) <= 624) or
-                        char_row >= 8) then
-                        contention2 <= '0';
-                    else
-                        contention2 <= not mode_40;
-                    end if;
                 else
                     -- Generate the rtc interrupt on the rising edge (line 100 of the screen)
                     if (rtc_intr2 = '0' and rtc_intr1 = '1') then
@@ -519,9 +507,6 @@ begin
                     if display_intr2 = '0' and display_intr1 = '1' then
                         isr(2) <= '1';
                     end if;
-                    -- Generate the display memory signal
-                    contention1 <= contention;
-                    contention2 <= contention1;
                 end if;
                 if (comms_mode = "00") then
                     -- Cassette In Mode
@@ -816,6 +801,11 @@ begin
     begin
         if rising_edge(clk_16M00) then
 
+            -- Delay the screen data by a further 2MHz cycle to correctly align palette writes
+            if vid_clken = '1' then
+                screen_data <= screen_data_tmp;
+            end if;
+
             -- Horizontal counter, clocked at the pixel clock rate
             if h_count = h_total then
                 h_count <= (others => '0');
@@ -824,7 +814,7 @@ begin
             end if;
 
             -- Pipelined version of h_count by to compensate the register in the RAM
-            h_count1 <= h_count - 7;
+            h_count1 <= h_count - 15;
 
             -- Vertical counter, incremented at the end of each line
             if h_count = h_total then
