@@ -105,9 +105,6 @@ entity ElectronULAEnhanced is
         -- 4-bit ROM latch
         rom_latch      : out std_logic_vector(3 downto 0);
 
-        -- Fake the RTC and Display interrupt timing (useful in 60Hz modes)
-        fake_timing    : in  std_logic := '0';
-
         -- Clock Generation
         cpu_clken_out  : out std_logic;
         mhz1_clken_out : out std_logic;
@@ -230,8 +227,6 @@ begin
             motor     => motor,
             -- 4-bit ROM latch
             rom_latch => rom_latch,
-            -- Fake the RTC and Display interrupt timing (useful in 60Hz modes)
-            fake_timing    => fake_timing,
             -- Clock Generation
             cpu_clken_out  => cpu_clken,
             mhz1_clken_out => mhz1_clken,

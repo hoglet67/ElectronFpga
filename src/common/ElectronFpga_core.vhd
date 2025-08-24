@@ -40,7 +40,6 @@ entity ElectronFpga_core is
         clk_27M00      : in  std_logic := '0'; -- used for HDMI and VGA
 
         -- ULA Core Timing
-        fake_timing    : in  std_logic := '0';
         interlace      : in  std_logic := '1';
 
         -- Hard reset (active low)
@@ -403,8 +402,6 @@ begin
         motor          => motor_led,
 
         rom_latch      => rom_latch,
-
-        fake_timing    => fake_timing,
 
         -- Clock Generation
         cpu_clken_out  => cpu_clken,

@@ -105,7 +105,6 @@ architecture behavioral of ElectronULA is
     signal power_on_reset : std_logic := '1';
     signal delayed_clear_reset : std_logic := '0';
 
-    signal intr_counter   : std_logic_vector(19 downto 0);
     signal general_counter: std_logic_vector(15 downto 0);
     signal sound_bit      : std_logic;
     signal isr_data       : std_logic_vector(7 downto 0);
@@ -173,11 +172,9 @@ architecture behavioral of ElectronULA is
 
     signal display_intr   : std_logic;
     signal display_intr1  : std_logic;
-    signal display_intr2  : std_logic;
 
     signal rtc_intr       : std_logic;
     signal rtc_intr1      : std_logic;
-    signal rtc_intr2      : std_logic;
 
     signal ctrl_caps      : std_logic;
 
@@ -453,7 +450,6 @@ begin
                 comms_mode      <= "00";
                 motor_int       <= '0';
                 caps_int        <= '0';
-                intr_counter    <= (others => '0');
                 general_counter <= (others => '0');
                 sound_bit       <= '0';
                 ctrl_caps       <= '0';
@@ -465,49 +461,19 @@ begin
                 field1 <= field_int;
                 field2 <= field1;
                 field3 <= field2;
-                -- This 20 bit-counter counts two fields in 16MHz cycles (0 to approx 639999)
-                if intr_counter = 639999 then
-                    intr_counter <= (others => '0');
-                else
-                    intr_counter <= intr_counter + 1;
-                end if;
-                -- Synchronise the interrupt counter with some hysteresis when field transitions from 0 to 1
-                if field2 = '1' and field3 = '0' and intr_counter > 4  and intr_counter < 640000 - 4 then
-                    intr_counter <= (others => '0');
-                end if;
 
-                -- Synchronize the display interrupt signal from the VGA clock domain
-                display_intr1 <= display_intr;
-                display_intr2 <= display_intr1;
-
-                -- Synchronize the rtc interrupt signal from the VGA clock domain
+                -- Generate the rtc interrupt on the rising edge (line 100 of the screen)
                 rtc_intr1 <= rtc_intr;
-                rtc_intr2 <= rtc_intr1;
-
-                -- Two options for generating the display/rtc interrupt, depening on the fake_timing input
-                if fake_timing = '1' then
-                    -- Allow fine tuning of interrupt positions (16 = 1us late)
-                    disp_skew := 16; -- this is critical to firetrack (0, -16, -32 induce failures)
-                    rtc_skew  := 16;
-                    -- RTC interrupt exact timing (from logic analyzer captures in 16MHz cycles)
-                    if intr_counter = 101874 + rtc_skew or intr_counter = 421874 + rtc_skew then
-                        isr(3) <= '1';
-                    end if;
-                    -- Display interrupt exact timing (from logic analyzer captures in 16MHz cycles)
-                    if ((intr_counter = 261888 + disp_skew or intr_counter = 582400 + disp_skew) and mode_text = '0') or
-                        ((intr_counter = 255744 + disp_skew or intr_counter = 576256 + disp_skew) and mode_text = '1') then
-                        isr(2) <= '1';
-                    end if;
-                else
-                    -- Generate the rtc interrupt on the rising edge (line 100 of the screen)
-                    if (rtc_intr2 = '0' and rtc_intr1 = '1') then
-                        isr(3) <= '1';
-                    end if;
-                    -- Generate the display end interrupt on the rising edge (line 256 of the screen)
-                    if display_intr2 = '0' and display_intr1 = '1' then
-                        isr(2) <= '1';
-                    end if;
+                if (rtc_intr1 = '0' and rtc_intr = '1') then
+                    isr(3) <= '1';
                 end if;
+
+                -- Generate the display end interrupt on the rising edge (line 256 of the screen)
+                display_intr1 <= display_intr;
+                if display_intr1 = '0' and display_intr = '1' then
+                    isr(2) <= '1';
+                end if;
+
                 if (comms_mode = "00") then
                     -- Cassette In Mode
                     if (casIn2 = '0') then

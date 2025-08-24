@@ -490,7 +490,6 @@ begin
         clk_24M00         => clock_24,
         clk_27M00         => clock_27,
         -- ULA Core Timing
-        fake_timing       => '0',
         interlace         => '1',
         -- Hard reset (active low)
         hard_reset_n      => hard_reset_n,
