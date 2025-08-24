@@ -416,7 +416,7 @@ begin
         hd_blue  <= jafa_hd_blue  when IncludeJafaMode7 and mode7_enable_hd = '1' else rgb_out(0);
         hd_hsync <= jafa_hd_hsync when IncludeJafaMode7 and mode7_enable_hd = '1' else hsync_tmp;
         hd_vsync <= jafa_hd_vsync when IncludeJafaMode7 and mode7_enable_hd = '1' else vsync_tmp;
-        hd_blank <= jafa_hd_blank when IncludeJafaMode7 and mode7_enable_hd = '1' else '0';  -- Unused when video comes from ULA
+        hd_blank <= jafa_hd_blank when IncludeJafaMode7 and mode7_enable_hd = '1' else '0';  -- Unused
 
     end generate;
 
@@ -425,32 +425,32 @@ begin
 --------------------------------------------------------
 
     HDMIncluded: if IncludeHDMI generate
-        signal hsync1     : std_logic;
-        signal vsync1     : std_logic;
-        signal hcnt       : unsigned(9 downto 0);
-        signal vcnt       : unsigned(9 downto 0);
-        signal vsize      : unsigned(9 downto 0);
-        signal voffset    : unsigned(9 downto 0);
+        signal hsync1          : std_logic;
+        signal vsync1          : std_logic;
+        signal hcnt            : unsigned(9 downto 0);
+        signal vcnt            : unsigned(9 downto 0);
+        signal vsize           : unsigned(9 downto 0);
+        signal voffset         : unsigned(9 downto 0);
+        signal blank           : std_logic;
 
-        signal blank      : std_logic;
-        signal hdmi_red   : std_logic_vector(7 downto 0);
-        signal hdmi_green : std_logic_vector(7 downto 0);
-        signal hdmi_blue  : std_logic_vector(7 downto 0);
-        signal hdmi_hsync : std_logic;
-        signal hdmi_vsync : std_logic;
-        signal hdmi_blank : std_logic;
-        signal hdmi_audio : std_logic_vector (15 downto 0);
+        signal hdmi_red        : std_logic_vector(7 downto 0);
+        signal hdmi_green      : std_logic_vector(7 downto 0);
+        signal hdmi_blue       : std_logic_vector(7 downto 0);
+        signal hdmi_hsync      : std_logic;
+        signal hdmi_vsync      : std_logic;
+        signal hdmi_blank      : std_logic;
+        signal hdmi_aspect_169 : std_logic;
+        signal hdmi_audio      : std_logic_vector (15 downto 0);
 
     begin
 
         -- Mode 0..6 we need to create a blanking signal to have a 720px wide image
-        -- Mode 7 has it's own blanking to give a 540 wide image
+        -- Mode 7 has it's own blanking to give a 540 wide image; we don't currently use that
 
         voffset <= to_unsigned( 39, 10) when hdmi_audio_en = '1' else to_unsigned( 55, 10);
         vsize   <= to_unsigned(576, 10) when hdmi_audio_en = '1' else to_unsigned(540, 10);
-        blank   <= hd_blank when IncludeJafaMode7 and mode7_enable_hd = '1' else
-                   '1'      when hcnt < 68 or hcnt >= 68 + 720 or vcnt < voffset or vcnt >= voffset + vsize else
-                   '0';
+        blank   <= '1' when hcnt < 68 or hcnt >= 68 + 720 or vcnt < voffset or vcnt >= voffset + vsize else '0';
+        hdmi_aspect_169 <= '1' when IncludeJafaMode7 and mode7_enable_hd = '1' else '0';
 
         process(hdmi_clk)
         begin
@@ -516,7 +516,7 @@ begin
                 I_BLANK          => hdmi_blank,
                 I_HSYNC          => hdmi_hsync,
                 I_VSYNC          => hdmi_vsync,
-                I_ASPECT_169     => '0',
+                I_ASPECT_169     => hdmi_aspect_169,
                 -- PCM audio
                 I_AUDIO_ENABLE   => hdmi_audio_en,
                 I_AUDIO_PCM_L    => hdmi_audio,
