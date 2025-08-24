@@ -10,11 +10,13 @@ entity RAM_DualPort is
         );
     port (
         clka  : in  std_logic;
+        cea   : in  std_logic := '1';
         wea   : in  std_logic;
         addra : in  std_logic_vector(AWIDTH - 1 downto 0);
         dina  : in  std_logic_vector(DWIDTH - 1 downto 0);
         douta : out std_logic_vector(DWIDTH - 1 downto 0);
         clkb  : in  std_logic;
+        ceb   : in  std_logic := '1';
         web   : in  std_logic;
         addrb : in  std_logic_vector(AWIDTH - 1 downto 0);
         dinb  : in  std_logic_vector(DWIDTH - 1 downto 0);
@@ -33,20 +35,24 @@ begin
     process (clka)
     begin
         if rising_edge(clka) then
-            if (wea = '1') then
-                RAM(conv_integer(addra)) := dina;
+            if cea = '1' then
+                if (wea = '1') then
+                    RAM(conv_integer(addra)) := dina;
+                end if;
+                douta <= RAM(conv_integer(addra));
             end if;
-            douta <= RAM(conv_integer(addra));
         end if;
     end process;
 
     process (clkb)
     begin
         if rising_edge(clkb) then
-            if (web = '1') then
-                RAM(conv_integer(addrb)) := dinb;
+            if ceb = '1' then
+                if (web = '1') then
+                    RAM(conv_integer(addrb)) := dinb;
+                end if;
+                doutb <= RAM(conv_integer(addrb));
             end if;
-            doutb <= RAM(conv_integer(addrb));
         end if;
     end process;
 

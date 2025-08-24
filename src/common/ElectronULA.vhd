@@ -220,6 +220,7 @@ architecture behavioral of ElectronULA is
     signal clk_stopped    : std_logic_vector(1 downto 0) := "00";
 
     signal cpu_clken      : std_logic;
+    signal vid_clken      : std_logic;
     signal mhz1_clken     : std_logic;
     signal mhz4_clken     : std_logic;
     signal cpu_clk        : std_logic := '1';
@@ -348,6 +349,7 @@ begin
                 douta => ram_data,
                 -- Port B is the video port
                 clkb  => clk_16M00,
+                ceb   => vid_clken,
                 web   => '0',
                 addrb => screen_addr,
                 dinb  => x"00",
@@ -379,6 +381,7 @@ begin
                 douta => ram_data,
                 -- Port B is the video port
                 clkb  => clk_16M00,
+                ceb   => vid_clken,
                 web   => '0',
                 addrb => addrb,
                 dinb  => x"00",
@@ -821,7 +824,7 @@ begin
             end if;
 
             -- Pipelined version of h_count by to compensate the register in the RAM
-            h_count1 <= h_count;
+            h_count1 <= h_count - 7;
 
             -- Vertical counter, incremented at the end of each line
             if h_count = h_total then
@@ -902,7 +905,7 @@ begin
             screen_addr <= byte_addr & char_row(2 downto 0);
 
             -- Indicate possible memory contention on active scans lines.
-            if (h_count1 >= 640) or
+            if (h_count >= h_active) or
                (mode_text = '0' and v_count >= v_active_gph) or
                (mode_text = '1' and v_count >= v_active_txt) or
                (char_row >= 8) then
@@ -1101,6 +1104,9 @@ begin
             -- clken counter
             clken_counter <= clken_counter + 1;
 
+            -- video clock enable is always 2MHz
+            vid_clken <= clken_counter(2) and clken_counter(1) and not clken_counter(0);
+
             -- Logic to supress cpu cycles
             case (turbo_sync) is
                 when "00" =>
@@ -1133,7 +1139,7 @@ begin
                     -- Stop the clock on RAM or IO accesses, in the same way the ULA does
                     if clk_stopped = 0 and clken_counter(2 downto 0) = "110" and (ram_access = '1' or io_access = '1') then
                         clk_stopped <= "01";
-                    elsif clken_counter(3 downto 0) = "1110" and not (ram_access = '1' and contention2 = '1') then
+                    elsif clken_counter(3 downto 0) = "1110" and not (ram_access = '1' and contention = '1') then
                         clk_stopped <= "00";
                     end if;
 
