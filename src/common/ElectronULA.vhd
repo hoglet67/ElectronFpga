@@ -678,16 +678,27 @@ begin
                                         -- Clear Display End IRQ
                                         isr(2) <= '0';
                                     end if;
-                                    if (page_enable = '1' and page(2) = '0') then
+                                    -- The Electron ROM Latch behaviour is complex, because part is
+                                    -- implemented in the ULA and part in the Plus 1. It's possible
+                                    -- for these to get out of sync and cause a bus conflict. See
+                                    -- https://stardot.org.uk/forums/viewtopic.php?p=405701#p405701
+                                    --
+                                    -- We don't currently implement this bug/feature. The ROM latch
+                                    -- is implemented in one place (here in ElectronULA), and bits
+                                    -- 7..4 must be zero to change it. This mimics the Plus 1
+                                    -- implementation, where this check is implemented by IC4.
+                                    if data_in(7 downto 4) = "0000" then
+                                        if (page_enable = '1' and page(2) = '0') then
                                         -- Roms 8-11 currently selected, so only selecting 8-15 will be honoured
-                                        if (data_in(3) = '1') then
+                                            if (data_in(3) = '1') then
+                                                page_enable <= data_in(3);
+                                                page <= data_in(2 downto 0);
+                                            end if;
+                                        else
+                                        -- Roms 0-7 or 12-15 currently selected, so anything goes
                                             page_enable <= data_in(3);
                                             page <= data_in(2 downto 0);
                                         end if;
-                                    else
-                                        -- Roms 0-7 or 12-15 currently selected, so anything goes
-                                        page_enable <= data_in(3);
-                                        page <= data_in(2 downto 0);
                                     end if;
                                 when x"6" =>
                                     counter <= data_in;
