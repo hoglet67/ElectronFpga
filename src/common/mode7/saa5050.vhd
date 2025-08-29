@@ -490,7 +490,8 @@ begin
 
     hold_active <= '1' when gfx_hold = '1' and code_r(6 downto 5) = "00" else '0';
 
-    rom_address1 <= (others => '0') when (double_high = '0' and double_high2 = '1') else
+    rom_address1 <= char_rom_addr when char_rom_we = '1' and not IncludeTTxtROM else
+                    (others => '0') when (double_high = '0' and double_high2 = '1') else
                     gfx & last_gfx & std_logic_vector(line_addr) when hold_active = '1' else
                     gfx & code_r & std_logic_vector(line_addr);
 
