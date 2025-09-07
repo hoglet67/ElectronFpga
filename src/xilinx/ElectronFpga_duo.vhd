@@ -41,8 +41,7 @@ entity ElectronFpga_duo is
         audioR         : out   std_logic;
         casIn          : in    std_logic;
         casOut         : out   std_logic;
-        LED1           : out   std_logic;
-        LED2           : out   std_logic;
+        LED            : out   std_logic_vector (4 downto 1);
         SRAM_nOE       : out   std_logic;
         SRAM_nWE       : out   std_logic;
         SRAM_nCS       : out   std_logic;
@@ -60,7 +59,11 @@ entity ElectronFpga_duo is
         SDMOSI         : out   std_logic;
         DIP            : in    std_logic_vector(1 downto 0);
         avr_RxD        : in    std_logic;
-        avr_TxD        : out   std_logic
+        avr_TxD        : out   std_logic;
+        serial_RxD     : in    std_logic;
+        serial_CTS     : in    std_logic;
+        serial_TxD     : out   std_logic;
+        serial_RTS     : out   std_logic
      );
 end;
 
@@ -134,12 +137,12 @@ begin
         IncludeHDMI        => false,
         IncludeICEDebugger => true,
         IncludeABRRegs     => true,
-        IncludeSerial      => false,
+        IncludeSerial      => true,
         IncludeAMXMouse    => true,
         IncludeUserPort    => true,
         IncludeMRB         => false,   -- needs additional 12K of block RAM and currently use
         IncludeSP64        => false,   -- depends on MRB
-        IncludeJafaMode7   => true
+        IncludeJafaMode7   => false
     )
     port map (
         clk_16M00         => clock_16, -- system clock
@@ -175,12 +178,16 @@ begin
         SDSS              => SDSS,
         SDCLK             => SDCLK,
         SDMOSI            => SDMOSI,
-        caps_led          => LED1,
-        motor_led         => LED2,
+        caps_led          => LED(1),
+        motor_led         => LED(2),
         cassette_in       => casIn,
         cassette_out      => casOut,
         avr_RxD           => avr_RxD,
-        avr_TxD           => avr_TxD
+        avr_TxD           => avr_TxD,
+        serial_RxD        => serial_RxD,
+        serial_CTS        => serial_CTS,
+        serial_TxD        => serial_TxD,
+        serial_RTS        => serial_RTS
         );
 
     joystick1_int <= JOYSTICK1(6) & JOYSTICK1(4) & JOYSTICK1(3) & JOYSTICK1(2) & JOYSTICK1(1);
@@ -191,6 +198,9 @@ begin
     blue  <= rgb_blue  when DIP(1) = '0' else vga_blue;
     hsync <= rgb_csync when DIP(1) = '0' else vga_hsync;
     vsync <= '1'       when DIP(1) = '0' else vga_vsync;
+
+    LED(3) <= '0';
+    LED(4) <= '0';
 
 --------------------------------------------------------
 -- Power Up Reset Generation
