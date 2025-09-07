@@ -66,7 +66,6 @@ architecture behavioral of ElectronFpga_duo is
     signal clock_16        : std_logic;
     signal clock_24        : std_logic;
     signal clock_27        : std_logic;
-    signal clock_40        : std_logic;
     signal hard_reset_n    : std_logic;
     signal powerup_reset_n : std_logic;
     signal reset_counter   : std_logic_vector (9 downto 0);
@@ -76,7 +75,15 @@ architecture behavioral of ElectronFpga_duo is
     signal RAM_nWE         : std_logic;
     signal RAM_nOE         : std_logic;
     signal RAM_nCS         : std_logic;
-
+    signal rgb_red         : std_logic_vector (3 downto 0);
+    signal rgb_green       : std_logic_vector (3 downto 0);
+    signal rgb_blue        : std_logic_vector (3 downto 0);
+    signal rgb_csync       : std_logic;
+    signal vga_red         : std_logic_vector (3 downto 0);
+    signal vga_green       : std_logic_vector (3 downto 0);
+    signal vga_blue        : std_logic_vector (3 downto 0);
+    signal vga_hsync       : std_logic;
+    signal vga_vsync       : std_logic;
 -----------------------------------------------
 -- Bootstrap ROM Image from SPI FLASH into SRAM
 -----------------------------------------------
@@ -103,7 +110,7 @@ begin
         -- used as a output clock MIST scan doubler for the SAA5050 in Mode 7
         CLK2_OUT  => open,
         -- used as a video clock when the ULA is in 60Hz VGA Mode
-        CLK3_OUT  => clock_40
+        CLK3_OUT  => open
     );
 
 
@@ -115,23 +122,41 @@ begin
 
     electron_core : entity work.ElectronFpga_core
     generic map (
+        UseRomSlot9        => false,
+        IncludeSRGB        => true,
+        IncludeVGA         => true,
+        IncludeHDMI        => false,
         IncludeICEDebugger => true,
         IncludeABRRegs     => true,
+        IncludeSerial      => false,
+        IncludeAMXMouse    => false,
+        IncludeUserPort    => true,
+        IncludeMRB         => false,
+        IncludeSP64        => false,
         IncludeJafaMode7   => true
     )
     port map (
-        clk_16M00         => clock_16,
-        clk_24M00         => clock_24,
-        clk_33M33         => clock_27, -- clock for mode="10" (576p)
-        clk_40M00         => clock_40, -- clock for mode="11" (600p)
+        clk_16M00         => clock_16, -- system clock
+        clk_24M00         => clock_24, -- used for Jafa Mode7
+        clk_27M00         => clock_27, -- used for HDMI and VGA
+        interlace         => DIP(0),
+
         hard_reset_n      => hard_reset_n,
         ps2_clk           => ps2_clk,
         ps2_data          => ps2_data,
-        video_red         => red,
-        video_green       => green,
-        video_blue        => blue,
-        video_vsync       => vsync,
-        video_hsync       => hsync,
+--        ps2_mouse_clk     => ,
+--        ps2_mouse_data    => ,
+--        joystick1         => ,
+--        joystick2         => ,
+        rgb_red           => rgb_red,
+        rgb_green         => rgb_green,
+        rgb_blue          => rgb_blue,
+        rgb_csync         => rgb_csync,
+        vga_red           => vga_red,
+        vga_green         => vga_green,
+        vga_blue          => vga_blue,
+        vga_vsync         => vga_vsync,
+        vga_hsync         => vga_hsync,
         audio_l           => audioL,
         audio_r           => audioR,
         ext_nOE           => RAM_nOE,
@@ -148,12 +173,17 @@ begin
         motor_led         => LED2,
         cassette_in       => casIn,
         cassette_out      => casOut,
-        vid_mode          => DIP,
-        test              => test,
         avr_RxD           => avr_RxD,
-        avr_TxD           => avr_TxD,
-        cpu_addr          => open
+        avr_TxD           => avr_TxD
     );
+
+    red   <= rgb_red   when DIP(1) = '0' else vga_red;
+    green <= rgb_green when DIP(1) = '0' else vga_green;
+    blue  <= rgb_blue  when DIP(1) = '0' else vga_blue;
+    hsync <= rgb_csync when DIP(1) = '0' else vga_hsync;
+    vsync <= '1'       when DIP(1) = '0' else vga_vsync;
+
+    test  <= (others => '0');
 
 --------------------------------------------------------
 -- Power Up Reset Generation
