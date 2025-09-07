@@ -27,6 +27,10 @@ entity ElectronFpga_duo is
         clk_32M00      : in    std_logic;
         ps2_clk        : in    std_logic;
         ps2_data       : in    std_logic;
+        ps2_mouse_clk  : inout std_logic;
+        ps2_mouse_data : inout std_logic;
+        JOYSTICK1      : in    std_logic_vector (9 downto 1);
+        JOYSTICK2      : in    std_logic_vector (9 downto 1);
         ERST           : in    std_logic;
         red            : out   std_logic_vector (3 downto 0);
         green          : out   std_logic_vector (3 downto 0);
@@ -55,7 +59,6 @@ entity ElectronFpga_duo is
         SDCLK          : out   std_logic;
         SDMOSI         : out   std_logic;
         DIP            : in    std_logic_vector(1 downto 0);
-        test           : out   std_logic_vector(7 downto 0);
         avr_RxD        : in    std_logic;
         avr_TxD        : out   std_logic
      );
@@ -84,6 +87,9 @@ architecture behavioral of ElectronFpga_duo is
     signal vga_blue        : std_logic_vector (3 downto 0);
     signal vga_hsync       : std_logic;
     signal vga_vsync       : std_logic;
+    signal joystick1_int   : std_logic_vector (4 downto 0);
+    signal joystick2_int   : std_logic_vector (4 downto 0);
+
 -----------------------------------------------
 -- Bootstrap ROM Image from SPI FLASH into SRAM
 -----------------------------------------------
@@ -129,10 +135,10 @@ begin
         IncludeICEDebugger => true,
         IncludeABRRegs     => true,
         IncludeSerial      => false,
-        IncludeAMXMouse    => false,
+        IncludeAMXMouse    => true,
         IncludeUserPort    => true,
-        IncludeMRB         => false,
-        IncludeSP64        => false,
+        IncludeMRB         => false,   -- needs additional 12K of block RAM and currently use
+        IncludeSP64        => false,   -- depends on MRB
         IncludeJafaMode7   => true
     )
     port map (
@@ -144,10 +150,10 @@ begin
         hard_reset_n      => hard_reset_n,
         ps2_clk           => ps2_clk,
         ps2_data          => ps2_data,
---        ps2_mouse_clk     => ,
---        ps2_mouse_data    => ,
---        joystick1         => ,
---        joystick2         => ,
+        ps2_mouse_clk     => ps2_mouse_clk,
+        ps2_mouse_data    => ps2_mouse_data,
+        joystick1         => joystick1_int,
+        joystick2         => joystick2_int,
         rgb_red           => rgb_red,
         rgb_green         => rgb_green,
         rgb_blue          => rgb_blue,
@@ -175,15 +181,16 @@ begin
         cassette_out      => casOut,
         avr_RxD           => avr_RxD,
         avr_TxD           => avr_TxD
-    );
+        );
+
+    joystick1_int <= JOYSTICK1(6) & JOYSTICK1(4) & JOYSTICK1(3) & JOYSTICK1(2) & JOYSTICK1(1);
+    joystick2_int <= JOYSTICK2(6) & JOYSTICK2(4) & JOYSTICK2(3) & JOYSTICK2(2) & JOYSTICK2(1);
 
     red   <= rgb_red   when DIP(1) = '0' else vga_red;
     green <= rgb_green when DIP(1) = '0' else vga_green;
     blue  <= rgb_blue  when DIP(1) = '0' else vga_blue;
     hsync <= rgb_csync when DIP(1) = '0' else vga_hsync;
     vsync <= '1'       when DIP(1) = '0' else vga_vsync;
-
-    test  <= (others => '0');
 
 --------------------------------------------------------
 -- Power Up Reset Generation
