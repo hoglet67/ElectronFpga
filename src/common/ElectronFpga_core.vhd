@@ -327,7 +327,7 @@ begin
     ula : entity work.ElectronULAEnhanced
     generic map (
         IncludeMMC       => true,
-        Include32KRAM    => IncludeMRB,
+        Include32KRAM    => false,
         IncludeSRGB      => IncludeSRGB,
         IncludeVGA       => IncludeVGA,
         IncludeHDMI      => IncludeHDMI,
@@ -433,8 +433,10 @@ begin
     serial_enable <= '1' when io_fred = '1' and cpu_a(7 downto 4) = x"6" else '0';
 
     ext_enable <= '1' when
-                  -- ROM accrss
+                  -- ROM access
                   ROM_n = '0' or
+                  -- RAM access (0000-2FFF)
+                  cpu_a(15 downto 12) < 3 or
                   -- Shadow memory access (0000-7FFF)
                   shadow = '1' or
                   -- Sideways ROM Access
@@ -467,7 +469,7 @@ begin
             cpu_clken_r <= cpu_clken;
             if cpu_a(15) = '0' then
                 -- exteral main memory access
-                ext_A <= "1" & "111" & cpu_a(14 downto 0);
+                ext_A <= "1" & "11" & shadow & cpu_a(14 downto 0);
             elsif cpu_a(15 downto 14) = "11" then
                  -- The OS rom images lives in slot 0/1 as these are overlaid by sideway RAM
                 ext_A <= "0" & "000" & mrb_mode(1) & cpu_a(13 downto 0);
