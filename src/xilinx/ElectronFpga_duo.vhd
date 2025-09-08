@@ -140,8 +140,8 @@ begin
         IncludeSerial      => true,
         IncludeAMXMouse    => true,
         IncludeUserPort    => true,
-        IncludeMRB         => false,   -- needs additional 12K of block RAM and currently use
-        IncludeSP64        => false,   -- depends on MRB
+        IncludeMRB         => true,
+        IncludeSP64        => true,   -- depends on MRB
         IncludeJafaMode7   => false
     )
     port map (
