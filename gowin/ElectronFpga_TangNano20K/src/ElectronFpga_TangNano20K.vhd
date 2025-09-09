@@ -70,7 +70,7 @@ entity ElectronFpga_TangNano20K is
         IncludeCoProExt        : boolean := not G_CONFIG_VGA;
         IncludeI2SAudio        : boolean := true;
         IncludeSPDIFAudio      : boolean := true;
-        IncludeVGADAC          : boolean := G_CONFIG_VGA;
+        IncludeVGADAC          : boolean := false;
 
         PRJ_ROOT               : string  := "../../..";
         MOS_NAME               : string  := "/roms/tmp/os10_basic.bit";
