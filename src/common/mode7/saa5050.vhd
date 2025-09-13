@@ -540,29 +540,19 @@ begin
         elsif rising_edge(CLOCK) then
             if CLKEN = '1' then
                 if disp_enable_r = '1' and pixel_counter = 0 then
-                    -- Character rounding
-
-                    -- a is the current row of pixels, doubled up
-                    a := rom_data1(5) & rom_data1(5) &
-                         rom_data1(4) & rom_data1(4) &
-                         rom_data1(3) & rom_data1(3) &
-                         rom_data1(2) & rom_data1(2) &
-                         rom_data1(1) & rom_data1(1) &
-                         rom_data1(0) & rom_data1(0);
-
-                    -- b is the adjacent row of pixels, doubled up
-                    b := rom_data2(5) & rom_data2(5) &
-                         rom_data2(4) & rom_data2(4) &
-                         rom_data2(3) & rom_data2(3) &
-                         rom_data2(2) & rom_data2(2) &
-                         rom_data2(1) & rom_data2(1) &
-                         rom_data2(0) & rom_data2(0);
 
                     -- If bit 7 of the ROM data is set then this is a graphics
                     -- character and separated/hold graphics modes apply.
                     -- We don't just assume this to be the case if gfx=1 because
                     -- these modes don't apply to caps even in graphics mode
-                    if rom_data1(7) = '1' then
+                    if rom_address1(11) = '1' and rom_address1(9) = '1' then
+                        if line_addr < 3 then
+                            a := (11 downto 6 => rom_address1(4), 5 downto 0 => rom_address1(5));
+                        elsif line_addr < 7 then
+                            a := (11 downto 6 => rom_address1(6), 5 downto 0 => rom_address1(7));
+                        else
+                            a := (11 downto 6 => rom_address1(8), 5 downto 0 => rom_address1(10));
+                        end if;
                         -- Apply a mask for separated graphics mode
                         if (hold_active = '0' and gfx_sep = '1') or (hold_active = '1' and last_gfx_sep = '1') then
                             a(10) := '0';
@@ -574,6 +564,24 @@ begin
                             end if;
                         end if;
                     else
+                    -- Character rounding
+
+                        -- a is the current row of pixels, doubled up
+                        a := rom_data1(5) & rom_data1(5) &
+                             rom_data1(4) & rom_data1(4) &
+                             rom_data1(3) & rom_data1(3) &
+                             rom_data1(2) & rom_data1(2) &
+                             rom_data1(1) & rom_data1(1) &
+                             rom_data1(0) & rom_data1(0);
+
+                        -- b is the adjacent row of pixels, doubled up
+                        b := rom_data2(5) & rom_data2(5) &
+                             rom_data2(4) & rom_data2(4) &
+                             rom_data2(3) & rom_data2(3) &
+                             rom_data2(2) & rom_data2(2) &
+                             rom_data2(1) & rom_data2(1) &
+                             rom_data2(0) & rom_data2(0);
+
                         -- Perform character rounding on alpha-numeric characters
                         a := a or
                             (('0' & a(11 downto 1)) and b and not('0' & b(11 downto 1))) or
