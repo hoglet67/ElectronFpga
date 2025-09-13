@@ -97,6 +97,14 @@ port (
     Y           :   out std_logic;
     PIXDE       :   out std_logic;
 
+    -- Simultaneous odd/even lines for feeding into a line doubler
+    R_even      :   out std_logic;
+    G_even      :   out std_logic;
+    B_even      :   out std_logic;
+    R_odd       :   out std_logic;
+    G_odd       :   out std_logic;
+    B_odd       :   out std_logic;
+
     -- SAA5050 character ROM loading
     char_rom_we   : in std_logic := '0';
     char_rom_addr : in std_logic_vector(10 downto 0) := (others => '0');
@@ -643,14 +651,19 @@ begin
     -- Output Pixel Colouring
     --------------------------------------------------------------------
     process(CLOCK,nRESET)
-    variable pixel : std_logic;
+        variable pixel_even : std_logic;
+        variable pixel_odd  : std_logic;
+        variable pixel      : std_logic;
     begin
         if rising_edge(CLOCK) then
             if CLKEN = '1' then
+                pixel_even := shift_reg_even(11) and not ((flash and is_flash_r) or conceal_r);
+                pixel_odd  := shift_reg_odd(11)  and not ((flash and is_flash_r) or conceal_r);
+
                 if (double_high = '0' and CRS = '0') or (double_high = '1' and line_counter(0) = '1') then
-                    pixel := shift_reg_even(11) and not ((flash and is_flash_r) or conceal_r);
+                    pixel := pixel_even;
                 else
-                    pixel := shift_reg_odd(11) and not ((flash and is_flash_r) or conceal_r);
+                    pixel := pixel_odd;
                 end if;
 
                 -- Generate mono output
@@ -667,11 +680,29 @@ begin
                     B <= bg_r(2);
                 end if;
 
+                if pixel_even = '1' then
+                    R_even <= fg_r(0);
+                    G_even <= fg_r(1);
+                    B_even <= fg_r(2);
+                else
+                    R_even <= bg_r(0);
+                    G_even <= bg_r(1);
+                    B_even <= bg_r(2);
+                end if;
+
+                if pixel_odd = '1' then
+                    R_odd <= fg_r(0);
+                    G_odd <= fg_r(1);
+                    B_odd <= fg_r(2);
+                else
+                    R_odd <= bg_r(0);
+                    G_odd <= bg_r(1);
+                    B_odd <= bg_r(2);
+                end if;
+
                 PIXDE <= shift_reg_de(11);
             end if;
         end if;
     end process;
-
-
 
 end architecture;
