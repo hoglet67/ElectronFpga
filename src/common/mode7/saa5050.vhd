@@ -140,9 +140,11 @@ signal pixel_counter :  unsigned(3 downto 0);
 -- The datasheet says this is 0.75 Hz with a 3:1 on/off ratio, so it
 -- is probably a /64 counter, which gives us 0.78 Hz
 signal flash_counter :  unsigned(5 downto 0);
+
 -- Output shift register
-signal shift_reg    :   std_logic_vector(11 downto 0);
-signal shift_reg_de :   std_logic_vector(11 downto 0);
+signal shift_reg_even :   std_logic_vector(11 downto 0);
+signal shift_reg_odd  :   std_logic_vector(11 downto 0);
+signal shift_reg_de   :   std_logic_vector(11 downto 0);
 
 -- Flash mask
 signal flash        :   std_logic;
@@ -534,17 +536,10 @@ begin
             );
     end generate;
 
-    --------------------------------------------------------------------
-    -- Shift register
-    --------------------------------------------------------------------
-    process(CLOCK,nRESET)
-    variable a : std_logic_vector(11 downto 0);
-    variable b : std_logic_vector(11 downto 0);
+    -- Latch reference rows
+    process(CLOCK)
     begin
-        if nRESET = '0' then
-            shift_reg <= (others => '0');
-            shift_reg_de <= (others => '0');
-        elsif rising_edge(CLOCK) then
+        if rising_edge(CLOCK) then
             if CLKEN = '1' then
                 if pixel_counter = 10 then
                     rom_data_prev <= rom_data;
@@ -552,12 +547,26 @@ begin
                 if pixel_counter = 11 then
                     rom_data_next <= rom_data;
                 end if;
+            end if;
+        end if;
+    end process;
+
+    --------------------------------------------------------------------
+    -- Shift register
+    --------------------------------------------------------------------
+    process(CLOCK,nRESET)
+        variable a : std_logic_vector(11 downto 0);
+        variable refp : std_logic_vector(11 downto 0);
+        variable refn : std_logic_vector(11 downto 0);
+    begin
+        if nRESET = '0' then
+            shift_reg_odd <= (others => '0');
+            shift_reg_even <= (others => '0');
+            shift_reg_de <= (others => '0');
+        elsif rising_edge(CLOCK) then
+            if CLKEN = '1' then
                 if disp_enable_r = '1' and pixel_counter = 0 then
 
-                    -- If bit 7 of the ROM data is set then this is a graphics
-                    -- character and separated/hold graphics modes apply.
-                    -- We don't just assume this to be the case if gfx=1 because
-                    -- these modes don't apply to caps even in graphics mode
                     if gfx = '1' and rom_char(5) = '1' then
                         if line_addr < 3 then
                             a := (11 downto 6 => rom_char(0), 5 downto 0 => rom_char(1));
@@ -576,6 +585,8 @@ begin
                                 a := (others => '0');
                             end if;
                         end if;
+                        shift_reg_even <= a;
+                        shift_reg_odd  <= a;
                     else
                         -- Character rounding
 
@@ -587,39 +598,42 @@ begin
                              rom_data(1) & rom_data(1) &
                              rom_data(0) & rom_data(0);
 
-                        -- b is the adjacent row of pixels, doubled up
+                        -- refn is the below row of pixels, doubled up
+                        refn := rom_data_next(5) & rom_data_next(5) &
+                                rom_data_next(4) & rom_data_next(4) &
+                                rom_data_next(3) & rom_data_next(3) &
+                                rom_data_next(2) & rom_data_next(2) &
+                                rom_data_next(1) & rom_data_next(1) &
+                                rom_data_next(0) & rom_data_next(0);
 
-                        if (double_high = '0' and CRS = '0') or (double_high = '1' and line_counter(0) = '1') then
-                            b := rom_data_next(5) & rom_data_next(5) &
-                                 rom_data_next(4) & rom_data_next(4) &
-                                 rom_data_next(3) & rom_data_next(3) &
-                                 rom_data_next(2) & rom_data_next(2) &
-                                 rom_data_next(1) & rom_data_next(1) &
-                                 rom_data_next(0) & rom_data_next(0);
-                        else
-                            b := rom_data_prev(5) & rom_data_prev(5) &
-                                 rom_data_prev(4) & rom_data_prev(4) &
-                                 rom_data_prev(3) & rom_data_prev(3) &
-                                 rom_data_prev(2) & rom_data_prev(2) &
-                                 rom_data_prev(1) & rom_data_prev(1) &
-                                 rom_data_prev(0) & rom_data_prev(0);
-                        end if;
+                        -- refp is the above row of pixels, doubled up
+                        refp := rom_data_prev(5) & rom_data_prev(5) &
+                                rom_data_prev(4) & rom_data_prev(4) &
+                                rom_data_prev(3) & rom_data_prev(3) &
+                                rom_data_prev(2) & rom_data_prev(2) &
+                                rom_data_prev(1) & rom_data_prev(1) &
+                                rom_data_prev(0) & rom_data_prev(0);
 
-                        -- Perform character rounding on alpha-numeric characters
-                        a := a or
-                            (('0' & a(11 downto 1)) and b and not('0' & b(11 downto 1))) or
-                            ((a(10 downto 0) & '0') and b and not(b(10 downto 0) & '0'));
+                        -- Perform character rounding on even row
+                        shift_reg_even <= a or (('0' & a(11 downto 1)) and refn and not('0' & refn(11 downto 1))) or
+                                          ((a(10 downto 0) & '0') and refn and not(refn(10 downto 0) & '0'));
+
+                        -- Perform character rounding on odd row
+                        shift_reg_odd  <= a or (('0' & a(11 downto 1)) and refp and not('0' & refp(11 downto 1))) or
+                                          ((a(10 downto 0) & '0') and refp and not(refp(10 downto 0) & '0'));
+
                     end if;
 
                     -- Load the shift register with the ROM bit pattern
                     -- at the start of each character while disp_enable is asserted.
-                    shift_reg <= a;
+
                     shift_reg_de <= (others => '1');
 
                 else
                     -- Pump the shift register
-                    shift_reg <= shift_reg(10 downto 0) & "0";
-                    shift_reg_de <= shift_reg_de(10 downto 0) & "0";
+                    shift_reg_even <= shift_reg_even(10 downto 0) & "0";
+                    shift_reg_odd  <= shift_reg_odd(10 downto 0)  & "0";
+                    shift_reg_de   <= shift_reg_de(10 downto 0)   & "0";
                 end if;
             end if;
         end if;
@@ -633,7 +647,11 @@ begin
     begin
         if rising_edge(CLOCK) then
             if CLKEN = '1' then
-                pixel := shift_reg(11) and not ((flash and is_flash_r) or conceal_r);
+                if (double_high = '0' and CRS = '0') or (double_high = '1' and line_counter(0) = '1') then
+                    pixel := shift_reg_even(11) and not ((flash and is_flash_r) or conceal_r);
+                else
+                    pixel := shift_reg_odd(11) and not ((flash and is_flash_r) or conceal_r);
+                end if;
 
                 -- Generate mono output
                 Y <= pixel;
@@ -653,6 +671,7 @@ begin
             end if;
         end if;
     end process;
+
 
 
 end architecture;
