@@ -10,6 +10,7 @@ entity saa5050_rom_uninitialized is
     );
     port(
         clock    : in  std_logic;
+        clken    : in  std_logic;
         wea      : in  std_logic;
         addressA : in  std_logic_vector(ADDR_WIDTH-1 downto 0);
         dina     : in  std_logic_vector(DATA_WIDTH-1 downto 0);
@@ -28,11 +29,13 @@ architecture RTL of saa5050_rom_uninitialized is
     process(clock)
     begin
         if (rising_edge(clock)) then
-            if wea = '1' then
-                mem(to_integer(unsigned(addressA))) <= dina;
+            if clken = '1' then
+                if wea = '1' then
+                    mem(to_integer(unsigned(addressA))) <= dina;
+                end if;
+                QA <= mem(to_integer(unsigned(addressA)));
+                --QA <= addressA(7 downto 0);  --DEBUG generate something until memory init works
             end if;
-            QA <= mem(to_integer(unsigned(addressA)));
-            --QA <= addressA(7 downto 0);  --DEBUG generate something until memory init works
         end if;
     end process;
 

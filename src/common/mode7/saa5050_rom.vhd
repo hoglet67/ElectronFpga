@@ -9,6 +9,7 @@ entity saa5050_rom is
     );
     port(
         clock    : in  std_logic;
+        clken    : in  std_logic;
         addressA : in  std_logic_vector(ADDR_WIDTH-1 downto 0);
         QA       : out std_logic_vector(DATA_WIDTH-1 downto 0)
   );
@@ -155,7 +156,9 @@ architecture RTL of saa5050_rom is
     process(clock) is
     begin
         if (rising_edge(clock)) then
-            QA <= std_logic_vector(mem(to_integer(unsigned(addressA))));
+            if clken = '1' then
+                QA <= std_logic_vector(mem(to_integer(unsigned(addressA))));
+            end if;
         end if;
     end process;
 

@@ -511,6 +511,7 @@ begin
     char_rom_block: if IncludeTTxtROM generate
     char_rom : entity work.saa5050_rom port map (
         clock    => CLOCK,
+        clken    => CLKEN,
         addressA => rom_address,
         QA       => rom_data
         );
@@ -522,6 +523,7 @@ begin
     char_ram_block: if not IncludeTTxtROM generate
         char_ram : entity work.saa5050_rom_uninitialized port map (
             clock    => CLOCK,
+            clken    => CLKEN,
             wea      => char_rom_we,
             addressA => rom_address,
             dina     => char_rom_data,
