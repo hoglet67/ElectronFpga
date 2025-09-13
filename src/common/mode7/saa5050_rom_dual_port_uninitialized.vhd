@@ -5,7 +5,7 @@ use std.textio.all;
 
 entity saa5050_rom_dual_port_uninitialized is
     generic (
-        ADDR_WIDTH       : integer := 12;
+        ADDR_WIDTH       : integer := 11;
         DATA_WIDTH       : integer := 8
     );
     port(

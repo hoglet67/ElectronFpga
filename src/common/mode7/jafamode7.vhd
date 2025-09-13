@@ -50,7 +50,7 @@ entity JafaMode7 is
         blank         : out std_logic;
         -- SAA5050 character ROM loading
         char_rom_we   : in std_logic := '0';
-        char_rom_addr : in std_logic_vector(11 downto 0) := (others => '0');
+        char_rom_addr : in std_logic_vector(10 downto 0) := (others => '0');
         char_rom_data : in std_logic_vector(7 downto 0) := (others => '0')
         );
 end;

@@ -99,7 +99,7 @@ port (
 
     -- SAA5050 character ROM loading
     char_rom_we   : in std_logic := '0';
-    char_rom_addr : in std_logic_vector(11 downto 0) := (others => '0');
+    char_rom_addr : in std_logic_vector(10 downto 0) := (others => '0');
     char_rom_data : in std_logic_vector(7 downto 0) := (others => '0')
     );
 end entity;
@@ -114,8 +114,8 @@ signal lose_r       :   std_logic;
 -- Data input registered in the pixel clock domain
 signal code         :   std_logic_vector(6 downto 0);
 signal line_addr    :   unsigned(3 downto 0);
-signal rom_address1 :   std_logic_vector(11 downto 0);
-signal rom_address2 :   std_logic_vector(11 downto 0);
+signal rom_address1 :   std_logic_vector(10 downto 0);
+signal rom_address2 :   std_logic_vector(10 downto 0);
 signal rom_data1    :   std_logic_vector(7 downto 0);
 signal rom_data2    :   std_logic_vector(7 downto 0);
 
@@ -492,8 +492,8 @@ begin
 
     rom_address1 <= char_rom_addr when char_rom_we = '1' and not IncludeTTxtROM else
                     (others => '0') when (double_high = '0' and double_high2 = '1') else
-                    gfx & last_gfx & std_logic_vector(line_addr) when hold_active = '1' else
-                    gfx & code_r & std_logic_vector(line_addr);
+                    last_gfx & std_logic_vector(line_addr) when hold_active = '1' else
+                    code_r   & std_logic_vector(line_addr);
 
     -- reference row for character rounding
     rom_address2 <= rom_address1 + 1 when ((double_high = '0' and CRS = '0') or (double_high = '1' and line_counter(0) = '1')) else
@@ -545,7 +545,7 @@ begin
                     -- character and separated/hold graphics modes apply.
                     -- We don't just assume this to be the case if gfx=1 because
                     -- these modes don't apply to caps even in graphics mode
-                    if rom_address1(11) = '1' and rom_address1(9) = '1' then
+                    if gfx = '1' and rom_address1(9) = '1' then
                         if line_addr < 3 then
                             a := (11 downto 6 => rom_address1(4), 5 downto 0 => rom_address1(5));
                         elsif line_addr < 7 then

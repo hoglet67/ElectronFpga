@@ -10,7 +10,6 @@
         <File path="../../../src/common/serial/uart.v" type="file.verilog" enable="1"/>
         <File path="../../../src/common/serial/uart_rx.v" type="file.verilog" enable="1"/>
         <File path="../../../src/common/serial/uart_tx.v" type="file.verilog" enable="1"/>
-        <File path="../../src/saa5050_rom_dual_port.vhd" type="file.vhdl" enable="1"/>
         <File path="../src/ElectronFpga_TangNano20K.vhd" type="file.vhdl" enable="1"/>
         <File path="../src/dac1_oser.vhd" type="file.vhdl" enable="1"/>
         <File path="../src/i2s_simple.vhd" type="file.vhdl" enable="1"/>
@@ -97,6 +96,7 @@
         <File path="../../../src/common/mode7/jafamode7.vhd" type="file.vhdl" enable="1"/>
         <File path="../../../src/common/mode7/mc6845.vhd" type="file.vhdl" enable="1"/>
         <File path="../../../src/common/mode7/saa5050.vhd" type="file.vhdl" enable="1"/>
+        <File path="../../../src/common/mode7/saa5050_rom_dual_port.vhd" type="file.vhdl" enable="1"/>
         <File path="../../../src/common/mode7/saa5050_rom_dual_port_uninitialized.vhd" type="file.vhdl" enable="1"/>
         <File path="../../../src/common/mode7/retimer.vhd" type="file.vhdl" enable="1"/>
         <File path="../../../src/common/scandoubler/rgb2vga_scandoubler.vhd" type="file.vhdl" enable="1"/>
