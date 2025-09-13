@@ -111,15 +111,18 @@ signal di_tmp       :   std_logic_vector(6 downto 0);
 signal di_r         :   std_logic_vector(6 downto 0);
 signal dew_r        :   std_logic;
 signal lose_r       :   std_logic;
+
 -- Data input registered in the pixel clock domain
-signal code         :   std_logic_vector(6 downto 0);
-signal line_addr    :   unsigned(3 downto 0);
-signal rom_address  :   std_logic_vector(10 downto 0);
-signal rom_address1 :   std_logic_vector(10 downto 0);
-signal rom_address2 :   std_logic_vector(10 downto 0);
-signal rom_data     :   std_logic_vector(7 downto 0);
-signal rom_data1    :   std_logic_vector(7 downto 0);
-signal rom_data2    :   std_logic_vector(7 downto 0);
+signal code          :   std_logic_vector(6 downto 0);
+signal line_addr     :   unsigned(3 downto 0);
+signal rom_char      :   std_logic_vector(6 downto 0);
+signal rom_addr      :   std_logic_vector(10 downto 0);
+signal rom_addr_this :   std_logic_vector(10 downto 0);
+signal rom_addr_prev :   std_logic_vector(10 downto 0);
+signal rom_addr_next :   std_logic_vector(10 downto 0);
+signal rom_data      :   std_logic_vector(7 downto 0);
+signal rom_data_prev :   std_logic_vector(7 downto 0);
+signal rom_data_next :   std_logic_vector(7 downto 0);
 
 -- Delayed display enable derived from LOSE by delaying for one and two characters
 signal disp_enable  :   std_logic;
@@ -492,18 +495,18 @@ begin
 
     hold_active <= '1' when gfx_hold = '1' and code_r(6 downto 5) = "00" else '0';
 
-    rom_address1 <= (others => '0') when (double_high = '0' and double_high2 = '1') else
-                    last_gfx & std_logic_vector(line_addr) when hold_active = '1' else
-                    code_r   & std_logic_vector(line_addr);
+    rom_char      <= (others => '0') when (double_high = '0' and double_high2 = '1') else
+                       last_gfx when hold_active = '1'                          else
+                       code_r;
 
-    -- reference row for character rounding
-    rom_address2 <= rom_address1 + 1 when ((double_high = '0' and CRS = '0') or (double_high = '1' and line_counter(0) = '1')) else
-                    rom_address1 - 1;
+    rom_addr_this <= rom_char & std_logic_vector(line_addr);
+    rom_addr_prev <= rom_addr_this - 1;
+    rom_addr_next <= rom_addr_this + 1;
 
-    rom_address <= char_rom_addr when char_rom_we = '1' and not IncludeTTxtROM else
-                   rom_address1  when pixel_counter = 9 else
-                   rom_address2  when pixel_counter = 10 else
-                   (others => '0');
+    rom_addr <= char_rom_addr when char_rom_we = '1' and not IncludeTTxtROM else
+                   rom_addr_prev when pixel_counter = 9  else
+                   rom_addr_next when pixel_counter = 10 else
+                   rom_addr_this;
 
     -- If IncludeTTxtROM is true then we include the "ROM" version that is
     -- initialized with the mode 7 character set data
@@ -512,7 +515,7 @@ begin
     char_rom : entity work.saa5050_rom port map (
         clock    => CLOCK,
         clken    => CLKEN,
-        addressA => rom_address,
+        addressA => rom_addr,
         QA       => rom_data
         );
     end generate;
@@ -525,7 +528,7 @@ begin
             clock    => CLOCK,
             clken    => CLKEN,
             wea      => char_rom_we,
-            addressA => rom_address,
+            addressA => rom_addr,
             dina     => char_rom_data,
             QA       => rom_data
             );
@@ -544,10 +547,10 @@ begin
         elsif rising_edge(CLOCK) then
             if CLKEN = '1' then
                 if pixel_counter = 10 then
-                    rom_data1 <= rom_data;
+                    rom_data_prev <= rom_data;
                 end if;
                 if pixel_counter = 11 then
-                    rom_data2 <= rom_data;
+                    rom_data_next <= rom_data;
                 end if;
                 if disp_enable_r = '1' and pixel_counter = 0 then
 
@@ -555,13 +558,13 @@ begin
                     -- character and separated/hold graphics modes apply.
                     -- We don't just assume this to be the case if gfx=1 because
                     -- these modes don't apply to caps even in graphics mode
-                    if gfx = '1' and rom_address1(9) = '1' then
+                    if gfx = '1' and rom_char(5) = '1' then
                         if line_addr < 3 then
-                            a := (11 downto 6 => rom_address1(4), 5 downto 0 => rom_address1(5));
+                            a := (11 downto 6 => rom_char(0), 5 downto 0 => rom_char(1));
                         elsif line_addr < 7 then
-                            a := (11 downto 6 => rom_address1(6), 5 downto 0 => rom_address1(7));
+                            a := (11 downto 6 => rom_char(2), 5 downto 0 => rom_char(3));
                         else
-                            a := (11 downto 6 => rom_address1(8), 5 downto 0 => rom_address1(10));
+                            a := (11 downto 6 => rom_char(4), 5 downto 0 => rom_char(6));
                         end if;
                         -- Apply a mask for separated graphics mode
                         if (hold_active = '0' and gfx_sep = '1') or (hold_active = '1' and last_gfx_sep = '1') then
@@ -574,23 +577,33 @@ begin
                             end if;
                         end if;
                     else
-                    -- Character rounding
+                        -- Character rounding
 
                         -- a is the current row of pixels, doubled up
-                        a := rom_data1(5) & rom_data1(5) &
-                             rom_data1(4) & rom_data1(4) &
-                             rom_data1(3) & rom_data1(3) &
-                             rom_data1(2) & rom_data1(2) &
-                             rom_data1(1) & rom_data1(1) &
-                             rom_data1(0) & rom_data1(0);
+                        a := rom_data(5) & rom_data(5) &
+                             rom_data(4) & rom_data(4) &
+                             rom_data(3) & rom_data(3) &
+                             rom_data(2) & rom_data(2) &
+                             rom_data(1) & rom_data(1) &
+                             rom_data(0) & rom_data(0);
 
                         -- b is the adjacent row of pixels, doubled up
-                        b := rom_data2(5) & rom_data2(5) &
-                             rom_data2(4) & rom_data2(4) &
-                             rom_data2(3) & rom_data2(3) &
-                             rom_data2(2) & rom_data2(2) &
-                             rom_data2(1) & rom_data2(1) &
-                             rom_data2(0) & rom_data2(0);
+
+                        if (double_high = '0' and CRS = '0') or (double_high = '1' and line_counter(0) = '1') then
+                            b := rom_data_next(5) & rom_data_next(5) &
+                                 rom_data_next(4) & rom_data_next(4) &
+                                 rom_data_next(3) & rom_data_next(3) &
+                                 rom_data_next(2) & rom_data_next(2) &
+                                 rom_data_next(1) & rom_data_next(1) &
+                                 rom_data_next(0) & rom_data_next(0);
+                        else
+                            b := rom_data_prev(5) & rom_data_prev(5) &
+                                 rom_data_prev(4) & rom_data_prev(4) &
+                                 rom_data_prev(3) & rom_data_prev(3) &
+                                 rom_data_prev(2) & rom_data_prev(2) &
+                                 rom_data_prev(1) & rom_data_prev(1) &
+                                 rom_data_prev(0) & rom_data_prev(0);
+                        end if;
 
                         -- Perform character rounding on alpha-numeric characters
                         a := a or
