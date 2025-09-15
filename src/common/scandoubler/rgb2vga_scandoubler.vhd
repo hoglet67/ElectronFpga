@@ -38,7 +38,8 @@ entity rgb2vga_scandoubler is
         mode : in std_logic;
 
         -- Input 15.625kHz RGB signals
-        rgbi_in   : in  std_logic_vector(WIDTH - 1 downto 0);
+        rgbi_even_in : in  std_logic_vector(WIDTH - 1 downto 0);
+        rgbi_odd_in : in  std_logic_vector(WIDTH - 1 downto 0);
         hSync_in  : in  std_logic;
         vSync_in  : in  std_logic;
 
@@ -110,6 +111,8 @@ architecture rtl of rgb2vga_scandoubler is
     signal lineToggle_next : std_logic;
 
     -- Registers in the 25MHz clock domain:
+    signal field           : std_logic := '1';
+    signal field_next      : std_logic;
     signal hSync_s25a      : std_logic;
     signal hSync_s25b      : std_logic;
     signal hCount25        : unsigned(width25 - 1 downto 0) := to_unsigned(HORIZ_DISP + HORIZ_FP, width25);
@@ -120,8 +123,9 @@ architecture rtl of rgb2vga_scandoubler is
     signal writeEn1        : std_logic;
 
     -- Signals on the read side of the RAMs:
-    signal ram0Data        : std_logic_vector(WIDTH - 1 downto 0);
-    signal ram1Data        : std_logic_vector(WIDTH - 1 downto 0);
+    signal ramData         : std_logic_vector(2 * WIDTH - 1 downto 0);
+    signal ram0Data        : std_logic_vector(2 * WIDTH - 1 downto 0);
+    signal ram1Data        : std_logic_vector(2 * WIDTH - 1 downto 0);
 
 begin
 
@@ -131,30 +135,31 @@ begin
     --
     ram0: entity work.rgb2vga_dpram
         generic map (
-            WIDTH => WIDTH
+            WIDTH => WIDTH*2
             )
         port map(
             -- Write port
             wrclock   => clock,
             wraddress => std_logic_vector(hCount16),
             wren      => writeEn0,
-            data      => rgbi_in,
+            data      => rgbi_even_in & rgbi_odd_in,
 
             -- Read port
             rdclock   => clk25,
             rdaddress => std_logic_vector(hCount25(9 downto 0)),
             q         => ram0data
             );
+
     ram1: entity work.rgb2vga_dpram
         generic map (
-            WIDTH => WIDTH
+            WIDTH => WIDTH*2
             )
         port map(
             -- Write port
             wrclock   => clock,
             wraddress => std_logic_vector(hCount16),
             wren      => writeEn1,
-            data      => rgbi_in,
+            data      => rgbi_even_in & rgbi_odd_in,
 
             -- Read port
             rdclock   => clk25,
@@ -199,31 +204,37 @@ begin
         else '0';
 
     -- Interleave output of dual-port RAMs
-    rgbi_out <=
-        ram0Data when lineToggle = '1'
-        else ram1Data;
+    ramData  <= ram0Data when lineToggle = '1' else ram1Data;
+    rgbi_out <= ramData(2*WIDTH - 1 downto WIDTH) when field = '1' else ramData(WIDTH - 1 downto 0);
 
-	-- 25MHz clock domain ---------------------------------------------------------------------------
-	process(clk25)
-	begin
-		if ( rising_edge(clk25) ) then
-			hCount25  <= hCount25_next;
-			hSync_s25a <= hSync_in;
-			hSync_s25b <= hSync_s25a;
-			vSync_out <= vSync_in;
-		end if;
-	end process;
+    -- 25MHz clock domain ---------------------------------------------------------------------------
+    process(clk25)
+    begin
+        if ( rising_edge(clk25) ) then
+            hCount25  <= hCount25_next;
+            field <= field_next;
+            hSync_s25a <= hSync_in;
+            hSync_s25b <= hSync_s25a;
+            vSync_out <= vSync_in;
+        end if;
+    end process;
 
-	-- Generate 25MHz hCount
-	hCount25_next <=
-		to_unsigned(2**width25 - HORIZ_RT - HORIZ_BP, width25) when
+    -- Generate 25MHz hCount
+    hCount25_next <=
+        to_unsigned(2**width25 - HORIZ_RT - HORIZ_BP, width25) when
         (hSync_s25a = '1' and hSync_s25b = '0') or
         (hCount25 = HORIZ_DISP + HORIZ_FP - 1)
-		else hCount25 + 1;
+        else hCount25 + 1;
 
-	-- Generate VGA HSYNC
-	hSync_out <=
-		'0' when hCount25 >= to_unsigned(2**width25 - HORIZ_RT - HORIZ_BP, width25) and hCount25 < to_unsigned(2**width25 - HORIZ_BP, width25)
-		else '1';
+    -- Generate even/odd field
+    field_next <=
+        '0' when (hSync_s25a = '1' and hSync_s25b = '0') else
+        '1' when (hCount25 = HORIZ_DISP + HORIZ_FP - 1) else
+        field;
+
+    -- Generate VGA HSYNC
+    hSync_out <=
+        '0' when hCount25 >= to_unsigned(2**width25 - HORIZ_RT - HORIZ_BP, width25) and hCount25 < to_unsigned(2**width25 - HORIZ_BP, width25)
+        else '1';
 
 end architecture;

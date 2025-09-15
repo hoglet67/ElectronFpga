@@ -21,7 +21,6 @@ use ieee.std_logic_unsigned.all;
 
 entity JafaMode7 is
     generic (
-        ScanDoubled    : boolean := false;
         TTxtClockSpeed : integer := 24;
         IncludeTTxtROM : boolean := true
         );
@@ -37,8 +36,6 @@ entity JafaMode7 is
         data_en       : out std_logic;
         -- Teletext clock
         ttxt_clk      : in  std_logic;
-        -- Scandoubler clock
-        hd_clk        : in  std_logic := '0';
         -- Video out
         mode7_enable  : out std_logic;
         red           : out std_logic;
@@ -47,7 +44,16 @@ entity JafaMode7 is
         vsync         : out std_logic;
         hsync         : out std_logic;
         csync         : out std_logic;
+        field         : out std_logic;
         blank         : out std_logic;
+
+        red_even      : out std_logic;
+        red_odd       : out std_logic;
+        green_even    : out std_logic;
+        green_odd     : out std_logic;
+        blue_even     : out std_logic;
+        blue_odd      : out std_logic;
+
         -- SAA5050 character ROM loading
         char_rom_we   : in std_logic := '0';
         char_rom_addr : in std_logic_vector(10 downto 0) := (others => '0');
@@ -70,11 +76,7 @@ architecture behavioral of JafaMode7 is
 
     function f_max_divider return natural is
     begin
-        if ScanDoubled then
-            return TTxtClockSpeed / 24 - 1;
-        else
-            return TTxtClockSpeed / 12 - 1;
-        end if;
+        return TTxtClockSpeed / 12 - 1;
     end function;
 
     signal ttxt_clken     : std_logic;
@@ -85,13 +87,15 @@ architecture behavioral of JafaMode7 is
     signal ttxt_dew       : std_logic;
     signal ttxt_crs       : std_logic;
     signal ttxt_lose      : std_logic;
-    signal ttxt_r_tmp     : std_logic;
-    signal ttxt_g_tmp     : std_logic;
-    signal ttxt_b_tmp     : std_logic;
-    signal ttxt_de_tmp    : std_logic;
     signal ttxt_r         : std_logic;
     signal ttxt_g         : std_logic;
     signal ttxt_b         : std_logic;
+    signal ttxt_r_even    : std_logic;
+    signal ttxt_g_even    : std_logic;
+    signal ttxt_b_even    : std_logic;
+    signal ttxt_r_odd     : std_logic;
+    signal ttxt_g_odd     : std_logic;
+    signal ttxt_b_odd     : std_logic;
     signal ttxt_de        : std_logic;
 
     signal status_enable  : std_logic;
@@ -111,10 +115,7 @@ architecture behavioral of JafaMode7 is
     signal crtc_ma        : std_logic_vector(13 downto 0);
     signal crtc_ra        : std_logic_vector(4 downto 0);
 
-    signal is_scandoubled : std_logic;
-
 begin
-
 
     process(ttxt_clk)
     begin
@@ -128,8 +129,6 @@ begin
             end if;
         end if;
     end process;
-
-    is_scandoubled <= '1' when ScanDoubled else '0';
 
     -- FC1C - Write address register
     -- FC1D - Write data register
@@ -164,7 +163,7 @@ begin
         variable counter : std_logic_vector(3 downto 0);
     begin
         if rising_edge(clk_16M00) then
-            if counter = "1111" or (is_scandoubled = '1' and counter = "0111") then
+            if counter = "1111" then
                 crtc_clken <= '1';
             else
                 crtc_clken <= '0';
@@ -200,7 +199,7 @@ begin
         CLOCK     => clk_16M00,
         CLKEN     => crtc_clken,
         CLKEN_CPU => '1',
-        VGA       => is_scandoubled,
+        VGA       => '0',
         nRESET    => RST_n,
         ENABLE    => crtc_enable,
         R_nW      => R_W_n,
@@ -234,7 +233,7 @@ begin
             CLOCK    => ttxt_clk,
             CLKEN    => ttxt_clken,
             nRESET   => RST_n,
-            VGA      => is_scandoubled,
+            VGA      => '0',
             DI_CLOCK => clk_16M00,
             DI_CLKEN => '1',
             DI       => ttxt_ram_data(6 downto 0),
@@ -243,10 +242,16 @@ begin
             CRS      => ttxt_crs,
             LOSE     => ttxt_lose,
             -- outputs
-            R        => ttxt_r_tmp,
-            G        => ttxt_g_tmp,
-            B        => ttxt_b_tmp,
-            PIXDE    => ttxt_de_tmp,
+            R        => ttxt_r,
+            G        => ttxt_g,
+            B        => ttxt_b,
+            PIXDE    => ttxt_de,
+            R_even   => ttxt_r_even,
+            G_even   => ttxt_g_even,
+            B_even   => ttxt_b_even,
+            R_odd    => ttxt_r_odd,
+            G_odd    => ttxt_g_odd,
+            B_odd    => ttxt_b_odd,
 
             -- SAA5050 character ROM loading
             char_rom_we   => char_rom_we,
@@ -255,62 +260,24 @@ begin
             );
 
     -- make the cursor visible
-    ttxt_r  <= ttxt_r_tmp xor crtc_cursor2;
-    ttxt_g  <= ttxt_g_tmp xor crtc_cursor2;
-    ttxt_b  <= ttxt_b_tmp xor crtc_cursor2;
-    ttxt_de <= ttxt_de_tmp;
+    red        <= ttxt_r      xor crtc_cursor2;
+    red_even   <= ttxt_r_even xor crtc_cursor2;
+    red_odd    <= ttxt_r_odd  xor crtc_cursor2;
+    green      <= ttxt_g      xor crtc_cursor2;
+    green_even <= ttxt_g_even xor crtc_cursor2;
+    green_odd  <= ttxt_g_odd  xor crtc_cursor2;
+    blue       <= ttxt_b      xor crtc_cursor2;
+    blue_even  <= ttxt_b_even xor crtc_cursor2;
+    blue_odd   <= ttxt_b_odd  xor crtc_cursor2;
+    hsync      <= crtc_hsync_n;
+    vsync      <= crtc_vsync_n;
+    csync      <= crtc_hsync_n and crtc_vsync_n;
+    blank      <= not ttxt_de;
 
     -- enable mode 7
     mode7_enable <= crtc_ma(13);
 
-    ScanDoubledEnabled: if ScanDoubled generate
-        signal tmp_r     : std_logic;
-        signal tmp_g     : std_logic;
-        signal tmp_b     : std_logic;
-        signal tmp_hs    : std_logic;
-        signal tmp_vs    : std_logic;
-        signal tmp_de    : std_logic;
-    begin
-
-        inst_retimer: entity work.retimer
-            generic map (
-                WIDTH => 1
-                )
-            port map (
-                clk_in    => ttxt_clk,
-                clken_in  => ttxt_clken,
-                clk_out   => hd_clk,
-                clken_out => '1',
-                hs_in     => crtc_hsync_n,
-                vs_in     => crtc_vsync_n,
-                r_in(0)   => ttxt_r,
-                g_in(0)   => ttxt_g,
-                b_in(0)   => ttxt_b,
-                de_in     => ttxt_de,
-                hs_out    => tmp_hs,
-                vs_out    => tmp_vs,
-                de_out    => tmp_de,
-                r_out(0)  => tmp_r,
-                g_out(0)  => tmp_g,
-                b_out(0)  => tmp_b
-                );
-        red   <= tmp_r;
-        green <= tmp_g;
-        blue  <= tmp_b;
-        hsync <= tmp_hs;
-        vsync <= tmp_vs;
-        csync <= tmp_hs and tmp_vs;
-        blank <= not tmp_de;
-    end generate;
-
-    ScanDoubledDisabled : if not ScanDoubled generate
-        red   <= ttxt_r;
-        green <= ttxt_g;
-        blue  <= ttxt_b;
-        hsync <= crtc_hsync_n;
-        vsync <= crtc_vsync_n;
-        csync <= crtc_hsync_n and crtc_vsync_n;
-        blank <= not ttxt_de;
-    end generate;
+    -- field output
+    field <= not crtc_ra(0);
 
 end behavioral;
