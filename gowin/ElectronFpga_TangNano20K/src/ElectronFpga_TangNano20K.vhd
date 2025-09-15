@@ -336,11 +336,9 @@ architecture rtl of ElectronFpga_TangNano20K is
     -- Signals
     --------------------------------------------------------
 
-    signal clock_16        : std_logic; -- system clock
-    signal clock_24        : std_logic; -- Jafa Mode 7 and debugger clock
+    signal clock_48        : std_logic; -- system clock
+    signal clock_24        : std_logic; -- AVR clock
     signal clock_27        : std_logic; -- HDMI slow clock
-    signal clock_32        : std_logic; -- Jafa Mode 7
-    signal clock_40        : std_logic; -- VGA 60Hz clock
     signal clock_96        : std_logic;
     signal clock_96_p      : std_logic;
     signal clock_135       : std_logic;
@@ -486,7 +484,7 @@ begin
     )
     port map (
         -- Clocks
-        clk_16M00         => clock_16,
+        sys_clk           => clock_48,
         clk_24M00         => clock_24,
         clk_27M00         => clock_27,
         -- ULA Core Timing
@@ -587,15 +585,15 @@ begin
             IDIV_SEL => 8,
             FBDIV_SEL => 31,
             ODIV_SEL => 8,
-            DYN_SDIV_SEL => 6,
+            DYN_SDIV_SEL => 2,
             PSDA_SEL => "1000"          -- 180 degree phase shift
         )
         port map (
             CLKIN    => sys_clk,
             CLKOUT   => clock_96,       -- 96MHz clock for SDRAM
             CLKOUTP  => clock_96_p,     -- 96MHz clock for SDRAM, phase shifted 180 degrees
-            CLKOUTD  => clock_16,       -- 16MHz main clock
-            CLKOUTD3 => clock_32,
+            CLKOUTD  => clock_48,       -- 48MHz main clock
+            CLKOUTD3 => open,
             LOCK     => pll1_lock,
             RESET    => '0',
             RESET_P  => '0',
@@ -687,9 +685,9 @@ begin
     -- Power Up Reset Generation
     --------------------------------------------------------
 
-    process(clock_16)
+    process(clock_48)
     begin
-        if rising_edge(clock_16) then
+        if rising_edge(clock_48) then
             if btn1 = '1' then
                 reset_counter <= (others => '0');
             elsif (reset_counter(reset_counter'high) = '0') then
@@ -700,9 +698,9 @@ begin
         end if;
     end process;
 
-    process(clock_16)
+    process(clock_48)
     begin
-        if rising_edge(clock_16) then
+        if rising_edge(clock_48) then
             if powerup_reset_n = '0' then
                 hdmi_audio_en <= jumper(4);
             elsif btn2 = '1' then
@@ -725,7 +723,7 @@ begin
             CORE_ID => G_CORE_ID
             )
         port map (
-            clock           => clock_16,
+            clock           => clock_48,
             powerup_reset_n => powerup_reset_n,
             btn1            => btn1,
             btn2            => btn2,
@@ -803,7 +801,7 @@ begin
                 msbi_g => 9
                 )
             port map (
-                clk_i => clock_16,
+                clk_i => clock_48,
                 reset => '0',
                 dac_i => dac_l_in,
                 dac_o => audiol
@@ -814,7 +812,7 @@ begin
                 msbi_g => 9
                 )
             port map (
-                clk_i => clock_16,
+                clk_i => clock_48,
                 reset => '0',
                 dac_i => dac_r_in,
                 dac_o => audior
@@ -1028,7 +1026,7 @@ begin
         port map (
             CLK_96         => clock_96,
             CLK_96_p       => clock_96_p,
-            CLK_48         => clock_16,
+            CLK_48         => clock_48,
 
             rst_n          => powerup_reset_n,
 
@@ -1222,9 +1220,9 @@ begin
 -- External shift register for joysticks / config links
 --------------------------------------------------------
 
-    process(clock_16)
+    process(clock_48)
     begin
-        if rising_edge(clock_16) then
+        if rising_edge(clock_48) then
             -- external 74LV165A clocked on rising edge, so work here on falling edge
             if phi2 = '0' and last_phi2 = '1' then
                 if sr_counter = "1111" then
@@ -1318,9 +1316,9 @@ begin
         avr_rx     <= uart_rx when IncludeICEDebugger and jumper(5) = '1' else '1';
     end generate;
 
-    process(clock_16)
+    process(clock_48)
     begin
-        if rising_edge(clock_16) then
+        if rising_edge(clock_48) then
             if ext_1mhz_addr < 32 then
                 version_rom_byte <= std_logic_vector(version_rom(conv_integer(ext_1mhz_addr(4 downto 0))));
             else
