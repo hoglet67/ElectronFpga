@@ -36,6 +36,7 @@ entity JafaMode7 is
         data_en       : out std_logic;
         -- Teletext clock
         ttxt_clk      : in  std_logic;
+        ttxt_clken    : in  std_logic;
         -- Video out
         mode7_enable  : out std_logic;
         red           : out std_logic;
@@ -63,24 +64,6 @@ end;
 
 architecture behavioral of JafaMode7 is
 
-    -- This gracefully handles passing zero in
-    function f_log2 (x : natural) return natural is
-        variable i : natural;
-    begin
-        i := 1;
-        while (2**i < x) and i < 31 loop
-            i := i + 1;
-        end loop;
-        return i;
-    end function;
-
-    function f_max_divider return natural is
-    begin
-        return TTxtClockSpeed / 12 - 1;
-    end function;
-
-    signal ttxt_clken     : std_logic;
-    signal ttxt_divider   : unsigned(f_log2(f_max_divider) - 1 downto 0) := (others => '0');
     signal ttxt_ram_we    : std_logic;
     signal ttxt_ram_data  : std_logic_vector(7 downto 0);
     signal ttxt_glr       : std_logic;
@@ -116,19 +99,6 @@ architecture behavioral of JafaMode7 is
     signal crtc_ra        : std_logic_vector(4 downto 0);
 
 begin
-
-    process(ttxt_clk)
-    begin
-        if rising_edge(ttxt_clk) then
-            if ttxt_divider = to_unsigned(f_max_divider, ttxt_divider'length) then
-                ttxt_clken <= '1';
-                ttxt_divider <= (others => '0');
-            else
-                ttxt_clken <= '0';
-                ttxt_divider <= ttxt_divider + 1;
-            end if;
-        end if;
-    end process;
 
     -- FC1C - Write address register
     -- FC1D - Write data register

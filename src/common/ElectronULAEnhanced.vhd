@@ -139,6 +139,7 @@ architecture behavioral of ElectronULAEnhanced is
     signal cpu_clk         : std_logic;
 
     -- Jafa Mode 7 SD Video
+    signal ttxt_clken      : std_logic;
     signal jafa_do         : std_logic_vector(7 downto 0);
     signal jafa_den        : std_logic;
     signal jafa_red        : std_logic;
@@ -169,8 +170,7 @@ architecture behavioral of ElectronULAEnhanced is
 
     -- Constants to make if/generate easier
     constant IncludeHD     : boolean := IncludeVGA or IncludeHDMI;
-    constant IncludeJafaSD : boolean := IncludeJafaMode7 and IncludeSRGB;
-    constant IncludeJafaHD : boolean := IncludeJafaMode7 and (IncludeVGA or IncludeHDMI);
+
 
 begin
 
@@ -282,10 +282,41 @@ begin
 --------------------------------------------------------
 
     JafaIncluded: if IncludeJafaMode7 generate
+        -- This gracefully handles passing zero in
+        function f_log2 (x : natural) return natural is
+            variable i : natural;
+        begin
+            i := 1;
+            while (2**i < x) and i < 31 loop
+                i := i + 1;
+            end loop;
+            return i;
+        end function;
+
+        function f_max_divider return natural is
+        begin
+            return TTxtClockSpeed / 12 - 1;
+        end function;
+
+        signal ttxt_divider   : unsigned(f_log2(f_max_divider) - 1 downto 0) := (others => '0');
+
+    begin
+
+        process(ttxt_clk)
+        begin
+            if rising_edge(ttxt_clk) then
+                if ttxt_divider = to_unsigned(f_max_divider, ttxt_divider'length) then
+                    ttxt_clken <= '1';
+                    ttxt_divider <= (others => '0');
+                else
+                    ttxt_clken <= '0';
+                    ttxt_divider <= ttxt_divider + 1;
+                end if;
+            end if;
+        end process;
 
         jafa : entity work.JafaMode7
             generic map (
-                TTxtClockSpeed => TTxtClockSpeed,
                 IncludeTTxtROM => IncludeTTxtROM
                 )
             port map (
@@ -300,6 +331,7 @@ begin
                 data_en       => jafa_den,
                 -- Teletext clock
                 ttxt_clk      => ttxt_clk,
+                ttxt_clken    => ttxt_clken,
                 -- Video out
                 mode7_enable  => mode7_enable,
                 red           => jafa_red,
@@ -328,7 +360,8 @@ begin
 
     HDIncluded: if IncludeHD generate
         -- scan doubler inputs
-        signal tmp_clk_in    : std_logic;
+        signal vid_clk       : std_logic;
+        signal vid_clken     : std_logic;
         signal tmp_even_in   : std_logic_vector(2 downto 0);
         signal tmp_odd_in    : std_logic_vector(2 downto 0);
         signal tmp_hsync_in  : std_logic;
@@ -341,24 +374,25 @@ begin
         signal bypass        : std_logic;
     begin
 
-        tmp_clk_in   <= clk_16M00;
+        vid_clk   <= clk_16M00; -- ttxt_clk   when IncludeJafaMode7 and mode7_enable = '1' else clk_16M00;
+        vid_clken <= ttxt_clken when IncludeJafaMode7 and mode7_enable = '1' else '1';
 
-        tmp_even_in  <= jafa_red_even & jafa_green_even & jafa_blue_even when mode7_enable = '1' else
+        tmp_even_in  <= jafa_red_even & jafa_green_even & jafa_blue_even when IncludeJafaMode7 and mode7_enable = '1' else
                         ula_red & ula_green & ula_blue;
 
-        tmp_odd_in   <= jafa_red_odd & jafa_green_odd & jafa_blue_odd when mode7_enable = '1' else
+        tmp_odd_in   <= jafa_red_odd & jafa_green_odd & jafa_blue_odd when IncludeJafaMode7 and mode7_enable = '1' else
                         ula_red & ula_green & ula_blue;
 
-        tmp_hsync_in <= jafa_hsync when mode7_enable = '1' else ula_hsync;
-        tmp_vsync_in <= jafa_vsync when mode7_enable = '1' else ula_vsync;
+        tmp_hsync_in <= jafa_hsync when IncludeJafaMode7 and mode7_enable = '1' else ula_hsync;
+        tmp_vsync_in <= jafa_vsync when IncludeJafaMode7 and mode7_enable = '1' else ula_vsync;
 
         inst_rgb2vga_scandoubler: entity work.rgb2vga_scandoubler
             generic map (
                 WIDTH => 3
                 )
             port map (
-                clock => tmp_clk_in,
-                clken => '1',
+                clock => vid_clk,
+                clken => vid_clken,
                 clk25 => hdmi_clk,
                 mode => '0',
                 rgbi_even_in => tmp_even_in,
@@ -370,7 +404,7 @@ begin
                 vSync_out => tmp_vsync
                 );
 
-        bypass <= not jafa_field when mode7_enable = '1' else not ula_field;
+        bypass <= not jafa_field when IncludeJafaMode7 and mode7_enable = '1' else not ula_field;
 
         inst_linedelay : entity work.linedelay
             generic map (
@@ -533,13 +567,13 @@ begin
 --------------------------------------------------------
 
     SRGBIncluded : if IncludeSRGB generate
-        rgb_red   <= (others => jafa_red)   when IncludeJafaSD and mode7_enable = '1' else
+        rgb_red   <= (others => jafa_red)   when IncludeJafaMode7 and mode7_enable = '1' else
                      (others => ula_red);
-        rgb_green <= (others => jafa_green) when IncludeJafaSD and mode7_enable = '1' else
+        rgb_green <= (others => jafa_green) when IncludeJafaMode7 and mode7_enable = '1' else
                      (others => ula_green);
-        rgb_blue  <= (others => jafa_blue)  when IncludeJafaSD and mode7_enable = '1' else
+        rgb_blue  <= (others => jafa_blue)  when IncludeJafaMode7 and mode7_enable = '1' else
                      (others => ula_blue);
-        rgb_csync <= jafa_csync             when IncludeJafaSD and mode7_enable = '1' else
+        rgb_csync <= jafa_csync             when IncludeJafaMode7 and mode7_enable = '1' else
                      ula_csync;
     end generate;
 
