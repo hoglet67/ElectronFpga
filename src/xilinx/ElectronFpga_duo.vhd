@@ -69,7 +69,7 @@ end;
 
 architecture behavioral of ElectronFpga_duo is
 
-    signal clock_16        : std_logic;
+    signal clock_48        : std_logic;
     signal clock_24        : std_logic;
     signal clock_27        : std_logic;
     signal hard_reset_n    : std_logic;
@@ -113,13 +113,13 @@ begin
         -- 32 MHz input clock
         CLKIN_IN => clk_32M00,
         -- the main system clock, and also the video clock in sRGB mode
-        CLK0_OUT => clock_16,
+        CLK0_OUT => clock_48,
         -- used as a 24.00MHz for the SAA5050 in Mode 7
-        CLK1_OUT  => clock_24,
+        CLK1_OUT => clock_24,
         -- used as a output clock MIST scan doubler for the SAA5050 in Mode 7
-        CLK2_OUT  => open,
+        CLK2_OUT => open,
         -- used as a video clock when the ULA is in 60Hz VGA Mode
-        CLK3_OUT  => open
+        CLK3_OUT => open
     );
 
 
@@ -142,11 +142,11 @@ begin
         IncludeUserPort    => true,
         IncludeMRB         => true,
         IncludeSP64        => true,   -- depends on MRB
-        IncludeJafaMode7   => false
+        IncludeJafaMode7   => true
     )
     port map (
-        clk_16M00         => clock_16, -- system clock
-        clk_24M00         => clock_24, -- used for Jafa Mode7
+        sys_clk           => clock_48, -- system clock
+        clk_24M00         => clock_24, -- used for debugger
         clk_27M00         => clock_27, -- used for HDMI and VGA
         interlace         => DIP(0),
 
@@ -207,9 +207,9 @@ begin
 --------------------------------------------------------
 
     -- Generate a reliable power up reset, as ERST on the Papilio doesn't do this
-    reset_gen : process(clock_16)
+    reset_gen : process(clock_48)
     begin
-        if rising_edge(clock_16) then
+        if rising_edge(clock_48) then
             if (reset_counter(reset_counter'high) = '0') then
                 reset_counter <= reset_counter + 1;
             end if;
@@ -237,7 +237,7 @@ begin
         user_length    => user_length
     )
     port map(
-        clock           => clock_16,
+        clock           => clock_48,
         powerup_reset_n => powerup_reset_n,
         bootstrap_busy  => bootstrap_busy,
         RAM_nOE         => RAM_nOE,

@@ -10,8 +10,8 @@ CONFIG PROHIBIT=P144;
 CONFIG PROHIBIT=P69;
 CONFIG PROHIBIT=P60;
 
-NET "clock_16" TNM_NET = clk_period_grp1;
-TIMESPEC TS_clk_period1 = PERIOD "clk_period_grp1" 62.50ns HIGH;
+NET "clock_48" TNM_NET = clk_period_grp1;
+TIMESPEC TS_clk_period1 = PERIOD "clk_period_grp1" 20.83ns HIGH;
 
 NET "clock_24" TNM_NET = clk_period_grp2;
 TIMESPEC TS_clk_period2 = PERIOD "clk_period_grp2" 41.66ns HIGH;
@@ -25,13 +25,13 @@ TIMESPEC TS_clk_period3 = PERIOD "clk_period_grp3" 37.37ns HIGH;
 # Avoid timing warnings for cross domain signals
 NET "clock_24" TNM_NET = FFS "clk_domain_24_ffs";
 NET "clock_27" TNM_NET = FFS "clk_domain_27_ffs";
-NET "clock_16" TNM_NET = FFS "clk_domain_16_ffs";
+NET "clock_48" TNM_NET = FFS "clk_domain_48_ffs";
 #NET "electron_core/ula/clk_video_BUFG" TNM_NET = FFS "clk_domain_vid_ffs";
 #NET "electron_core/ula/clk_video_BUFG" TNM_NET = RAMS "clk_domain_vid_ram";
 
 #TIMESPEC "TS_CrossDomain1" = FROM "clk_domain_16_ffs" TO "clk_domain_27_ffs" TIG;
 #TIMESPEC "TS_CrossDomain2" = FROM "clk_domain_27_ffs" TO "clk_domain_16_ffs" TIG;
-TIMESPEC "TS_CrossDomain3" = FROM "clk_domain_16_ffs" TO "clk_domain_24_ffs" TIG;
+TIMESPEC "TS_CrossDomain3" = FROM "clk_domain_48_ffs" TO "clk_domain_24_ffs" TIG;
 #TIMESPEC "TS_CrossDomain4" = FROM "clk_domain_16_ffs" TO "clk_domain_vid_ffs" TIG;
 #TIMESPEC "TS_CrossDomain5" = FROM "clk_domain_16_ffs" TO "clk_domain_vid_ram" TIG;
 #TIMESPEC "TS_CrossDomain6" = FROM "clk_domain_vid_ffs" TO "clk_domain_16_ffs" TIG;
