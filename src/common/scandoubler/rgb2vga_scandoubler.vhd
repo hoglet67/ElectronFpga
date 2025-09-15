@@ -119,53 +119,41 @@ architecture rtl of rgb2vga_scandoubler is
     signal hCount25_next   : unsigned(width25 - 1 downto 0);
 
     -- Signals on the write side of the RAMs:
-    signal writeEn0        : std_logic;
-    signal writeEn1        : std_logic;
+    signal writeEn         : std_logic;
+    signal writeAddr       : std_logic_vector(10 downto 0);
+    signal writeData       : std_logic_vector(2 * WIDTH - 1 downto 0);
 
     -- Signals on the read side of the RAMs:
-    signal ramData         : std_logic_vector(2 * WIDTH - 1 downto 0);
-    signal ram0Data        : std_logic_vector(2 * WIDTH - 1 downto 0);
-    signal ram1Data        : std_logic_vector(2 * WIDTH - 1 downto 0);
+    signal readAddr        : std_logic_vector(10 downto 0);
+    signal readData        : std_logic_vector(2 * WIDTH - 1 downto 0);
 
 begin
+    writeData <= rgbi_even_in & rgbi_odd_in;
+    writeAddr <=     lineToggle & std_logic_vector(hCount16);
+    readAddr  <= not lineToggle & std_logic_vector(hCount25(9 downto 0));
 
-    -- Two RAM blocks, each straddling the 16MHz and 25MHz clock domains, for storing pixel lines;
-    -- whilst we're reading from one at 25MHz, we're writing to the other at 16MHz. Their roles
+    -- Double buffered block RAM straddling the 16MHz and 25MHz clock
+    -- domains, for storing pixel lines; whilst we're reading from one
+    -- line at 25MHz, we're writing to the other at 16MHz. Their roles
     -- swap every incoming 64us scanline.
     --
-    ram0: entity work.rgb2vga_dpram
+    ram: entity work.rgb2vga_dpram
         generic map (
             WIDTH => WIDTH*2
             )
         port map(
             -- Write port
             wrclock   => clock,
-            wraddress => std_logic_vector(hCount16),
-            wren      => writeEn0,
-            data      => rgbi_even_in & rgbi_odd_in,
+            wraddress => writeAddr,
+            wren      => writeEn,
+            data      => writeData,
 
             -- Read port
             rdclock   => clk25,
-            rdaddress => std_logic_vector(hCount25(9 downto 0)),
-            q         => ram0data
+            rdaddress => readAddr,
+            q         => readData
             );
 
-    ram1: entity work.rgb2vga_dpram
-        generic map (
-            WIDTH => WIDTH*2
-            )
-        port map(
-            -- Write port
-            wrclock   => clock,
-            wraddress => std_logic_vector(hCount16),
-            wren      => writeEn1,
-            data      => rgbi_even_in & rgbi_odd_in,
-
-            -- Read port
-            rdclock   => clk25,
-            rdaddress => std_logic_vector(hCount25(9 downto 0)),
-            q         => ram1data
-            );
 
     -- 16MHz clock domain ---------------------------------------------------------------------------
     process(clock)
@@ -196,16 +184,12 @@ begin
         else lineToggle;
 
     -- Generate interleaved write signals for dual-port RAMs
-    writeEn0 <=
-        '1' when hCount16 < SAMPLE_WIDTH and lineToggle = '0' and clken = '1'
-        else '0';
-    writeEn1 <=
-        '1' when hCount16 < SAMPLE_WIDTH and lineToggle = '1' and clken = '1'
+    writeEn <=
+        '1' when hCount16 < SAMPLE_WIDTH and clken = '1'
         else '0';
 
     -- Interleave output of dual-port RAMs
-    ramData  <= ram0Data when lineToggle = '1' else ram1Data;
-    rgbi_out <= ramData(2*WIDTH - 1 downto WIDTH) when field = '1' else ramData(WIDTH - 1 downto 0);
+    rgbi_out <= readData(2*WIDTH - 1 downto WIDTH) when field = '1' else readData(WIDTH - 1 downto 0);
 
     -- 25MHz clock domain ---------------------------------------------------------------------------
     process(clk25)
