@@ -40,7 +40,8 @@ entity ElectronULAEnhanced is
         );
     port (
         -- System clock: should be 16MHz
-        clk_16M00      : in  std_logic;
+        sys_clk        : in  std_logic;
+        sys_clken      : in  std_logic;
 
         -- Power on reset
         hard_reset_n   : in std_logic := '1';
@@ -186,7 +187,8 @@ begin
             )
         port map (
             -- System clock: should be 16MHz
-            clk_16M00 => clk_16M00,
+            sys_clk   => sys_clk,
+            sys_clken => sys_clken,
             -- Power on reset
             hard_reset_n => hard_reset_n,
             -- CPU Interface
@@ -254,8 +256,8 @@ begin
         Inst_SPI_Port: entity work.SPI_Port
             port map (
                 nRST    => RST_n,
-                clk     => clk_16M00,
-                clken   => '1',  -- needs to be 16MHz or less (SPI clock is half this rate)
+                clk     => sys_clk,
+                clken   => sys_clken,  -- needs to be 16MHz or less (SPI clock is half this rate)
                 enable  => spisd_enable,
                 nwe     => R_W_n,
                 datain  => data_in,
@@ -321,7 +323,8 @@ begin
                 )
             port map (
                 -- CPU interface
-                clk_16M00     => clk_16M00,
+                sys_clk       => sys_clk,
+                mhz1_clken    => mhz1_clken,
                 cpu_clken     => cpu_clken,
                 RST_n         => RST_n,
                 R_W_n         => R_W_n,
@@ -374,8 +377,8 @@ begin
         signal bypass        : std_logic;
     begin
 
-        vid_clk   <= clk_16M00; -- ttxt_clk   when IncludeJafaMode7 and mode7_enable = '1' else clk_16M00;
-        vid_clken <= ttxt_clken when IncludeJafaMode7 and mode7_enable = '1' else '1';
+        vid_clk   <= sys_clk;
+        vid_clken <= ttxt_clken when IncludeJafaMode7 and mode7_enable = '1' else sys_clken;
 
         tmp_even_in  <= jafa_red_even & jafa_green_even & jafa_blue_even when IncludeJafaMode7 and mode7_enable = '1' else
                         ula_red & ula_green & ula_blue;
@@ -394,7 +397,7 @@ begin
                 clock => vid_clk,
                 clken => vid_clken,
                 clk25 => hdmi_clk,
-                mode => '0',
+                mode  => mode7_enable,
                 rgbi_even_in => tmp_even_in,
                 rgbi_odd_in => tmp_odd_in,
                 hSync_in => tmp_hsync_in,

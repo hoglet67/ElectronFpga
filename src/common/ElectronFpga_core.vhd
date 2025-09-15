@@ -35,8 +35,8 @@ entity ElectronFpga_core is
     );
     port (
         -- Clocks
-        clk_16M00      : in  std_logic;        -- system clock
-        clk_24M00      : in  std_logic := '0'; -- used for Jafa Mode7
+        sys_clk        : in  std_logic;
+        clk_24M00      : in  std_logic := '0'; -- used for debugger
         clk_27M00      : in  std_logic := '0'; -- used for HDMI and VGA
 
         -- ULA Core Timing
@@ -216,6 +216,8 @@ architecture behavioral of ElectronFpga_core is
 
     signal mhz1_clken        : std_logic;
     signal mhz4_clken        : std_logic;
+    signal mhz16_clken       : std_logic;
+    signal divider           : unsigned(1 downto 0);
     signal cpu_clken         : std_logic;
     signal cpu_clken_r       : std_logic;
 
@@ -255,6 +257,19 @@ architecture behavioral of ElectronFpga_core is
 
 begin
 
+    process(sys_clk)
+    begin
+        if rising_edge(sys_clk) then
+            if divider = 2 then
+                divider     <= (others => '0');
+                mhz16_clken <= '1';
+            else
+                divider <= divider + 1;
+                mhz16_clken <= '0';
+            end if;
+        end if;
+    end process;
+
     reset       <= not reset_n;
 
     GenDebug: if IncludeICEDebugger generate
@@ -267,9 +282,9 @@ begin
                 )
             port map (
                 clock_avr    => clk_24M00,
-                busmon_clk   => clk_16M00,
+                busmon_clk   => sys_clk,
                 busmon_clken => cpu_clken1,
-                cpu_clk      => clk_16M00,
+                cpu_clk      => sys_clk,
                 cpu_clken    => cpu_clken,
                 IRQ_n        => cpu_IRQ_n,
                 NMI_n        => cpu_NMI_n,
@@ -294,9 +309,9 @@ begin
                 tcclk        => open
                 );
 
-        process(clk_16M00)
+        process(sys_clk)
         begin
-            if rising_edge(clk_16M00) then
+            if rising_edge(sys_clk) then
                 cpu_clken1 <= cpu_clken;
             end if;
         end process;
@@ -311,7 +326,7 @@ begin
             SO_n            => '1',
             Res_n           => reset_n,
             Enable          => cpu_clken,
-            Clk             => clk_16M00,
+            Clk             => sys_clk,
             Rdy             => '1',
             IRQ_n           => cpu_IRQ_n,
             NMI_n           => cpu_NMI_n,
@@ -334,18 +349,19 @@ begin
         IncludeJafaMode7 => IncludeJafaMode7,
         LimitROMSpeed    => false,
         LimitIOSpeed     => false,
-        TTxtClockSpeed   => 24,
+        TTxtClockSpeed   => 48,
         IncludeTTxtROM   => true
     )
     port map (
         -- System clock: should be 16MHz
-        clk_16M00      => clk_16M00,
+        sys_clk        => sys_clk,
+        sys_clken      => mhz16_clken,
 
         -- Power on reset
         hard_reset_n   => hard_reset_n,
-        -- Teletext clock
 
-        ttxt_clk       => clk_24M00,
+        -- Teletext clock
+        ttxt_clk       => sys_clk,
 
         -- CPU Interface
         addr           => ula_a,   -- top bits forced to 110 when MRB shaddow access
@@ -413,7 +429,7 @@ begin
     );
 
     input : entity work.keyboard port map(
-        clk        => clk_16M00,
+        clk        => sys_clk,
         rst_n      => hard_reset_n, -- to avoid a loop when break pressed!
         ps2_clk    => ps2_clk,
         ps2_data   => ps2_data,
@@ -456,7 +472,7 @@ begin
      -- External addresses 40000-7FFFF are routed to SRAM
     -- Note: the bottom 32K of CPU address space is mapped to SRAM, 20K of this is overlaid by the ULA
 
-    process(clk_16M00,hard_reset_n)
+    process(sys_clk,hard_reset_n)
     begin
 
         if hard_reset_n = '0' then
@@ -464,7 +480,7 @@ begin
             ext_Din <= (others => '0');
             ext_nWE <= '1';
             ext_nOE <= '1';
-        elsif rising_edge(clk_16M00) then
+        elsif rising_edge(sys_clk) then
             -- delayed cpu_clken for use as an external write signal
             cpu_clken_r <= cpu_clken;
             if cpu_a(15) = '0' then
@@ -543,12 +559,12 @@ begin
 --------------------------------------------------------
 
     SP64Included: if IncludeSP64 generate
-        process(clk_16M00, reset_n)
+        process(sys_clk, reset_n)
         begin
             if reset_n = '0' then
                 sp64_ram_enable <= '0';
                 sp64_rom_select  <= '0';
-            elsif rising_edge(clk_16M00) then
+            elsif rising_edge(sys_clk) then
                 if cpu_clken = '1' then
                     -- Bits 0 and 7 of FCFA control the Stop Press 64 RAM/ROM overlay in slot 10
                     if io_fred = '1' and cpu_a(7 downto 0) = x"fa" and cpu_R_W_n = '0' then
@@ -666,12 +682,12 @@ begin
                      "11" when key_turbo = "11" else
                      "00";
 
-        process(clk_16M00, reset_n)
+        process(sys_clk, reset_n)
         begin
             if reset_n = '0' then
                 mrb_enabled <= '1'; -- enabled on reset
                 vdu_op <= '0';
-            elsif rising_edge(clk_16M00) then
+            elsif rising_edge(sys_clk) then
                 if cpu_clken = '1' then
                     -- The setting the MSB of FC7F disabled all MRB functionality
                     if io_fred = '1' and cpu_a(7 downto 0) = x"7f" and cpu_R_W_n = '0' then
@@ -716,12 +732,12 @@ begin
         signal abr_enable : std_logic;
     begin
         abr_enable <= '1' when io_fred = '1' and cpu_a(7 downto 2) & "00" = x"dc" else '0';
-        process(clk_16M00, reset_n)
+        process(sys_clk, reset_n)
         begin
             if reset_n = '0' then
                 abr_lo_bank_lock <= '1';
                 abr_hi_bank_lock <= '1';
-            elsif rising_edge(clk_16M00) then
+            elsif rising_edge(sys_clk) then
                 if cpu_clken = '1' then
                     if abr_enable = '1' and cpu_R_W_n = '0' then
                         if cpu_a(1) = '0' then
@@ -758,7 +774,7 @@ begin
                 CLK_FREQ_HZ => 16000000
                 )
             port map (
-                clk     => clk_16M00,
+                clk     => sys_clk,
                 reset   => reset,
                 clken   => cpu_clken,
                 enable  => serial_enable,
@@ -840,14 +856,14 @@ begin
             RESET_L    => reset_n,
             I_P2_H     => mhz1_clken,
             ENA_4      => mhz4_clken,
-            CLK        => clk_16M00
+            CLK        => sys_clk
             );
 
         -- This is needed as in v003 of the 6522 data out is only valid while I_P2_H is asserted
         -- I_P2_H is driven from via1_clken
-        data_latch: process(clk_16M00)
+        data_latch: process(sys_clk)
         begin
-            if rising_edge(clk_16M00) then
+            if rising_edge(sys_clk) then
                 if mhz1_clken = '1' then
                     mc6522_data <= mc6522_data_tmp;
                 end if;
@@ -895,7 +911,7 @@ begin
            ps2_clk_out  => mse_clk_out,
            ps2_data     => mse_data_in,
            ps2_data_out => mse_data_out,
-           clk          => clk_16M00,
+           clk          => sys_clk,
            rst          => reset,
            tx_data      => mouse_tx_data,
            write        => mouse_write,
@@ -913,7 +929,7 @@ begin
         -- 18 - D6  - Middle button
         -- 20 - D7  - Right button
         mouse_controller: entity work.quadrature_controller port map(
-           clk      => clk_16M00,
+           clk      => sys_clk,
            rst      => reset,
            read     => mouse_read,
            err      => mouse_err,
@@ -944,9 +960,9 @@ begin
 -- 6502 Tracing
 --------------------------------------------------------
 
-    process(clk_16M00)
+    process(sys_clk)
     begin
-        if rising_edge(clk_16M00) then
+        if rising_edge(sys_clk) then
             if cpu_clken = '1' then
                 if cpu_R_W_n = '1' then
                     trace_data <= cpu_Din;

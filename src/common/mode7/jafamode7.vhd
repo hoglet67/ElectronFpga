@@ -26,7 +26,8 @@ entity JafaMode7 is
         );
     port (
         -- CPU interface
-        clk_16M00     : in  std_logic;
+        sys_clk       : in  std_logic;
+        mhz1_clken    : in  std_logic;
         cpu_clken     : in  std_logic;
         RST_n         : in  std_logic;
         R_W_n         : in  std_logic;
@@ -84,7 +85,6 @@ architecture behavioral of JafaMode7 is
     signal status_enable  : std_logic;
     signal status_do      : std_logic_vector(7 downto 0);
 
-    signal crtc_clken     : std_logic;
     signal crtc_enable    : std_logic;
     signal crtc_do        : std_logic_vector(7 downto 0);
     signal crtc_vsync     : std_logic;
@@ -115,32 +115,24 @@ begin
             )
         port map (
             -- Port A is the 6502 port
-            clka  => clk_16M00,
+            clk   => sys_clk,
+            cea   => '1',
             wea   => ttxt_ram_we,
             addra => addr(9 downto 0),
             dina  => data_in,
             douta => open,
             -- Port B is the video port
-            clkb  => clk_16M00,
-            web   => '0',
+            ceb   => '1',
             addrb => crtc_ma(9 downto 0),
-            dinb  => x"00",
             doutb => ttxt_ram_data
             );
 
 
-    process (clk_16M00)
-        variable counter : std_logic_vector(3 downto 0);
+    process (sys_clk)
     begin
-        if rising_edge(clk_16M00) then
-            if counter = "1111" then
-                crtc_clken <= '1';
-            else
-                crtc_clken <= '0';
-            end if;
-            counter := counter + 1;
+        if rising_edge(sys_clk) then
             -- Generate a cursor signal that is delayed by 2 characters
-            if crtc_clken = '1' then
+            if mhz1_clken = '1' then
                 crtc_cursor1 <= crtc_cursor;
                 crtc_cursor2 <= crtc_cursor1;
             end if;
@@ -166,9 +158,9 @@ begin
 
     crtc : entity work.mc6845 port map (
         -- inputs
-        CLOCK     => clk_16M00,
-        CLKEN     => crtc_clken,
-        CLKEN_CPU => '1',
+        CLOCK     => sys_clk,
+        CLKEN     => mhz1_clken,
+        CLKEN_CPU => cpu_clken,
         VGA       => '0',
         nRESET    => RST_n,
         ENABLE    => crtc_enable,
@@ -204,7 +196,7 @@ begin
             CLKEN    => ttxt_clken,
             nRESET   => RST_n,
             VGA      => '0',
-            DI_CLOCK => clk_16M00,
+            DI_CLOCK => sys_clk,
             DI_CLKEN => '1',
             DI       => ttxt_ram_data(6 downto 0),
             GLR      => ttxt_glr,

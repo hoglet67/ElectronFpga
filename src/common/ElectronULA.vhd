@@ -31,7 +31,8 @@ entity ElectronULA is
         );
     port (
         -- System clock: should be 16MHz
-        clk_16M00 : in  std_logic;
+        sys_clk   : in  std_logic;
+        sys_clken : in  std_logic;
 
         -- Power on reset
         hard_reset_n : in std_logic := '1';
@@ -97,7 +98,6 @@ architecture behavioral of ElectronULA is
     signal hsync_int_last : std_logic;
     signal vsync_int      : std_logic;
 
-    signal ram_we         : std_logic;
     signal ram_data       : std_logic_vector(7 downto 0);
 
     signal master_irq     : std_logic;
@@ -330,6 +330,13 @@ begin
 
     -- All of main memory (0x0000-0x7fff) is dual port RAM in the ULA
     ram_32k_gen: if Include32KRAM generate
+        signal cea : std_logic;
+        signal ceb : std_logic;
+        signal wea : std_logic;
+    begin
+        cea <= sys_clken;
+        ceb <= sys_clken and vid_clken;
+        wea <= '1' when addr(15) = '0' and R_W_n = '0' and cpu_clken = '1' else '0';
         ram_32k : entity work.RAM_DualPort
             generic map (
                 DEPTH => 32768,
@@ -338,29 +345,32 @@ begin
                 )
             port map (
                 -- Port A is the 6502 port
-                clka  => clk_16M00,
-                wea   => ram_we,
+                clk   => sys_clk,
+                cea   => cea,
+                wea   => wea,
                 addra => addr(14 downto 0),
                 dina  => data_in,
                 douta => ram_data,
                 -- Port B is the video port
-                clkb  => clk_16M00,
-                ceb   => vid_clken,
-                web   => '0',
+                ceb   => ceb,
                 addrb => screen_addr,
-                dinb  => x"00",
                 doutb => screen_data_tmp
             );
-        ram_we <= '1' when addr(15) = '0' and R_W_n = '0' and cpu_clken = '1' else '0';
     end generate;
 
     -- Just screen memory (0x3000-0x7fff) is dual port RAM in the ULA
     ram_20k_gen: if not Include32KRAM generate
+        signal cea   : std_logic;
+        signal ceb   : std_logic;
+        signal wea   : std_logic;
         signal addra : std_logic_vector(14 downto 0);
         signal addrb : std_logic_vector(14 downto 0);
     begin
+        cea   <= sys_clken;
+        ceb   <= sys_clken and vid_clken;
         addra <= addr(14 downto 0) xor "111000000000000";
         addrb <= screen_addr       xor "111000000000000";
+        wea   <= '1' when (addr(15 downto 12) = "0011" or addr(15 downto 14) = "01") and R_W_n = '0' and cpu_clken = '1' else '0';
         -- xor'ing with 7000 maps 3000-7fff into range 0000-4fff
         ram_20k : entity work.RAM_DualPort
             generic map (
@@ -370,20 +380,17 @@ begin
                 )
             port map (
                 -- Port A is the 6502 port
-                clka  => clk_16M00,
-                wea   => ram_we,
+                clk   => sys_clk,
+                cea   => cea,
+                wea   => wea,
                 addra => addra,
                 dina  => data_in,
                 douta => ram_data,
                 -- Port B is the video port
-                clkb  => clk_16M00,
-                ceb   => vid_clken,
-                web   => '0',
+                ceb   => ceb,
                 addrb => addrb,
-                dinb  => x"00",
                 doutb => screen_data_tmp
             );
-        ram_we <= '1' when (addr(15 downto 12) = "0011" or addr(15 downto 14) = "01") and R_W_n = '0' and cpu_clken = '1' else '0';
     end generate;
 
     sound <= sound_bit when comms_mode = "01" else '0';
@@ -426,342 +433,345 @@ begin
 
     rom_latch  <= page_enable & page;
 
-    process (clk_16M00, RST_n)
+    process (sys_clk, RST_n)
         variable rtc_skew  : integer;
         variable disp_skew : integer;
     begin
 
-        if rising_edge(clk_16M00) then
+        if rising_edge(sys_clk) then
 
-            if hard_reset_n = '0' then
-                power_on_reset      <= '1';
-                delayed_clear_reset <= '0';
-            end if;
+            if sys_clken = '1' then
 
-            if RST_n = '0' then
-
-                isr             <= (others => '0');
-                ier             <= (others => '0');
-                screen_base     <= (others => '0');
-                data_shift      <= (others => '0');
-                page_enable     <= '0';
-                page            <= (others => '0');
-                counter         <= (others => '0');
-                comms_mode      <= "00";
-                motor_int       <= '0';
-                caps_int        <= '0';
-                general_counter <= (others => '0');
-                sound_bit       <= '0';
-                ctrl_caps       <= '0';
-                cindat          <= '0';
-                cintone         <= '0';
-
-            else
-                -- Synchronize the field signal from the VGA clock domain
-                field1 <= field_int;
-                field2 <= field1;
-                field3 <= field2;
-
-                -- Generate the rtc interrupt on the rising edge (line 100 of the screen)
-                rtc_intr1 <= rtc_intr;
-                if (rtc_intr1 = '0' and rtc_intr = '1') then
-                    isr(3) <= '1';
+                if hard_reset_n = '0' then
+                    power_on_reset      <= '1';
+                    delayed_clear_reset <= '0';
                 end if;
 
-                -- Generate the display end interrupt on the rising edge (line 256 of the screen)
-                display_intr1 <= display_intr;
-                if display_intr1 = '0' and display_intr = '1' then
-                    isr(2) <= '1';
-                end if;
+                if RST_n = '0' then
 
-                if (comms_mode = "00") then
-                    -- Cassette In Mode
-                    if (casIn2 = '0') then
-                        general_counter <= (others => '0');
-                    else
-                        general_counter <= general_counter + 1;
+                    isr             <= (others => '0');
+                    ier             <= (others => '0');
+                    screen_base     <= (others => '0');
+                    data_shift      <= (others => '0');
+                    page_enable     <= '0';
+                    page            <= (others => '0');
+                    counter         <= (others => '0');
+                    comms_mode      <= "00";
+                    motor_int       <= '0';
+                    caps_int        <= '0';
+                    general_counter <= (others => '0');
+                    sound_bit       <= '0';
+                    ctrl_caps       <= '0';
+                    cindat          <= '0';
+                    cintone         <= '0';
+
+                else
+                    -- Synchronize the field signal from the VGA clock domain
+                    field1 <= field_int;
+                    field2 <= field1;
+                    field3 <= field2;
+
+                    -- Generate the rtc interrupt on the rising edge (line 100 of the screen)
+                    rtc_intr1 <= rtc_intr;
+                    if (rtc_intr1 = '0' and rtc_intr = '1') then
+                        isr(3) <= '1';
                     end if;
-                elsif (comms_mode = "01") then
-                    -- Sound Mode - Frequency = 1MHz / [16 * (S + 1)]
-                    if (general_counter = 0) then
-                        general_counter <= counter & "11111111";
-                        sound_bit <= not sound_bit;
-                    else
-                        general_counter <= general_counter - 1;
+
+                    -- Generate the display end interrupt on the rising edge (line 256 of the screen)
+                    display_intr1 <= display_intr;
+                    if display_intr1 = '0' and display_intr = '1' then
+                        isr(2) <= '1';
                     end if;
-                elsif (comms_mode = "10") then
-                    -- Cassette Out Mode
-                    -- Bit 12 is at 2404Hz
-                    -- Bit 13 is at 1202Hz
-                    if (general_counter(11 downto 0) = 0) then
-                        general_counter <= general_counter - x"301";
-                    else
-                        general_counter <= general_counter - x"001";
+
+                    if (comms_mode = "00") then
+                        -- Cassette In Mode
+                        if (casIn2 = '0') then
+                            general_counter <= (others => '0');
+                        else
+                            general_counter <= general_counter + 1;
+                        end if;
+                    elsif (comms_mode = "01") then
+                        -- Sound Mode - Frequency = 1MHz / [16 * (S + 1)]
+                        if (general_counter = 0) then
+                            general_counter <= counter & "11111111";
+                            sound_bit <= not sound_bit;
+                        else
+                            general_counter <= general_counter - 1;
+                        end if;
+                    elsif (comms_mode = "10") then
+                        -- Cassette Out Mode
+                        -- Bit 12 is at 2404Hz
+                        -- Bit 13 is at 1202Hz
+                        if (general_counter(11 downto 0) = 0) then
+                            general_counter <= general_counter - x"301";
+                        else
+                            general_counter <= general_counter - x"001";
+                        end if;
                     end if;
-                end if;
 
-                -- Tape Interface Receive
-                casIn1 <= casIn;
-                casIn2 <= casIn1;
-                casIn3 <= casIn2;
-                if (comms_mode = "00" and motor_int = '1') then
-                    -- Only take actions on the falling edge of casIn
-                    -- On the falling edge, general_counter will contain length of
-                    -- the previous high pulse in 16MHz cycles.
-                    -- A 1200Hz pulse is 6666 cycles
-                    -- A 2400Hz pulse is 3333 cycles
-                    -- A threshold in between would be 5000 cycles.
-                    -- Ignore pulses shorter then say 500 cycles as these are
-                    -- probably just noise.
+                    -- Tape Interface Receive
+                    casIn1 <= casIn;
+                    casIn2 <= casIn1;
+                    casIn3 <= casIn2;
+                    if (comms_mode = "00" and motor_int = '1') then
+                        -- Only take actions on the falling edge of casIn
+                        -- On the falling edge, general_counter will contain length of
+                        -- the previous high pulse in 16MHz cycles.
+                        -- A 1200Hz pulse is 6666 cycles
+                        -- A 2400Hz pulse is 3333 cycles
+                        -- A threshold in between would be 5000 cycles.
+                        -- Ignore pulses shorter then say 500 cycles as these are
+                        -- probably just noise.
 
-                    if (casIn3 = '1' and casIn2 = '0' and general_counter > 500) then
-                        -- a Pulse of length > 500 cycles has been detected
+                        if (casIn3 = '1' and casIn2 = '0' and general_counter > 500) then
+                            -- a Pulse of length > 500 cycles has been detected
 
-                        if (cindat = '0' and cintone = '0' and general_counter <= 5000) then
-                            -- High Tone detected
-                            cindat  <= '0';
-                            cintone <= '1';
-                            cinbits <= (others => '0');
-                            -- Generate the high tone detect interrupt
-                            isr(6) <= '1';
-
-                        elsif (cindat = '0' and cintone = '1' and general_counter > 5000) then
-                            -- Start bit detected
-                            cindat  <= '1';
-                            cintone <= '0';
-                            cinbits <= (others => '0');
-
-                        elsif (cindat = '1' and ignore_next = '1') then
-                            -- Ignoring the second pulse in a bit at 2400Hz
-                            ignore_next <= '0';
-
-                        elsif (cindat = '1' and cinbits < 9) then
-
-                            if (cinbits < 8) then
-                                if (general_counter > 5000) then
-                                    -- shift in a zero
-                                    data_shift <= '0' & data_shift(7 downto 1);
-                                else
-                                    -- shift in a one
-                                    data_shift <= '1' & data_shift(7 downto 1);
-                                end if;
-                                -- Generate the receive data int as soon as the
-                                -- last bit has been shifted in.
-                                if (cinbits = 7) then
-                                    isr(4) <= '1';
-                                end if;
-                            end if;
-                            -- Ignore the second pulse in a bit at 2400Hz
-                            if (general_counter > 5000) then
-                                ignore_next <= '0';
-                            else
-                                ignore_next <= '1';
-                            end if;
-                            -- Move on to the next data bit
-                            cinbits <= cinbits + 1;
-                        elsif (cindat = '1' and cinbits = 9) then
-                            if (general_counter > 5000) then
-                                -- Found next start bit...
-                                cindat  <= '1';
-                                cintone <= '0';
-                                cinbits <= (others => '0');
-                            else
-                                -- Back in tone again
+                            if (cindat = '0' and cintone = '0' and general_counter <= 5000) then
+                                -- High Tone detected
                                 cindat  <= '0';
                                 cintone <= '1';
                                 cinbits <= (others => '0');
                                 -- Generate the high tone detect interrupt
                                 isr(6) <= '1';
-                            end if;
-                        end if;
-                    end if;
-                else
-                    cindat      <= '0';
-                    cintone     <= '0';
-                    cinbits     <= (others => '0');
-                    ignore_next <= '0';
-                end if;
 
-                -- regardless of the comms mode, update coutbits state (at 1200Hz)
-                if general_counter(13 downto 0) = 0 then
-                    -- wait to TDEmpty interrupt to be cleared before starting
-                    if coutbits = 0 then
-                        if isr(5) = '0' then
-                            coutbits <= x"9";
+                            elsif (cindat = '0' and cintone = '1' and general_counter > 5000) then
+                                -- Start bit detected
+                                cindat  <= '1';
+                                cintone <= '0';
+                                cinbits <= (others => '0');
+
+                            elsif (cindat = '1' and ignore_next = '1') then
+                                -- Ignoring the second pulse in a bit at 2400Hz
+                                ignore_next <= '0';
+
+                            elsif (cindat = '1' and cinbits < 9) then
+
+                                if (cinbits < 8) then
+                                    if (general_counter > 5000) then
+                                        -- shift in a zero
+                                        data_shift <= '0' & data_shift(7 downto 1);
+                                    else
+                                        -- shift in a one
+                                        data_shift <= '1' & data_shift(7 downto 1);
+                                    end if;
+                                    -- Generate the receive data int as soon as the
+                                    -- last bit has been shifted in.
+                                    if (cinbits = 7) then
+                                        isr(4) <= '1';
+                                    end if;
+                                end if;
+                                -- Ignore the second pulse in a bit at 2400Hz
+                                if (general_counter > 5000) then
+                                    ignore_next <= '0';
+                                else
+                                    ignore_next <= '1';
+                                end if;
+                                -- Move on to the next data bit
+                                cinbits <= cinbits + 1;
+                            elsif (cindat = '1' and cinbits = 9) then
+                                if (general_counter > 5000) then
+                                    -- Found next start bit...
+                                    cindat  <= '1';
+                                    cintone <= '0';
+                                    cinbits <= (others => '0');
+                                else
+                                    -- Back in tone again
+                                    cindat  <= '0';
+                                    cintone <= '1';
+                                    cinbits <= (others => '0');
+                                    -- Generate the high tone detect interrupt
+                                    isr(6) <= '1';
+                                end if;
+                            end if;
                         end if;
                     else
-                        -- set the TDEmpty interrpt after the last data bit is sent
-                        if coutbits = 1 then
-                            isr(5) <= '1';
-                        end if;
-                        -- shift the data shift register if not the start bit
-                        -- shifting a 1 at the top end gives us the correct stop bit
-                        if comms_mode = "10" and coutbits /= 9 then
-                            data_shift <= '1' & data_shift(7 downto 1);
-                        end if;
-                        -- move to the next state
-                        coutbits <= coutbits - 1;
+                        cindat      <= '0';
+                        cintone     <= '0';
+                        cinbits     <= (others => '0');
+                        ignore_next <= '0';
                     end if;
-                end if;
-                -- Generate the cassette out tone based on the current state
-                if coutbits = 9 or (coutbits > 0 and data_shift(0) = '0') then
-                    -- start bit or data bit "0" = 1200Hz
-                    casOut <= general_counter(13);
-                else
-                    -- stop bit or data bit "1" or any other time= 2400Hz
-                    casOut <= general_counter(12);
-                end if;
 
-                -- ULA Writes
-                if cpu_clken = '1' then
-                    if delayed_clear_reset = '1' then
-                        power_on_reset <= '0';
-                    end if;
-                    ---- Detect control+caps 1...4 and change video format
-                    if addr = x"9fff" and page_enable = '1' and page(2 downto 1) = "00" then
-                        if kbd(2 downto 1) = "00" then
-                            ctrl_caps <= '1';
+                    -- regardless of the comms mode, update coutbits state (at 1200Hz)
+                    if general_counter(13 downto 0) = 0 then
+                        -- wait to TDEmpty interrupt to be cleared before starting
+                        if coutbits = 0 then
+                            if isr(5) = '0' then
+                                coutbits <= x"9";
+                            end if;
                         else
-                            ctrl_caps <= '0';
+                            -- set the TDEmpty interrpt after the last data bit is sent
+                            if coutbits = 1 then
+                                isr(5) <= '1';
+                            end if;
+                            -- shift the data shift register if not the start bit
+                            -- shifting a 1 at the top end gives us the correct stop bit
+                            if comms_mode = "10" and coutbits /= 9 then
+                                data_shift <= '1' & data_shift(7 downto 1);
+                            end if;
+                            -- move to the next state
+                            coutbits <= coutbits - 1;
                         end if;
                     end if;
-                    -- Detect "1" being pressed: 1MHz
-                    if (addr = x"afff" and page_enable = '1' and page(2 downto 1) = "00" and ctrl_caps = '1' and kbd(0) = '0') then
-                        turbo_out <= "00";
+                    -- Generate the cassette out tone based on the current state
+                    if coutbits = 9 or (coutbits > 0 and data_shift(0) = '0') then
+                        -- start bit or data bit "0" = 1200Hz
+                        casOut <= general_counter(13);
+                    else
+                        -- stop bit or data bit "1" or any other time= 2400Hz
+                        casOut <= general_counter(12);
                     end if;
-                    -- Detect "2" being pressed: 2MHz with contention
-                    if (addr = x"b7ff" and page_enable = '1' and page(2 downto 1) = "00" and ctrl_caps = '1' and kbd(0) = '0') then
-                        turbo_out <= "01";
-                    end if;
-                    -- Detect "3" being pressed: 2MHz no contention
-                    if (addr = x"bbff" and page_enable = '1' and page(2 downto 1) = "00" and ctrl_caps = '1' and kbd(0) = '0') then
-                        turbo_out <= "10";
-                    end if;
-                    -- Detect "4" being pressed: 4MHz
-                    if (addr = x"bdff" and page_enable = '1' and page(2 downto 1) = "00" and ctrl_caps = '1' and kbd(0) = '0') then
-                        turbo_out <= "11";
-                    end if;
-                    if (addr(15 downto 8) = x"FE") then
-                        if (R_W_n = '1') then
-                            -- Clear the power on reset flag on the first read of the ISR (FEx0)
-                            if (addr(3 downto 0) = x"0") then
-                                delayed_clear_reset <= '1';
+
+                    -- ULA Writes
+                    if cpu_clken = '1' then
+                        if delayed_clear_reset = '1' then
+                            power_on_reset <= '0';
+                        end if;
+                        ---- Detect control+caps 1...4 and change video format
+                        if addr = x"9fff" and page_enable = '1' and page(2 downto 1) = "00" then
+                            if kbd(2 downto 1) = "00" then
+                                ctrl_caps <= '1';
+                            else
+                                ctrl_caps <= '0';
                             end if;
-                            -- Clear the RDFull interrupts on reading the data_shift register
-                            if (addr(3 downto 0) = x"4") then
-                                isr(4) <= '0';
-                            end if;
-                        else
-                            case addr(3 downto 0) is
-                                when x"0" =>
-                                    ier(6 downto 2) <= data_in(6 downto 2);
-                                when x"1" =>
-                                when x"2" =>
-                                    screen_base(8 downto 6) <= data_in(7 downto 5);
-                                when x"3" =>
-                                    screen_base(14 downto 9) <= data_in(5 downto 0);
-                                when x"4" =>
-                                    data_shift <= data_in;
-                                    -- Clear the TDEmpty interrupt on writing the
-                                    -- data_shift register
-                                    isr(5) <= '0';
-                                when x"5" =>
-                                    if (data_in(6) = '1') then
+                        end if;
+                        -- Detect "1" being pressed: 1MHz
+                        if (addr = x"afff" and page_enable = '1' and page(2 downto 1) = "00" and ctrl_caps = '1' and kbd(0) = '0') then
+                            turbo_out <= "00";
+                        end if;
+                        -- Detect "2" being pressed: 2MHz with contention
+                        if (addr = x"b7ff" and page_enable = '1' and page(2 downto 1) = "00" and ctrl_caps = '1' and kbd(0) = '0') then
+                            turbo_out <= "01";
+                        end if;
+                        -- Detect "3" being pressed: 2MHz no contention
+                        if (addr = x"bbff" and page_enable = '1' and page(2 downto 1) = "00" and ctrl_caps = '1' and kbd(0) = '0') then
+                            turbo_out <= "10";
+                        end if;
+                        -- Detect "4" being pressed: 4MHz
+                        if (addr = x"bdff" and page_enable = '1' and page(2 downto 1) = "00" and ctrl_caps = '1' and kbd(0) = '0') then
+                            turbo_out <= "11";
+                        end if;
+                        if (addr(15 downto 8) = x"FE") then
+                            if (R_W_n = '1') then
+                                -- Clear the power on reset flag on the first read of the ISR (FEx0)
+                                if (addr(3 downto 0) = x"0") then
+                                    delayed_clear_reset <= '1';
+                                end if;
+                                -- Clear the RDFull interrupts on reading the data_shift register
+                                if (addr(3 downto 0) = x"4") then
+                                    isr(4) <= '0';
+                                end if;
+                            else
+                                case addr(3 downto 0) is
+                                    when x"0" =>
+                                        ier(6 downto 2) <= data_in(6 downto 2);
+                                    when x"1" =>
+                                    when x"2" =>
+                                        screen_base(8 downto 6) <= data_in(7 downto 5);
+                                    when x"3" =>
+                                        screen_base(14 downto 9) <= data_in(5 downto 0);
+                                    when x"4" =>
+                                        data_shift <= data_in;
+                                        -- Clear the TDEmpty interrupt on writing the
+                                        -- data_shift register
+                                        isr(5) <= '0';
+                                    when x"5" =>
+                                        if (data_in(6) = '1') then
                                         -- Clear High Tone Detect IRQ
-                                        isr(6) <= '0';
-                                    end if;
-                                    if (data_in(5) = '1') then
+                                            isr(6) <= '0';
+                                        end if;
+                                        if (data_in(5) = '1') then
                                         -- Clear Real Time Clock IRQ
-                                        isr(3) <= '0';
-                                    end if;
-                                    if (data_in(4) = '1') then
+                                            isr(3) <= '0';
+                                        end if;
+                                        if (data_in(4) = '1') then
                                         -- Clear Display End IRQ
-                                        isr(2) <= '0';
-                                    end if;
-                                    -- The Electron ROM Latch behaviour is complex, because part is
-                                    -- implemented in the ULA and part in the Plus 1. It's possible
-                                    -- for these to get out of sync and cause a bus conflict. See
-                                    -- https://stardot.org.uk/forums/viewtopic.php?p=405701#p405701
-                                    --
-                                    -- We don't currently implement this bug/feature. The ROM latch
-                                    -- is implemented in one place (here in ElectronULA), and bits
-                                    -- 7..4 must be zero to change it. This mimics the Plus 1
-                                    -- implementation, where this check is implemented by IC4.
-                                    if data_in(7 downto 4) = "0000" then
-                                        if (page_enable = '1' and page(2) = '0') then
+                                            isr(2) <= '0';
+                                        end if;
+                                        -- The Electron ROM Latch behaviour is complex, because part is
+                                        -- implemented in the ULA and part in the Plus 1. It's possible
+                                        -- for these to get out of sync and cause a bus conflict. See
+                                        -- https://stardot.org.uk/forums/viewtopic.php?p=405701#p405701
+                                        --
+                                        -- We don't currently implement this bug/feature. The ROM latch
+                                        -- is implemented in one place (here in ElectronULA), and bits
+                                        -- 7..4 must be zero to change it. This mimics the Plus 1
+                                        -- implementation, where this check is implemented by IC4.
+                                        if data_in(7 downto 4) = "0000" then
+                                            if (page_enable = '1' and page(2) = '0') then
                                         -- Roms 8-11 currently selected, so only selecting 8-15 will be honoured
-                                            if (data_in(3) = '1') then
+                                                if (data_in(3) = '1') then
+                                                    page_enable <= data_in(3);
+                                                    page <= data_in(2 downto 0);
+                                                end if;
+                                            else
+                                        -- Roms 0-7 or 12-15 currently selected, so anything goes
                                                 page_enable <= data_in(3);
                                                 page <= data_in(2 downto 0);
                                             end if;
-                                        else
-                                        -- Roms 0-7 or 12-15 currently selected, so anything goes
-                                            page_enable <= data_in(3);
-                                            page <= data_in(2 downto 0);
                                         end if;
-                                    end if;
-                                when x"6" =>
-                                    counter <= data_in;
-                                when x"7" =>
-                                    caps_int  <= data_in(7);
-                                    motor_int <= data_in(6);
-                                    case (data_in(5 downto 3)) is
-                                        when "000" =>
-                                            mode_base    <= "0110"; -- 0x3000
-                                            mode_bpp     <= "00";
-                                            mode_40      <= '0';
-                                            mode_text    <= '0';
-                                        when "001" =>
-                                            mode_base    <= "0110"; -- 0x3000
-                                            mode_bpp     <= "01";
-                                            mode_40      <= '0';
-                                            mode_text    <= '0';
-                                        when "010" =>
-                                            mode_base    <= "0110"; -- 0x3000
-                                            mode_bpp     <= "10";
-                                            mode_40      <= '0';
-                                            mode_text    <= '0';
-                                        when "011" =>
-                                            mode_base    <= "1000"; -- 0x4000
-                                            mode_bpp     <= "00";
-                                            mode_40      <= '0';
-                                            mode_text    <= '1';
-                                        when "100" =>
-                                            mode_base    <= "1011"; -- 0x5800
-                                            mode_bpp     <= "00";
-                                            mode_40      <= '1';
-                                            mode_text    <= '0';
-                                        when "101" =>
-                                            mode_base    <= "1011"; -- 0x5800
-                                            mode_bpp     <= "01";
-                                            mode_40      <= '1';
-                                            mode_text    <= '0';
-                                        when "110" =>
-                                            mode_base    <= "1100"; -- 0x6000
-                                            mode_bpp     <= "00";
-                                            mode_40      <= '1';
-                                            mode_text    <= '1';
-                                        when "111" =>
-                                            -- mode 7 seems to default to mode 4
-                                            mode_base    <= "1011"; -- 0x5800
-                                            mode_bpp     <= "00";
-                                            mode_40      <= '1';
-                                            mode_text    <= '0';
-                                        when others =>
-                                    end case;
-                                    comms_mode   <= data_in(2 downto 1);
-                                    -- A quirk of the Electron ULA is that RxFull
-                                    -- interrupt fires when tape output mode is
-                                    -- entered. Games like Southen Belle rely on
-                                    -- this quirk.
-                                    if data_in(2 downto 1) = "10" then
-                                        isr(4) <= '1';
-                                    end if;
-                                when others =>
-                                    -- A '1' in the palatte data means disable the colour
-                                    -- Invert the stored palette, to make the palette logic simpler
-                                    palette(slv2int(addr(2 downto 0))) <= data_in xor "11111111";
-                            end case;
+                                    when x"6" =>
+                                        counter <= data_in;
+                                    when x"7" =>
+                                        caps_int  <= data_in(7);
+                                        motor_int <= data_in(6);
+                                        case (data_in(5 downto 3)) is
+                                            when "000" =>
+                                                mode_base    <= "0110"; -- 0x3000
+                                                mode_bpp     <= "00";
+                                                mode_40      <= '0';
+                                                mode_text    <= '0';
+                                            when "001" =>
+                                                mode_base    <= "0110"; -- 0x3000
+                                                mode_bpp     <= "01";
+                                                mode_40      <= '0';
+                                                mode_text    <= '0';
+                                            when "010" =>
+                                                mode_base    <= "0110"; -- 0x3000
+                                                mode_bpp     <= "10";
+                                                mode_40      <= '0';
+                                                mode_text    <= '0';
+                                            when "011" =>
+                                                mode_base    <= "1000"; -- 0x4000
+                                                mode_bpp     <= "00";
+                                                mode_40      <= '0';
+                                                mode_text    <= '1';
+                                            when "100" =>
+                                                mode_base    <= "1011"; -- 0x5800
+                                                mode_bpp     <= "00";
+                                                mode_40      <= '1';
+                                                mode_text    <= '0';
+                                            when "101" =>
+                                                mode_base    <= "1011"; -- 0x5800
+                                                mode_bpp     <= "01";
+                                                mode_40      <= '1';
+                                                mode_text    <= '0';
+                                            when "110" =>
+                                                mode_base    <= "1100"; -- 0x6000
+                                                mode_bpp     <= "00";
+                                                mode_40      <= '1';
+                                                mode_text    <= '1';
+                                            when "111" =>
+                                        -- mode 7 seems to default to mode 4
+                                                mode_base    <= "1011"; -- 0x5800
+                                                mode_bpp     <= "00";
+                                                mode_40      <= '1';
+                                                mode_text    <= '0';
+                                            when others =>
+                                        end case;
+                                        comms_mode   <= data_in(2 downto 1);
+                                        -- A quirk of the Electron ULA is that RxFull
+                                        -- interrupt fires when tape output mode is
+                                        -- entered. Games like Southen Belle rely on
+                                        -- this quirk.
+                                        if data_in(2 downto 1) = "10" then
+                                            isr(4) <= '1';
+                                        end if;
+                                    when others =>
+                                        -- A '1' in the palatte data means disable the colour
+                                        -- Invert the stored palette, to make the palette logic simpler
+                                        palette(slv2int(addr(2 downto 0))) <= data_in xor "11111111";
+                                end case;
+                            end if;
                         end if;
                     end if;
                 end if;
@@ -769,269 +779,272 @@ begin
         end if;
     end process;
 
-    process (clk_16M00)
+    process (sys_clk)
         variable pixel : std_logic_vector(3 downto 0);
         -- start address of current row block (8-10 lines)
         variable row_addr  : std_logic_vector(14 downto 6);
         -- address within current line
         variable byte_addr : std_logic_vector(14 downto 3);
     begin
-        if rising_edge(clk_16M00) then
+        if rising_edge(sys_clk) then
 
-            -- Delay the screen data by a further 2MHz cycle to correctly align palette writes
-            if vid_clken = '1' then
-                screen_data <= screen_data_tmp;
-            end if;
+            if sys_clken = '1' then
 
-            -- Horizontal counter, clocked at the pixel clock rate
-            if h_count = h_total then
-                h_count <= (others => '0');
-            else
-                h_count <= h_count + 1;
-            end if;
-
-            -- Pipelined version of h_count by to compensate the register in the RAM
-            h_count1 <= h_count - 15;
-
-            -- Vertical counter, incremented at the end of each line
-            if h_count = h_total then
-                if v_count = v_total then
-                    v_count <= (others => '0');
-                else
-                    v_count <= v_count + 1;
+                -- Delay the screen data by a further 2MHz cycle to correctly align palette writes
+                if vid_clken = '1' then
+                    screen_data <= screen_data_tmp;
                 end if;
-            end if;
 
-            -- Field; field=0 is the (first) odd field, field=1 is the even field
-            if h_count = h_total and v_count = v_total then
-                field_int <= not field_int;
-            end if;
-
-            -- Char_row counts 0..7 or 0..9 depending on the mode.
-            -- It incremented on the trailing edge of hsync
-            hsync_int_last <= hsync_int;
-            if hsync_int = '1' and hsync_int_last = '0'  then
-                if v_count = v_total then
-                    char_row <= (others => '0');
-                elsif last_line = '1' then
-                    char_row <= (others => '0');
+                -- Horizontal counter, clocked at the pixel clock rate
+                if h_count = h_total then
+                    h_count <= (others => '0');
                 else
-                    char_row <= char_row + 1;
+                    h_count <= h_count + 1;
                 end if;
-            elsif mode_text = '0' then
-                -- From the ULA schematics sheet 7, VA3 is a T-type Latch
-                -- with an additional reset input connected to GMODE, so it's
-                -- immediately forced to zero in a graphics mode. This is
-                -- needed for 0xC0DE's Vertical Rupture demo to work.
-                char_row(3) <= '0';
-            end if;
 
-            -- Determine last line of a row
-            if ((mode_text = '0' and char_row = 7) or (mode_text = '1' and char_row = 9)) then
-                last_line <= '1';
-            else
-                last_line <= '0';
-            end if;
+                -- Pipelined version of h_count by to compensate the register in the RAM
+                h_count1 <= h_count - 15;
 
-            -- RAM Address, constructed from the local row_addr and byte_addr registers
-            -- Some of this is taken from Hick's efforts to understand the schematics:
-            -- https://www.mups.co.uk/project/hardware/acorn_electron/
-
-            -- At start of the field, update row_addr and byte_addr from the ULA registers 2,3
-            if h_count = h_total and v_count = v_total then
-                row_addr  := screen_base;
-                byte_addr := screen_base & "000";
-            end if;
-
-            -- At the start of hsync,  update the row_addr from byte_addr which
-            -- gets to the start of the next block
-            if hsync_int = '0' and last_line = '1' then
-                row_addr := byte_addr(14 downto 6);
-            end if;
-
-            -- During hsync, reset byte reset back to start of line, unless
-            -- it's the last line
-            if hsync_int = '0' and last_line = '0' then
-                byte_addr := row_addr & "000";
-            end if;
-
-            -- Every 8 or 16 pixels depending on mode/repeats
-            if h_count < h_active then
-                if (mode_40 = '0' and h_count(2 downto 0) = "111") or
-                    (mode_40 = '1' and h_count(3 downto 0) = "1111") then
-                    byte_addr := byte_addr + 1;
-                end if;
-            end if;
-
-            -- Handle wrap-around back to mode_base
-            if byte_addr(14 downto 11) = "0000" then
-                byte_addr := mode_base & byte_addr(10 downto 3);
-            end if;
-
-            -- Screen_addr is the final 15-bit Video RAM address
-            screen_addr <= byte_addr & char_row(2 downto 0);
-
-            -- Indicate possible memory contention on active scans lines.
-            if (h_count >= h_active) or
-               (mode_text = '0' and v_count >= v_active_gph) or
-               (mode_text = '1' and v_count >= v_active_txt) or
-               (char_row >= 8) then
-                contention <= '0';
-            else
-                contention <= not mode_40;
-            end if;
-
-            -- RGB Data
-            if (h_count1 >= h_active or (mode_text = '0' and v_count >= v_active_gph) or (mode_text = '1' and v_count >= v_active_txt) or char_row >= 8) then
-                -- blanking and border are always black
-                red   <= '0';
-                green <= '0';
-                blue  <= '0';
-            else
-                -- rendering an actual pixel
-                if (mode_bpp = 0) then
-                    -- 1 bit per pixel, map to colours 0 and 8 for the palette lookup
-                    if (mode_40 = '1') then
-                        pixel := screen_data(7 - slv2int(h_count1(3 downto 1))) & "000";
+                -- Vertical counter, incremented at the end of each line
+                if h_count = h_total then
+                    if v_count = v_total then
+                        v_count <= (others => '0');
                     else
-                        pixel := screen_data(7 - slv2int(h_count1(2 downto 0))) & "000";
-                    end if;
-                elsif (mode_bpp = 1) then
-                    -- 2 bits per pixel, map to colours 0, 2, 8, 10 for the palette lookup
-                    if (mode_40 = '1') then
-                        pixel := screen_data(7 - slv2int(h_count1(3 downto 2))) & "0" &
-                                 screen_data(3 - slv2int(h_count1(3 downto 2))) & "0";
-                    else
-                        pixel := screen_data(7 - slv2int(h_count1(2 downto 1))) & "0" &
-                                 screen_data(3 - slv2int(h_count1(2 downto 1))) & "0";
-                    end if;
-                else
-                    -- 4 bits per pixel, map directly for the palette lookup
-                    if (mode_40 = '1') then
-                        pixel := screen_data(7 - sl2int(h_count1(3))) &
-                                 screen_data(5 - sl2int(h_count1(3))) &
-                                 screen_data(3 - sl2int(h_count1(3))) &
-                                 screen_data(1 - sl2int(h_count1(3)));
-                    else
-                        pixel := screen_data(7 - sl2int(h_count1(2))) &
-                                 screen_data(5 - sl2int(h_count1(2))) &
-                                 screen_data(3 - sl2int(h_count1(2))) &
-                                 screen_data(1 - sl2int(h_count1(2)));
+                        v_count <= v_count + 1;
                     end if;
                 end if;
-                -- Implement Color Palette
-                case (pixel) is
-                    when "0000" =>
-                        red   <= palette(1)(0);
-                        green <= palette(1)(4);
-                        blue  <= palette(0)(4);
-                    when "0001" =>
-                        red   <= palette(7)(0);
-                        green <= palette(7)(4);
-                        blue  <= palette(6)(4);
-                    when "0010" =>
-                        red   <= palette(1)(1);
-                        green <= palette(1)(5);
-                        blue  <= palette(0)(5);
-                    when "0011" =>
-                        red   <= palette(7)(1);
-                        green <= palette(7)(5);
-                        blue  <= palette(6)(5);
-                    when "0100" =>
-                        red   <= palette(3)(0);
-                        green <= palette(3)(4);
-                        blue  <= palette(2)(4);
-                    when "0101" =>
-                        red   <= palette(5)(0);
-                        green <= palette(5)(4);
-                        blue  <= palette(4)(4);
-                    when "0110" =>
-                        red   <= palette(3)(1);
-                        green <= palette(3)(5);
-                        blue  <= palette(2)(5);
-                    when "0111" =>
-                        red   <= palette(5)(1);
-                        green <= palette(5)(5);
-                        blue  <= palette(4)(5);
-                    when "1000" =>
-                        red   <= palette(1)(2);
-                        green <= palette(0)(2);
-                        blue  <= palette(0)(6);
-                    when "1001" =>
-                        red   <= palette(7)(2);
-                        green <= palette(6)(2);
-                        blue  <= palette(6)(6);
-                    when "1010" =>
-                        red   <= palette(1)(3);
-                        green <= palette(0)(3);
-                        blue  <= palette(0)(7);
-                    when "1011" =>
-                        red   <= palette(7)(3);
-                        green <= palette(6)(3);
-                        blue  <= palette(6)(7);
-                    when "1100" =>
-                        red   <= palette(3)(2);
-                        green <= palette(2)(2);
-                        blue  <= palette(2)(6);
-                    when "1101" =>
-                        red   <= palette(5)(2);
-                        green <= palette(4)(2);
-                        blue  <= palette(4)(6);
-                    when "1110" =>
-                        red   <= palette(3)(3);
-                        green <= palette(2)(3);
-                        blue  <= palette(2)(7);
-                    when "1111" =>
-                        red   <= palette(5)(3);
-                        green <= palette(4)(3);
-                        blue  <= palette(4)(7);
-                    when others =>
-                end case;
-            end if;
-            -- Vertical Sync, lasts 160us (2.5 lines; 5 lines when scan doubled)
-            if is_int_field = '0' then
-                -- first field (odd) of interlaced scanning (or non interlaced)
-                -- vsync starts at the beginning of the line
-                if (h_count1 = 0 and v_count = vsync_start) then
-                    vsync_int <= '0';
-                elsif (h_count1 = ('0' & h_total(10 downto 1)) and v_count = vsync_end) then
-                    vsync_int <= '1';
+
+                -- Field; field=0 is the (first) odd field, field=1 is the even field
+                if h_count = h_total and v_count = v_total then
+                    field_int <= not field_int;
                 end if;
-            else
-                -- second field (even) of intelaced scanning
-                -- vsync starts half way through the line
-                if (h_count1 = ('0' & h_total(10 downto 1)) and v_count = vsync_start) then
-                    vsync_int <= '0';
-                elsif (h_count1 = 0 and v_count = vsync_end) then
-                    vsync_int <= '1';
+
+                -- Char_row counts 0..7 or 0..9 depending on the mode.
+                -- It incremented on the trailing edge of hsync
+                hsync_int_last <= hsync_int;
+                if hsync_int = '1' and hsync_int_last = '0'  then
+                    if v_count = v_total then
+                        char_row <= (others => '0');
+                    elsif last_line = '1' then
+                        char_row <= (others => '0');
+                    else
+                        char_row <= char_row + 1;
+                    end if;
+                elsif mode_text = '0' then
+                    -- From the ULA schematics sheet 7, VA3 is a T-type Latch
+                    -- with an additional reset input connected to GMODE, so it's
+                    -- immediately forced to zero in a graphics mode. This is
+                    -- needed for 0xC0DE's Vertical Rupture demo to work.
+                    char_row(3) <= '0';
                 end if;
-            end if;
-            -- Horizontal Sync
-            if (h_count1 = hsync_start) then
-                hsync_int <= '0';
-            elsif (h_count1 = hsync_end) then
-                hsync_int <= '1';
-            end if;
-            -- Blanking
-            if h_count1 = hblank_start then
-                blank <= '1';
-            elsif h_count1 = hblank_end and (v_count < vblank_start or v_count >= vblank_end) then
-                blank <= '0';
-            end if;
-            -- Display Interrupt, this is co-incident with the leading edge
-            -- of hsync at the end the last active line of display
-            -- (line 249 in text mode or line 255 in graphics mode)
-            if (h_count1 = hsync_start) and ((v_count = v_disp_gph and mode_text = '0') or (v_count = v_disp_txt and mode_text = '1')) then
-                display_intr <= '1';
-            elsif (h_count1 = hsync_end) then
-                display_intr <= '0';
-            end if;
-            -- RTC Interrupt, this occurs 8192us (128 lines) after the end of
-            -- the vsync, and is not co-incident with hsync
-            if (v_count = v_rtc) and ((is_int_field = '0' and h_count1 = 0) or (is_int_field = '1' and h_count1 = ('0' & h_total(10 downto 1)))) then
-                rtc_intr <= '1';
-            elsif (v_count = 0) then
-                rtc_intr <= '0';
+
+                -- Determine last line of a row
+                if ((mode_text = '0' and char_row = 7) or (mode_text = '1' and char_row = 9)) then
+                    last_line <= '1';
+                else
+                    last_line <= '0';
+                end if;
+
+                -- RAM Address, constructed from the local row_addr and byte_addr registers
+                -- Some of this is taken from Hick's efforts to understand the schematics:
+                -- https://www.mups.co.uk/project/hardware/acorn_electron/
+
+                -- At start of the field, update row_addr and byte_addr from the ULA registers 2,3
+                if h_count = h_total and v_count = v_total then
+                    row_addr  := screen_base;
+                    byte_addr := screen_base & "000";
+                end if;
+
+                -- At the start of hsync,  update the row_addr from byte_addr which
+                -- gets to the start of the next block
+                if hsync_int = '0' and last_line = '1' then
+                    row_addr := byte_addr(14 downto 6);
+                end if;
+
+                -- During hsync, reset byte reset back to start of line, unless
+                -- it's the last line
+                if hsync_int = '0' and last_line = '0' then
+                    byte_addr := row_addr & "000";
+                end if;
+
+                -- Every 8 or 16 pixels depending on mode/repeats
+                if h_count < h_active then
+                    if (mode_40 = '0' and h_count(2 downto 0) = "111") or
+                        (mode_40 = '1' and h_count(3 downto 0) = "1111") then
+                        byte_addr := byte_addr + 1;
+                    end if;
+                end if;
+
+                -- Handle wrap-around back to mode_base
+                if byte_addr(14 downto 11) = "0000" then
+                    byte_addr := mode_base & byte_addr(10 downto 3);
+                end if;
+
+                -- Screen_addr is the final 15-bit Video RAM address
+                screen_addr <= byte_addr & char_row(2 downto 0);
+
+                -- Indicate possible memory contention on active scans lines.
+                if (h_count >= h_active) or
+                    (mode_text = '0' and v_count >= v_active_gph) or
+                    (mode_text = '1' and v_count >= v_active_txt) or
+                    (char_row >= 8) then
+                    contention <= '0';
+                else
+                    contention <= not mode_40;
+                end if;
+
+                -- RGB Data
+                if (h_count1 >= h_active or (mode_text = '0' and v_count >= v_active_gph) or (mode_text = '1' and v_count >= v_active_txt) or char_row >= 8) then
+                    -- blanking and border are always black
+                    red   <= '0';
+                    green <= '0';
+                    blue  <= '0';
+                else
+                    -- rendering an actual pixel
+                    if (mode_bpp = 0) then
+                        -- 1 bit per pixel, map to colours 0 and 8 for the palette lookup
+                        if (mode_40 = '1') then
+                            pixel := screen_data(7 - slv2int(h_count1(3 downto 1))) & "000";
+                        else
+                            pixel := screen_data(7 - slv2int(h_count1(2 downto 0))) & "000";
+                        end if;
+                    elsif (mode_bpp = 1) then
+                        -- 2 bits per pixel, map to colours 0, 2, 8, 10 for the palette lookup
+                        if (mode_40 = '1') then
+                            pixel := screen_data(7 - slv2int(h_count1(3 downto 2))) & "0" &
+                                     screen_data(3 - slv2int(h_count1(3 downto 2))) & "0";
+                        else
+                            pixel := screen_data(7 - slv2int(h_count1(2 downto 1))) & "0" &
+                                     screen_data(3 - slv2int(h_count1(2 downto 1))) & "0";
+                        end if;
+                    else
+                        -- 4 bits per pixel, map directly for the palette lookup
+                        if (mode_40 = '1') then
+                            pixel := screen_data(7 - sl2int(h_count1(3))) &
+                                     screen_data(5 - sl2int(h_count1(3))) &
+                                     screen_data(3 - sl2int(h_count1(3))) &
+                                     screen_data(1 - sl2int(h_count1(3)));
+                        else
+                            pixel := screen_data(7 - sl2int(h_count1(2))) &
+                                     screen_data(5 - sl2int(h_count1(2))) &
+                                     screen_data(3 - sl2int(h_count1(2))) &
+                                     screen_data(1 - sl2int(h_count1(2)));
+                        end if;
+                    end if;
+                    -- Implement Color Palette
+                    case (pixel) is
+                        when "0000" =>
+                            red   <= palette(1)(0);
+                            green <= palette(1)(4);
+                            blue  <= palette(0)(4);
+                        when "0001" =>
+                            red   <= palette(7)(0);
+                            green <= palette(7)(4);
+                            blue  <= palette(6)(4);
+                        when "0010" =>
+                            red   <= palette(1)(1);
+                            green <= palette(1)(5);
+                            blue  <= palette(0)(5);
+                        when "0011" =>
+                            red   <= palette(7)(1);
+                            green <= palette(7)(5);
+                            blue  <= palette(6)(5);
+                        when "0100" =>
+                            red   <= palette(3)(0);
+                            green <= palette(3)(4);
+                            blue  <= palette(2)(4);
+                        when "0101" =>
+                            red   <= palette(5)(0);
+                            green <= palette(5)(4);
+                            blue  <= palette(4)(4);
+                        when "0110" =>
+                            red   <= palette(3)(1);
+                            green <= palette(3)(5);
+                            blue  <= palette(2)(5);
+                        when "0111" =>
+                            red   <= palette(5)(1);
+                            green <= palette(5)(5);
+                            blue  <= palette(4)(5);
+                        when "1000" =>
+                            red   <= palette(1)(2);
+                            green <= palette(0)(2);
+                            blue  <= palette(0)(6);
+                        when "1001" =>
+                            red   <= palette(7)(2);
+                            green <= palette(6)(2);
+                            blue  <= palette(6)(6);
+                        when "1010" =>
+                            red   <= palette(1)(3);
+                            green <= palette(0)(3);
+                            blue  <= palette(0)(7);
+                        when "1011" =>
+                            red   <= palette(7)(3);
+                            green <= palette(6)(3);
+                            blue  <= palette(6)(7);
+                        when "1100" =>
+                            red   <= palette(3)(2);
+                            green <= palette(2)(2);
+                            blue  <= palette(2)(6);
+                        when "1101" =>
+                            red   <= palette(5)(2);
+                            green <= palette(4)(2);
+                            blue  <= palette(4)(6);
+                        when "1110" =>
+                            red   <= palette(3)(3);
+                            green <= palette(2)(3);
+                            blue  <= palette(2)(7);
+                        when "1111" =>
+                            red   <= palette(5)(3);
+                            green <= palette(4)(3);
+                            blue  <= palette(4)(7);
+                        when others =>
+                    end case;
+                end if;
+                -- Vertical Sync, lasts 160us (2.5 lines; 5 lines when scan doubled)
+                if is_int_field = '0' then
+                    -- first field (odd) of interlaced scanning (or non interlaced)
+                    -- vsync starts at the beginning of the line
+                    if (h_count1 = 0 and v_count = vsync_start) then
+                        vsync_int <= '0';
+                    elsif (h_count1 = ('0' & h_total(10 downto 1)) and v_count = vsync_end) then
+                        vsync_int <= '1';
+                    end if;
+                else
+                    -- second field (even) of intelaced scanning
+                    -- vsync starts half way through the line
+                    if (h_count1 = ('0' & h_total(10 downto 1)) and v_count = vsync_start) then
+                        vsync_int <= '0';
+                    elsif (h_count1 = 0 and v_count = vsync_end) then
+                        vsync_int <= '1';
+                    end if;
+                end if;
+                -- Horizontal Sync
+                if (h_count1 = hsync_start) then
+                    hsync_int <= '0';
+                elsif (h_count1 = hsync_end) then
+                    hsync_int <= '1';
+                end if;
+                -- Blanking
+                if h_count1 = hblank_start then
+                    blank <= '1';
+                elsif h_count1 = hblank_end and (v_count < vblank_start or v_count >= vblank_end) then
+                    blank <= '0';
+                end if;
+                -- Display Interrupt, this is co-incident with the leading edge
+                -- of hsync at the end the last active line of display
+                -- (line 249 in text mode or line 255 in graphics mode)
+                if (h_count1 = hsync_start) and ((v_count = v_disp_gph and mode_text = '0') or (v_count = v_disp_txt and mode_text = '1')) then
+                    display_intr <= '1';
+                elsif (h_count1 = hsync_end) then
+                    display_intr <= '0';
+                end if;
+                -- RTC Interrupt, this occurs 8192us (128 lines) after the end of
+                -- the vsync, and is not co-incident with hsync
+                if (v_count = v_rtc) and ((is_int_field = '0' and h_count1 = 0) or (is_int_field = '1' and h_count1 = ('0' & h_total(10 downto 1)))) then
+                    rtc_intr <= '1';
+                elsif (v_count = 0) then
+                    rtc_intr <= '0';
+                end if;
             end if;
         end if;
     end process;
@@ -1063,148 +1076,152 @@ begin
     -- clken counter is just the LSB 4 bits of h_counter
     clken_counter <= h_count(3 downto 0);
 
-    clk_gen1 : process(clk_16M00)
+    clk_gen1 : process(sys_clk)
     begin
-        if rising_edge(clk_16M00) then
-            -- Synchronize changes in the current speed with a 1MHz clock boundary
-            if clken_counter = "1111" then
-                turbo_sync <= turbo;
-            end if;
+        if rising_edge(sys_clk) then
 
-            -- video clock enable is always 2MHz
-            vid_clken <= clken_counter(2) and clken_counter(1) and not clken_counter(0);
+            if sys_clken = '1' then
 
-            -- Logic to supress cpu cycles
-            case (turbo_sync) is
-                when "00" =>
-                    -- 1MHz No Contention
-                    --    RAM accesses 1MHz
-                    --    ROM accesses 1MHz
-                    --     IO accesses 1MHz
-                    -- cpu_clken active on cycle 0
-                    -- address/data changes on cycle 1
-                    if clken_counter(3 downto 0) = "1111" then
-                        cpu_clken <= '1';
-                    else
-                        cpu_clken <= '0';
-                    end if;
-                    -- No stopping of the clock in this mode
-                    clk_stopped <= "00";
+                -- Synchronize changes in the current speed with a 1MHz clock boundary
+                if clken_counter = "1111" then
+                    turbo_sync <= turbo;
+                end if;
 
-                when "01" =>
-                    -- 2MHz/1MHz with Contention (match original Electron)
-                    --    RAM accesses 1MHz + contention
-                    --    ROM accesses 2MHz
-                    --     IO accesses 1MHz
-                    -- cpu_clken active on cycle 0, 8
-                    -- address/data changes on cycle 1, 9
-                    if clken_counter(2 downto 0) = "111" and clk_stopped = 0 then
-                        cpu_clken <= '1';
-                    else
-                        cpu_clken <= '0';
-                    end if;
-                    -- Stop the clock on RAM or IO accesses, in the same way the ULA does
-                    if clk_stopped = 0 and clken_counter(2 downto 0) = "110" and (ram_access = '1' or io_access = '1') then
-                        clk_stopped <= "01";
-                    elsif clken_counter(3 downto 0) = "1110" and not (ram_access = '1' and contention = '1') then
-                        clk_stopped <= "00";
-                    end if;
+                -- video clock enable is always 2MHz
+                vid_clken <= clken_counter(2) and clken_counter(1) and not clken_counter(0);
 
-                when "10" =>
-                    -- 2MHz No Contention
-                    --    RAM accesses 2MHz
-                    --    ROM accesses 2MHz
-                    --     IO accesses 2MHz (or 1MHz if LimitIOSpeed true)
-                    -- cpu_clken active on cycle 0, 8
-                    -- address/data changes on cycle 1, 9
-                    if clken_counter(2 downto 0) = "111" and clk_stopped = 0 then
-                        cpu_clken <= '1';
-                    else
-                        cpu_clken <= '0';
-                    end if;
-                    -- Stop the clock on IO accesses as required
-                    if LimitIOSpeed and clk_stopped = 0 and clken_counter(2 downto 0) = "110" and io_access = '1' then
-                        clk_stopped <= "01";
-                    elsif clken_counter(3 downto 0) = "1110" then
-                        clk_stopped <= "00";
-                    end if;
-                when "11" =>
-                    -- 4MHz No contention
-                    --    RAM accesses 4MHz
-                    --    ROM accesses 4MHz (or 2MHz if LimitROMSpeed true)
-                    --     IO accesses 4MHz (or 1MHz if LimitIOSpeed true)
-                    -- cpu_clken active on cycle 0, 4, 8, 12
-                    -- address/data changes on cycle 1, 5, 9, 13
-                    if clken_counter(1 downto 0) = "11" and clk_stopped = 0 then
-                        cpu_clken <= '1';
-                    else
-                        cpu_clken <= '0';
-                    end if;
-                    -- Stop the clock on ROM or IO accesses as required
-                    if clk_stopped = 0 then
-                        if LimitROMSpeed and rom_access = '1' and clken_counter(1 downto 0) = "10" then
-                            clk_stopped <= "01";
-                        elsif LimitIOSpeed and io_access = '1' and clken_counter(1 downto 0) = "10" then
-                            if clken_counter(3 downto 2) = "00" or clken_counter(3 downto 2) = "11" then
-                                clk_stopped <= "01";
-                            else
-                                clk_stopped <= "10";
-                            end if;
-                        end if;
-                    else
-                        if rom_access = '1' then
-                            if clken_counter(2 downto 0) = "110" then
-                                clk_stopped <= "00";
-                            end if;
+                -- Logic to supress cpu cycles
+                case (turbo_sync) is
+                    when "00" =>
+                        -- 1MHz No Contention
+                        --    RAM accesses 1MHz
+                        --    ROM accesses 1MHz
+                        --     IO accesses 1MHz
+                        -- cpu_clken active on cycle 0
+                        -- address/data changes on cycle 1
+                        if clken_counter(3 downto 0) = "1111" then
+                            cpu_clken <= '1';
                         else
-                            if clken_counter(3 downto 0) = "1110" then
-                                if clk_stopped(1) = '1' then
+                            cpu_clken <= '0';
+                        end if;
+                        -- No stopping of the clock in this mode
+                        clk_stopped <= "00";
+
+                    when "01" =>
+                        -- 2MHz/1MHz with Contention (match original Electron)
+                        --    RAM accesses 1MHz + contention
+                        --    ROM accesses 2MHz
+                        --     IO accesses 1MHz
+                        -- cpu_clken active on cycle 0, 8
+                        -- address/data changes on cycle 1, 9
+                        if clken_counter(2 downto 0) = "111" and clk_stopped = 0 then
+                            cpu_clken <= '1';
+                        else
+                            cpu_clken <= '0';
+                        end if;
+                        -- Stop the clock on RAM or IO accesses, in the same way the ULA does
+                        if clk_stopped = 0 and clken_counter(2 downto 0) = "110" and (ram_access = '1' or io_access = '1') then
+                            clk_stopped <= "01";
+                        elsif clken_counter(3 downto 0) = "1110" and not (ram_access = '1' and contention = '1') then
+                            clk_stopped <= "00";
+                        end if;
+
+                    when "10" =>
+                        -- 2MHz No Contention
+                        --    RAM accesses 2MHz
+                        --    ROM accesses 2MHz
+                        --     IO accesses 2MHz (or 1MHz if LimitIOSpeed true)
+                        -- cpu_clken active on cycle 0, 8
+                        -- address/data changes on cycle 1, 9
+                        if clken_counter(2 downto 0) = "111" and clk_stopped = 0 then
+                            cpu_clken <= '1';
+                        else
+                            cpu_clken <= '0';
+                        end if;
+                        -- Stop the clock on IO accesses as required
+                        if LimitIOSpeed and clk_stopped = 0 and clken_counter(2 downto 0) = "110" and io_access = '1' then
+                            clk_stopped <= "01";
+                        elsif clken_counter(3 downto 0) = "1110" then
+                            clk_stopped <= "00";
+                        end if;
+                    when "11" =>
+                        -- 4MHz No contention
+                        --    RAM accesses 4MHz
+                        --    ROM accesses 4MHz (or 2MHz if LimitROMSpeed true)
+                        --     IO accesses 4MHz (or 1MHz if LimitIOSpeed true)
+                        -- cpu_clken active on cycle 0, 4, 8, 12
+                        -- address/data changes on cycle 1, 5, 9, 13
+                        if clken_counter(1 downto 0) = "11" and clk_stopped = 0 then
+                            cpu_clken <= '1';
+                        else
+                            cpu_clken <= '0';
+                        end if;
+                        -- Stop the clock on ROM or IO accesses as required
+                        if clk_stopped = 0 then
+                            if LimitROMSpeed and rom_access = '1' and clken_counter(1 downto 0) = "10" then
+                                clk_stopped <= "01";
+                            elsif LimitIOSpeed and io_access = '1' and clken_counter(1 downto 0) = "10" then
+                                if clken_counter(3 downto 2) = "00" or clken_counter(3 downto 2) = "11" then
                                     clk_stopped <= "01";
                                 else
+                                    clk_stopped <= "10";
+                                end if;
+                            end if;
+                        else
+                            if rom_access = '1' then
+                                if clken_counter(2 downto 0) = "110" then
                                     clk_stopped <= "00";
+                                end if;
+                            else
+                                if clken_counter(3 downto 0) = "1110" then
+                                    if clk_stopped(1) = '1' then
+                                        clk_stopped <= "01";
+                                    else
+                                        clk_stopped <= "00";
+                                    end if;
                                 end if;
                             end if;
                         end if;
-                    end if;
-                when others =>
-            end case;
+                    when others =>
+                end case;
 
-            -- Generate clock enables for VIA one cycle before cpu_clken
-            if turbo_sync(1) = '0' or LimitIOSpeed then
-                -- 1MHz
-                mhz1_clken <= clken_counter(3) and clken_counter(2) and clken_counter(1) and not clken_counter(0);
-                mhz4_clken <=                                           clken_counter(1) and not clken_counter(0);
-            elsif turbo_sync(0) = '0' then
-                -- 2MHz
-                mhz1_clken <= clken_counter(2) and clken_counter(1) and not clken_counter(0);
-                mhz4_clken <=                                           not clken_counter(0);
-            else
-                -- 4MHz
-                mhz1_clken <= clken_counter(1) and not clken_counter(0);
-                mhz4_clken <= '1';
-            end if;
-
-            -- Generate cpu_clk
-            if cpu_clken = '1' then
-                if turbo_sync = "11" then
-                    -- 4MHz clock; produce a 125 ns low pulse
-                    clk_counter <= "011";
+                -- Generate clock enables for VIA one cycle before cpu_clken
+                if turbo_sync(1) = '0' or LimitIOSpeed then
+                    -- 1MHz
+                    mhz1_clken <= clken_counter(3) and clken_counter(2) and clken_counter(1) and not clken_counter(0);
+                    mhz4_clken <=                                           clken_counter(1) and not clken_counter(0);
+                elsif turbo_sync(0) = '0' then
+                    -- 2MHz
+                    mhz1_clken <= clken_counter(2) and clken_counter(1) and not clken_counter(0);
+                    mhz4_clken <=                                           not clken_counter(0);
                 else
-                    -- 1MHz or 2MHz clock; produce a 250 ns low pulse
-                    clk_counter <= "001";
+                    -- 4MHz
+                    mhz1_clken <= clken_counter(1) and not clken_counter(0);
+                    mhz4_clken <= '1';
                 end if;
-                cpu_clk <= '0';
-            elsif clk_counter(2) = '0' then
-                clk_counter <= clk_counter + 1;
-            else
-                cpu_clk <= '1';
+
+                -- Generate cpu_clk
+                if cpu_clken = '1' then
+                    if turbo_sync = "11" then
+                        -- 4MHz clock; produce a 125 ns low pulse
+                        clk_counter <= "011";
+                    else
+                        -- 1MHz or 2MHz clock; produce a 250 ns low pulse
+                        clk_counter <= "001";
+                    end if;
+                    cpu_clk <= '0';
+                elsif clk_counter(2) = '0' then
+                    clk_counter <= clk_counter + 1;
+                else
+                    cpu_clk <= '1';
+                end if;
             end if;
         end if;
     end process;
 
-    cpu_clken_out  <= cpu_clken;
-    mhz1_clken_out <= mhz1_clken;
-    mhz4_clken_out <= mhz4_clken;
+    cpu_clken_out  <= cpu_clken  and sys_clken;
+    mhz1_clken_out <= mhz1_clken and sys_clken;
+    mhz4_clken_out <= mhz4_clken and sys_clken;
     cpu_clk_out    <= cpu_clk;
 
 end behavioral;
