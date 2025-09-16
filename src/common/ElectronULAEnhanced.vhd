@@ -391,20 +391,22 @@ begin
 
         inst_rgb2vga_scandoubler: entity work.rgb2vga_scandoubler
             generic map (
-                WIDTH => 3
+                WIDTH        => 3,
+                CLK_OUT_FREQ => 27
                 )
             port map (
-                clock => vid_clk,
-                clken => vid_clken,
-                clk25 => hdmi_clk,
-                mode  => mode7_enable,
-                rgbi_even_in => tmp_even_in,
-                rgbi_odd_in => tmp_odd_in,
-                hSync_in => tmp_hsync_in,
-                vSync_in => tmp_vsync_in,
-                rgbi_out => tmp_rgb,
-                hSync_out => tmp_hsync,
-                vSync_out => tmp_vsync
+                mode         => mode7_enable,
+                pal_clk      => vid_clk,
+                pal_clken    => vid_clken,
+                pal_rgb_even => tmp_even_in,
+                pal_rgb_odd  => tmp_odd_in,
+                pal_hsync    => tmp_hsync_in,
+                pal_vsync    => tmp_vsync_in,
+                vga_clk      => hdmi_clk,
+                vga_clken    => '1',
+                vga_rgb      => tmp_rgb,
+                vga_hsync    => tmp_hsync,
+                vga_vsync    => tmp_vsync
                 );
 
         bypass <= not jafa_field when IncludeJafaMode7 and mode7_enable = '1' else not ula_field;
