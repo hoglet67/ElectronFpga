@@ -20,7 +20,8 @@ use ieee.numeric_std.all;
 
 entity rgb2vga_scandoubler is
     generic (
-        WIDTH : integer
+        WIDTH        : integer;
+        CLK_OUT_FREQ : integer := 27
         );
     port (
         -- Selects between two different choices of sampling parms
@@ -44,6 +45,17 @@ entity rgb2vga_scandoubler is
 end entity;
 
 architecture rtl of rgb2vga_scandoubler is
+
+    function f_log2 (x : natural) return natural is
+        variable i : natural;
+    begin
+        i := 1;
+        while (2**i < x) and i < 31 loop
+            i := i + 1;
+        end loop;
+        return i;
+    end function;
+
     -- Config parameters
     constant SAMPLE_OFFSET0 : integer := 176;
     constant SAMPLE_OFFSET1 : integer := 32;
@@ -102,10 +114,14 @@ architecture rtl of rgb2vga_scandoubler is
 
     -- Registers in the 25MHz clock domain:
     signal field           : std_logic := '1';
-    signal field_next      : std_logic;
     signal hSync_s25a      : std_logic;
     signal hSync_s25b      : std_logic;
     signal hCount25        : unsigned(width25 - 1 downto 0) := to_unsigned(HORIZ_DISP + HORIZ_FP, width25);
+
+    -- Synchronization
+    signal hs_tmp1         : std_logic;
+    signal hs_tmp2         : std_logic;
+    signal sample_counter  : unsigned(f_log2(CLK_OUT_FREQ) - 1 downto 0);
 
     -- Signals on the write side of the RAMs:
     signal writeEn         : std_logic;
@@ -178,13 +194,54 @@ begin
     -- Field is low for the first line and high for the second line
     rgbi_out <= readData(2*WIDTH - 1 downto WIDTH) when field = '0' else readData(WIDTH - 1 downto 0);
 
-    -- Note: the synchronization here is potentially troublesome and will be improved in the next commit
-
     process(clk25)
     begin
         if rising_edge(clk25) then
-            vSync_out  <= vSync_in; -- synchronize async input
-            hSync_s25a <= hSync_in; -- synchronize async input
+
+            -- Note: the synchronization here is borrowed from the BeebFpga retimer
+            --
+            -- The input and output clocks are frequency locked
+            -- because they are derived from the same clock input, but
+            -- may have aribtrary phase.
+            --
+            -- It's important to only sample hsync when it's
+            -- stable. That's what sample counter does. This counter
+            -- wraps every microsecond, and a sample point it picked a
+            -- couple of clocks after a transition is seen.
+            --
+            -- Note: this scheme only works because we know that the
+            -- hsync period is an integer number of microseconds. So
+            -- the trailing edge will be at a consistent point
+            -- wrt. sample counter which has a period of one
+            -- microsecond.
+            --
+            -- TODO: pass in the output frequency (27) as a generic.
+
+            hs_tmp1 <= hSync_in;  -- synchronize async input
+            hs_tmp2 <= hs_tmp1;
+
+            -- 27MHz counter that wraps every micro second
+            if sample_counter = CLK_OUT_FREQ - 1 then
+                sample_counter <= (others => '0');
+            else
+                sample_counter <= sample_counter + 1;
+            end if;
+
+            -- Synchronise the counter to the trailing edge of hsync, with some hysteresis to avoid continuously hunting
+            -- (Note: this scheme relies on the nominal line being an integer number of microseconds long, which MODE 7 is)
+            if hs_tmp2 = '0' and hs_tmp1 = '1' then
+                -- The next edge should be time at 26, 0 or 1; outside of this resync
+                if sample_counter > 1 and sample_counter < (CLK_OUT_FREQ - 1) then
+                    sample_counter <= to_unsigned(1, sample_counter'length);
+                end if;
+            end if;
+
+            -- Sample once per microsecond, two clock cycles after the edge to be safe
+            if sample_counter = 2 then
+                vSync_out  <= vSync_in;
+                hSync_s25a <= hSync_in;
+            end if;
+
             hSync_s25b <= hSync_s25a;
             if (hSync_s25a = '1' and hSync_s25b = '0') or (hCount25 = HORIZ_DISP + HORIZ_FP - 1) then
                 hCount25 <= to_unsigned(2**width25 - HORIZ_RT - HORIZ_BP, width25);
