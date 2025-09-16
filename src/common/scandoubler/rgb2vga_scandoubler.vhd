@@ -14,15 +14,62 @@
 -- You should have received a copy of the GNU Lesser General Public License
 -- along with this program.  If not, see <http://www.gnu.org/licenses/>.
 --
+
+--    -- Values for 640x480 (total 800x525) with 25.175MHz clock
+--  VGA_HORIZ_RT       : integer := 96;
+--  VGA_HORIZ_BP       : integer := 30;
+--  VGA_HORIZ_DISP     : integer := 656;
+--  VGA_HORIZ_FP       : integer := 18;
+
+--    -- Values for 1170x584 (total 1480x624) with 46.2MHz clock
+--  VGA_HORIZ_RT       : integer := 176;
+--  VGA_HORIZ_BP       : integer := 404;
+--  VGA_HORIZ_DISP     : integer := 656;
+--  VGA_HORIZ_FP       : integer := 244;
+
+--    -- Values for 800x600 (total 1056x625) with 33.032MHz clock
+--  VGA_HORIZ_RT       : integer := 96;
+--  VGA_HORIZ_BP       : integer := 152;
+--  VGA_HORIZ_DISP     : integer := 656;
+--  VGA_HORIZ_FP       : integer := 152;
+
+--    -- Values for 800x600 (total 1024x625) with 32.000MHz clock
+--  VGA_HORIZ_RT       : integer := 128;
+--  VGA_HORIZ_BP       : integer := 160;
+--  VGA_HORIZ_DISP     : integer := 656;
+--  VGA_HORIZ_FP       : integer := 80;
+
+--    -- Values for 800x600 (total 960x625) with 30.000MHz clock
+--    -- Modeline "800x600@50" 30 800 814 884 960 600 601 606 625 +hsync +vsync
+--  VGA_HORIZ_RT       : integer := 70;
+--  VGA_HORIZ_BP       : integer := 76 + 72;
+--  VGA_HORIZ_DISP     : integer := 656;
+--  VGA_HORIZ_FP       : integer := 14 + 72;
+
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
 entity rgb2vga_scandoubler is
     generic (
-        WIDTH        : integer;       -- RGB width
-        CWIDTH       : integer := 10; -- internal counter width
-        CLK_OUT_FREQ : integer := 27
+        -- RGB width
+        WIDTH          : integer;
+
+        -- PAL timimg parameters
+        PAL_OFFSET0    : integer := 176;     -- Used when mode=0
+        PAL_OFFSET1    : integer := 32;      -- Used when mode=1
+        PAL_WIDTH      : integer := 656;     -- Active line width
+
+        -- VGA timimg parameters
+        VGA_CLK_MHZ    : integer := 27;      -- VGA clock frequency in MHz
+        VGA_HORIZ_RT   : integer := 64;
+        VGA_HORIZ_BP   : integer := 68 + 32;
+        VGA_HORIZ_DISP : integer := 656;
+        VGA_HORIZ_FP   : integer := 12 + 32
+
+        -- Values for 720x576p (total 864x625) with 27MHz clock
+        -- worked quite well on Belina and on LG
+        -- ModeLine "720x576" 27.00 720 732 796 864 576 581 586 625 -HSync -VSync
         );
     port (
         -- Selects between two different choices of sampling parms
@@ -58,82 +105,32 @@ architecture rtl of rgb2vga_scandoubler is
         return i;
     end function;
 
-    -- Config parameters
-    constant SAMPLE_OFFSET0 : integer := 176;
-    constant SAMPLE_OFFSET1 : integer := 32;
-    constant SAMPLE_WIDTH   : integer := 656;
-
-    -- Values for 720x576p (total 864x625) with 27MHz clock
-    -- worked quite well on Belina and on LG
-    -- ModeLine "720x576" 27.00 720 732 796 864 576 581 586 625 -HSync -VSync
-
-
-    constant HORIZ_RT       : integer := 64;
-    constant HORIZ_BP       : integer := 68 + 32;
-    constant HORIZ_DISP     : integer := 656;
-    constant HORIZ_FP       : integer := 12 + 32;
-
-
---    -- Original values
---  constant CWIDTH        : integer := 10;
---  constant HORIZ_RT       : integer := 96;
---  constant HORIZ_BP       : integer := 30;
---  constant HORIZ_DISP     : integer := 656;
---  constant HORIZ_FP       : integer := 18;
-
---    -- Values for 1170x584 (total 1480x624) with 46.2MHz clock
---  constant CWIDTH        : integer := 11;
---  constant HORIZ_RT       : integer := 176;
---  constant HORIZ_BP       : integer := 404;
---  constant HORIZ_DISP     : integer := 656;
---  constant HORIZ_FP       : integer := 244;
-
---    -- Values for 800x600 (total 1056x625) with 33.032MHz clock
---  constant CWIDTH        : integer := 11;
---  constant HORIZ_RT       : integer := 96;
---  constant HORIZ_BP       : integer := 152;
---  constant HORIZ_DISP     : integer := 656;
---  constant HORIZ_FP       : integer := 152;
-
---    -- Values for 800x600 (total 1024x625) with 32.000MHz clock
---  constant CWIDTH        : integer := 11;
---  constant HORIZ_RT       : integer := 128;
---  constant HORIZ_BP       : integer := 160;
---  constant HORIZ_DISP     : integer := 656;
---  constant HORIZ_FP       : integer := 80;
-
---    -- Values for 800x600 (total 960x625) with 30.000MHz clock
---    -- Modeline "800x600@50" 30 800 814 884 960 600 601 606 625 +hsync +vsync
---  constant CWIDTH        : integer := 10;
---  constant HORIZ_RT       : integer := 70;
---  constant HORIZ_BP       : integer := 76 + 72;
---  constant HORIZ_DISP     : integer := 656;
---  constant HORIZ_FP       : integer := 14 + 72;
+    constant CWIDTH : integer := f_log2(VGA_HORIZ_RT + VGA_HORIZ_BP + VGA_HORIZ_DISP + VGA_HORIZ_FP);
 
     -- Registers in the 16MHz clock domain:
-    signal pal_hsync1       : std_logic;
-    signal pal_counter      : unsigned(CWIDTH - 1 downto 0) := (others => '0');
-    signal line             : std_logic := '1';
+    signal pal_hsync1   : std_logic;
+    signal pal_counter  : unsigned(CWIDTH - 1 downto 0) := (others => '0');
+    signal line         : std_logic := '1';
 
-    -- Registers in the 25MHz clock domain:
-    signal field            : std_logic := '1';
-    signal vga_hsync1       : std_logic;
-    signal vga_hsync2       : std_logic;
-    signal vga_counter      : unsigned(CWIDTH - 1 downto 0) := to_unsigned(HORIZ_DISP + HORIZ_FP, CWIDTH);
+    -- Registers in the VGA clock domain:
+    signal field        : std_logic := '1';
+    signal vga_hsync1   : std_logic;
+    signal vga_hsync2   : std_logic;
+    signal vga_counter  : unsigned(CWIDTH - 1 downto 0) := to_unsigned(VGA_HORIZ_DISP + VGA_HORIZ_FP, CWIDTH);
 
-    -- Synchronization
-    signal sync_tmp1        : std_logic;
-    signal sync_tmp2        : std_logic;
-    signal sample_counter   : unsigned(f_log2(CLK_OUT_FREQ) - 1 downto 0);
+    -- Registers for synchronization
+    signal sync_tmp1    : std_logic;
+    signal sync_tmp2    : std_logic;
+    signal sync_counter : unsigned(f_log2(VGA_CLK_MHZ) - 1 downto 0);
 
     -- Signals on the write side of the RAM:
-    signal writeEn          : std_logic;
-    signal writeAddr        : std_logic_vector(CWIDTH downto 0); -- one extra bit for double buffering
-    signal writeData        : std_logic_vector(2 * WIDTH - 1 downto 0);
+    signal writeEn      : std_logic;
+    signal writeAddr    : std_logic_vector(CWIDTH downto 0); -- one extra bit for double buffering
+    signal writeData    : std_logic_vector(2 * WIDTH - 1 downto 0);
 
     -- Signals on the read side of the RAM:
-    signal readAddr         : std_logic_vector(CWIDTH downto 0); -- one extra bit for double buffering
-    signal readData         : std_logic_vector(2 * WIDTH - 1 downto 0);
+    signal readAddr     : std_logic_vector(CWIDTH downto 0); -- one extra bit for double buffering
+    signal readData     : std_logic_vector(2 * WIDTH - 1 downto 0);
 
 begin
 
@@ -149,9 +146,9 @@ begin
                 if pal_hsync1 = '0' and pal_hsync = '1' then
                     -- reload on trailing edge of hsync
                     if mode = '0' then
-                        pal_counter <= to_unsigned(2**CWIDTH - SAMPLE_OFFSET0 + 1, CWIDTH);
+                        pal_counter <= to_unsigned(2**CWIDTH - PAL_OFFSET0 + 1, CWIDTH);
                     else
-                        pal_counter <= to_unsigned(2**CWIDTH - SAMPLE_OFFSET1 + 1, CWIDTH);
+                        pal_counter <= to_unsigned(2**CWIDTH - PAL_OFFSET1 + 1, CWIDTH);
                     end if;
                     line <= not line;
                 else
@@ -161,7 +158,7 @@ begin
         end if;
     end process;
 
-    writeEn   <= '1' when pal_counter < SAMPLE_WIDTH else '0';
+    writeEn   <= '1' when pal_counter < PAL_WIDTH else '0';
     writeData <= pal_rgb_even & pal_rgb_odd;
     writeAddr <= line & std_logic_vector(pal_counter);
 
@@ -223,37 +220,37 @@ begin
                 sync_tmp2 <= sync_tmp1;
 
                 -- synchronization counter that wraps every micro second
-                if sample_counter = CLK_OUT_FREQ - 1 then
-                    sample_counter <= (others => '0');
+                if sync_counter = VGA_CLK_MHZ - 1 then
+                    sync_counter <= (others => '0');
                 else
-                    sample_counter <= sample_counter + 1;
+                    sync_counter <= sync_counter + 1;
                 end if;
 
                 -- Synchronise the counter to the trailing edge of hsync, with some hysteresis to avoid continuously hunting
                 -- (Note: this scheme relies on the nominal line being an integer number of microseconds long, which MODE 7 is)
                 if sync_tmp2 = '0' and sync_tmp1 = '1' then
                     -- The next edge should be time at 26, 0 or 1; outside of this resync
-                    if sample_counter > 1 and sample_counter < (CLK_OUT_FREQ - 1) then
-                        sample_counter <= to_unsigned(1, sample_counter'length);
+                    if sync_counter > 1 and sync_counter < (VGA_CLK_MHZ - 1) then
+                        sync_counter <= to_unsigned(1, sync_counter'length);
                     end if;
                 end if;
 
                 -- Sample once per microsecond, two clock cycles after the edge to be safe
-                if sample_counter = 2 then
+                if sync_counter = 2 then
                     vga_vsync  <= pal_vsync;
                     vga_hsync1 <= pal_hsync;
                 end if;
 
                 vga_hsync2 <= vga_hsync1;
-                if (vga_hsync1 = '1' and vga_hsync2 = '0') or (vga_counter = HORIZ_DISP + HORIZ_FP - 1) then
-                    vga_counter <= to_unsigned(2**CWIDTH - HORIZ_RT - HORIZ_BP, CWIDTH);
+                if (vga_hsync1 = '1' and vga_hsync2 = '0') or (vga_counter = VGA_HORIZ_DISP + VGA_HORIZ_FP - 1) then
+                    vga_counter <= to_unsigned(2**CWIDTH - VGA_HORIZ_RT - VGA_HORIZ_BP, CWIDTH);
                     field <= vga_hsync2;
                 else
                     vga_counter <= vga_counter + 1;
                 end if;
 
                 -- regenerate a line doubled hsync
-                if vga_counter >= to_unsigned(2**CWIDTH - HORIZ_RT - HORIZ_BP, CWIDTH) and vga_counter < to_unsigned(2**CWIDTH - HORIZ_BP, CWIDTH) then
+                if vga_counter >= to_unsigned(2**CWIDTH - VGA_HORIZ_RT - VGA_HORIZ_BP, CWIDTH) and vga_counter < to_unsigned(2**CWIDTH - VGA_HORIZ_BP, CWIDTH) then
                     vga_hsync <= '0';
                 else
                     vga_hsync <= '1';

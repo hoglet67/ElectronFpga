@@ -392,7 +392,7 @@ begin
         inst_rgb2vga_scandoubler: entity work.rgb2vga_scandoubler
             generic map (
                 WIDTH        => 3,
-                CLK_OUT_FREQ => 27
+                VGA_CLK_MHZ  => 27
                 )
             port map (
                 mode         => mode7_enable,
