@@ -161,7 +161,7 @@ begin
         end if;
     end process;
 
-    writeEn   <= '1' when pal_counter < SAMPLE_WIDTH and pal_clken = '1' else '0';
+    writeEn   <= '1' when pal_counter < SAMPLE_WIDTH else '0';
     writeData <= pal_rgb_even & pal_rgb_odd;
     writeAddr <= line & std_logic_vector(pal_counter);
 
@@ -172,17 +172,20 @@ begin
 
     ram: entity work.rgb2vga_dpram
         generic map (
-            WIDTH     => WIDTH * 2 -- double to allow different data for odd and even lines
+            DWIDTH    => WIDTH * 2,   -- * 2 to allow different data for odd and even lines
+            AWIDTH    => CWIDTH + 1   -- + 1 for double buffering
             )
         port map(
             -- Write port
             wrclock   => pal_clk,
+            wrclken   => pal_clken,
             wraddress => writeAddr,
             wren      => writeEn,
             data      => writeData,
 
             -- Read port
             rdclock   => vga_clk,
+            rdclken   => vga_clken,
             rdaddress => readAddr,
             q         => readData
             );
