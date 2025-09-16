@@ -15,7 +15,6 @@
 -- along with this program.  If not, see <http://www.gnu.org/licenses/>.
 --
 library ieee;
-
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
@@ -24,29 +23,23 @@ entity rgb2vga_scandoubler is
         WIDTH : integer
         );
     port (
-        -- 32MHz pixel clock from BBC Micro
-        clock : in  std_logic;
-
-        -- 16MHz clock enable BBC Micro
-        clken : in  std_logic;
-
-        -- 25MHz VGA clock
-        clk25 : in  std_logic;
-
         -- Selects between two different choices of sampling parms
         -- Use mode=0 at 16MHz and mode=1 at 12MHz
-        mode : in std_logic;
+        mode         : in std_logic;
 
         -- Input 15.625kHz RGB signals
-        rgbi_even_in : in  std_logic_vector(WIDTH - 1 downto 0);
-        rgbi_odd_in : in  std_logic_vector(WIDTH - 1 downto 0);
-        hSync_in  : in  std_logic;
-        vSync_in  : in  std_logic;
+        clock        : in  std_logic;
+        clken        : in  std_logic;
+        rgbi_even_in : in  std_logic_vector(WIDTH - 1 downto 0); -- even (upper) row
+        rgbi_odd_in  : in  std_logic_vector(WIDTH - 1 downto 0); -- odd (lower) row
+        hSync_in     : in  std_logic;
+        vSync_in     : in  std_logic;
 
-        -- Output 31.250kHz VGA signals
-        rgbi_out  : out std_logic_vector(WIDTH - 1 downto 0);
-        hSync_out : out std_logic;
-        vSync_out : out std_logic
+        -- Output 31.250kHz VGA signals (scan doubled)
+        clk25        : in  std_logic;
+        rgbi_out     : out std_logic_vector(WIDTH - 1 downto 0);
+        hSync_out    : out std_logic;
+        vSync_out    : out std_logic
         );
 end entity;
 
@@ -56,7 +49,17 @@ architecture rtl of rgb2vga_scandoubler is
     constant SAMPLE_OFFSET1 : integer := 32;
     constant SAMPLE_WIDTH   : integer := 656;
 
---    -- original values
+    -- Values for 720x576p (total 864x625) with 27MHz clock
+    -- worked quite well on Belina and on LG
+    -- ModeLine "720x576" 27.00 720 732 796 864 576 581 586 625 -HSync -VSync
+    constant width25       : integer := 10;
+    constant HORIZ_RT      : integer := 64;
+    constant HORIZ_BP      : integer := 68 + 32;
+    constant HORIZ_DISP    : integer := 656;
+    constant HORIZ_FP      : integer := 12 + 32;
+
+
+--    -- Original values
 --  constant width25       : integer := 10;
 --  constant HORIZ_RT      : integer := 96;
 --  constant HORIZ_BP      : integer := 30;
@@ -69,15 +72,6 @@ architecture rtl of rgb2vga_scandoubler is
 --  constant HORIZ_BP      : integer := 404;
 --  constant HORIZ_DISP    : integer := 656;
 --  constant HORIZ_FP      : integer := 244;
-
-    -- Values for 720x576p (total 864x625) with 27MHz clock
-    -- worked quite well on Belina and on LG
-    -- ModeLine "720x576" 27.00 720 732 796 864 576 581 586 625 -HSync -VSync
-    constant width25       : integer := 10;
-    constant HORIZ_RT      : integer := 64;
-    constant HORIZ_BP      : integer := 68 + 32;
-    constant HORIZ_DISP    : integer := 656;
-    constant HORIZ_FP      : integer := 12 + 32;
 
 --    -- Values for 800x600 (total 1056x625) with 33.032MHz clock
 --  constant width25       : integer := 11;
@@ -101,14 +95,10 @@ architecture rtl of rgb2vga_scandoubler is
 --  constant HORIZ_DISP    : integer := 656;
 --  constant HORIZ_FP      : integer := 14 + 72;
 
-
     -- Registers in the 16MHz clock domain:
     signal hSync_s16       : std_logic;
-    signal hSyncStart      : std_logic;
     signal hCount16        : unsigned(9 downto 0) := (others => '0');
-    signal hCount16_next   : unsigned(9 downto 0);
     signal lineToggle      : std_logic := '1';
-    signal lineToggle_next : std_logic;
 
     -- Registers in the 25MHz clock domain:
     signal field           : std_logic := '1';
@@ -116,7 +106,6 @@ architecture rtl of rgb2vga_scandoubler is
     signal hSync_s25a      : std_logic;
     signal hSync_s25b      : std_logic;
     signal hCount25        : unsigned(width25 - 1 downto 0) := to_unsigned(HORIZ_DISP + HORIZ_FP, width25);
-    signal hCount25_next   : unsigned(width25 - 1 downto 0);
 
     -- Signals on the write side of the RAMs:
     signal writeEn         : std_logic;
@@ -128,18 +117,43 @@ architecture rtl of rgb2vga_scandoubler is
     signal readData        : std_logic_vector(2 * WIDTH - 1 downto 0);
 
 begin
-    writeData <= rgbi_even_in & rgbi_odd_in;
-    writeAddr <=     lineToggle & std_logic_vector(hCount16);
-    readAddr  <= not lineToggle & std_logic_vector(hCount25(9 downto 0));
 
-    -- Double buffered block RAM straddling the 16MHz and 25MHz clock
+    -- 16MHz clock domain ---------------------------------------------------------------------------
+
+    -- there is nothing asynchronous here
+
+    process(clock)
+    begin
+        if rising_edge(clock) then
+            if clken = '1' then
+                hSync_s16 <= hSync_in;
+                if hSync_s16 = '0' and hSync_in = '1' then
+                    -- reload on trailing edge of hsync
+                    if mode = '0' then
+                        hCount16 <= to_unsigned(2**10 - SAMPLE_OFFSET0 + 1, 10);
+                    else
+                        hCount16 <= to_unsigned(2**10 - SAMPLE_OFFSET1 + 1, 10);
+                    end if;
+                    lineToggle <= not lineToggle;
+                else
+                    hCount16 <= hCount16 + 1;
+                end if;
+            end if;
+        end if;
+    end process;
+
+    writeEn   <= '1' when hCount16 < SAMPLE_WIDTH and clken = '1' else '0';
+    writeData <= rgbi_even_in & rgbi_odd_in;
+    writeAddr <= lineToggle & std_logic_vector(hCount16);
+
+    -- Double buffered block RAM straddling the input and output clock
     -- domains, for storing pixel lines; whilst we're reading from one
-    -- line at 25MHz, we're writing to the other at 16MHz. Their roles
-    -- swap every incoming 64us scanline.
-    --
+    -- line, we're writing to the other. Their roles swap every
+    -- incoming 64us scanline.
+
     ram: entity work.rgb2vga_dpram
         generic map (
-            WIDTH => WIDTH*2
+            WIDTH     => WIDTH * 2 -- double to allow different data for odd and even lines
             )
         port map(
             -- Write port
@@ -155,70 +169,36 @@ begin
             );
 
 
-    -- 16MHz clock domain ---------------------------------------------------------------------------
-    process(clock)
+    -- 25MHz clock domain ---------------------------------------------------------------------------
+
+    -- Note: we don't bother to synchronize lineToggle as it never changes during the active part of the line
+
+    readAddr  <= not lineToggle & std_logic_vector(hCount25);
+
+    -- Field is low for the first line and high for the second line
+    rgbi_out <= readData(2*WIDTH - 1 downto WIDTH) when field = '0' else readData(WIDTH - 1 downto 0);
+
+    -- Note: the synchronization here is potentially troublesome and will be improved in the next commit
+
+    process(clk25)
     begin
-        if rising_edge(clock) then
-            if clken = '1' then
-                hSync_s16 <= hSync_in;
-                hCount16  <= hCount16_next;
-                lineToggle <= lineToggle_next;
+        if rising_edge(clk25) then
+            vSync_out  <= vSync_in; -- synchronize async input
+            hSync_s25a <= hSync_in; -- synchronize async input
+            hSync_s25b <= hSync_s25a;
+            if (hSync_s25a = '1' and hSync_s25b = '0') or (hCount25 = HORIZ_DISP + HORIZ_FP - 1) then
+                hCount25 <= to_unsigned(2**width25 - HORIZ_RT - HORIZ_BP, width25);
+                field <= hSync_s25b;
+            else
+                hCount25 <= hCount25 + 1;
+            end if;
+            -- regenerate a line doubled hsync
+            if hCount25 >= to_unsigned(2**width25 - HORIZ_RT - HORIZ_BP, width25) and hCount25 < to_unsigned(2**width25 - HORIZ_BP, width25) then
+                hSync_out <= '0';
+            else
+                hSync_out <= '1';
             end if;
         end if;
     end process;
-
-    -- Pulses representing the start of incoming HSYNC & VSYNC
-    hSyncStart <=
-        '1' when hSync_s16 = '0' and hSync_in = '1'
-        else '0';
-
-    -- Create horizontal count, aligned to incoming HSYNC
-    hCount16_next <=
-        to_unsigned(2**10 - SAMPLE_OFFSET0 + 1, 10) when hSyncStart = '1' and mode = '0' else
-        to_unsigned(2**10 - SAMPLE_OFFSET1 + 1, 10) when hSyncStart = '1' and mode = '1' else
-        hCount16 + 1;
-
-    -- Toggle every incoming HSYNC
-    lineToggle_next <=
-        not(lineToggle) when hSyncStart = '1'
-        else lineToggle;
-
-    -- Generate interleaved write signals for dual-port RAMs
-    writeEn <=
-        '1' when hCount16 < SAMPLE_WIDTH and clken = '1'
-        else '0';
-
-    -- Interleave output of dual-port RAMs
-    rgbi_out <= readData(2*WIDTH - 1 downto WIDTH) when field = '0' else readData(WIDTH - 1 downto 0);
-
-    -- 25MHz clock domain ---------------------------------------------------------------------------
-    process(clk25)
-    begin
-        if ( rising_edge(clk25) ) then
-            hCount25  <= hCount25_next;
-            field <= field_next;
-            hSync_s25a <= hSync_in;
-            hSync_s25b <= hSync_s25a;
-            vSync_out <= vSync_in;
-        end if;
-    end process;
-
-    -- Generate 25MHz hCount
-    hCount25_next <=
-        to_unsigned(2**width25 - HORIZ_RT - HORIZ_BP, width25) when
-        (hSync_s25a = '1' and hSync_s25b = '0') or
-        (hCount25 = HORIZ_DISP + HORIZ_FP - 1)
-        else hCount25 + 1;
-
-    -- Generate even/odd field
-    field_next <=
-        '0' when (hSync_s25a = '1' and hSync_s25b = '0') else
-        '1' when (hCount25 = HORIZ_DISP + HORIZ_FP - 1) else
-        field;
-
-    -- Generate VGA HSYNC
-    hSync_out <=
-        '0' when hCount25 >= to_unsigned(2**width25 - HORIZ_RT - HORIZ_BP, width25) and hCount25 < to_unsigned(2**width25 - HORIZ_BP, width25)
-        else '1';
 
 end architecture;
