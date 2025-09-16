@@ -20,15 +20,16 @@ use ieee.numeric_std.all;
 
 entity rgb2vga_scandoubler is
     generic (
-        WIDTH        : integer;
+        WIDTH        : integer;       -- RGB width
+        CWIDTH       : integer := 10; -- internal counter width
         CLK_OUT_FREQ : integer := 27
         );
     port (
         -- Selects between two different choices of sampling parms
-        -- Use mode=0 at 16MHz and mode=1 at 12MHz
+        -- Use mode=0 at pal_clken = 16MHz and mode=1 at pal_clken = 12MHz
         mode         : in std_logic;
 
-        -- Input 15.625kHz RGB signals
+        -- Input 15.625kHz PAL signals
         pal_clk      : in  std_logic;
         pal_clken    : in  std_logic;
         pal_rgb_even : in  std_logic_vector(WIDTH - 1 downto 0); -- even (upper) row
@@ -65,7 +66,8 @@ architecture rtl of rgb2vga_scandoubler is
     -- Values for 720x576p (total 864x625) with 27MHz clock
     -- worked quite well on Belina and on LG
     -- ModeLine "720x576" 27.00 720 732 796 864 576 581 586 625 -HSync -VSync
-    constant width25        : integer := 10;
+
+
     constant HORIZ_RT       : integer := 64;
     constant HORIZ_BP       : integer := 68 + 32;
     constant HORIZ_DISP     : integer := 656;
@@ -73,28 +75,28 @@ architecture rtl of rgb2vga_scandoubler is
 
 
 --    -- Original values
---  constant width25        : integer := 10;
+--  constant CWIDTH        : integer := 10;
 --  constant HORIZ_RT       : integer := 96;
 --  constant HORIZ_BP       : integer := 30;
 --  constant HORIZ_DISP     : integer := 656;
 --  constant HORIZ_FP       : integer := 18;
 
 --    -- Values for 1170x584 (total 1480x624) with 46.2MHz clock
---  constant width25        : integer := 11;
+--  constant CWIDTH        : integer := 11;
 --  constant HORIZ_RT       : integer := 176;
 --  constant HORIZ_BP       : integer := 404;
 --  constant HORIZ_DISP     : integer := 656;
 --  constant HORIZ_FP       : integer := 244;
 
 --    -- Values for 800x600 (total 1056x625) with 33.032MHz clock
---  constant width25        : integer := 11;
+--  constant CWIDTH        : integer := 11;
 --  constant HORIZ_RT       : integer := 96;
 --  constant HORIZ_BP       : integer := 152;
 --  constant HORIZ_DISP     : integer := 656;
 --  constant HORIZ_FP       : integer := 152;
 
 --    -- Values for 800x600 (total 1024x625) with 32.000MHz clock
---  constant width25        : integer := 11;
+--  constant CWIDTH        : integer := 11;
 --  constant HORIZ_RT       : integer := 128;
 --  constant HORIZ_BP       : integer := 160;
 --  constant HORIZ_DISP     : integer := 656;
@@ -102,7 +104,7 @@ architecture rtl of rgb2vga_scandoubler is
 
 --    -- Values for 800x600 (total 960x625) with 30.000MHz clock
 --    -- Modeline "800x600@50" 30 800 814 884 960 600 601 606 625 +hsync +vsync
---  constant width25        : integer := 10;
+--  constant CWIDTH        : integer := 10;
 --  constant HORIZ_RT       : integer := 70;
 --  constant HORIZ_BP       : integer := 76 + 72;
 --  constant HORIZ_DISP     : integer := 656;
@@ -110,14 +112,14 @@ architecture rtl of rgb2vga_scandoubler is
 
     -- Registers in the 16MHz clock domain:
     signal pal_hsync1       : std_logic;
-    signal pal_counter      : unsigned(9 downto 0) := (others => '0');
+    signal pal_counter      : unsigned(CWIDTH - 1 downto 0) := (others => '0');
     signal line             : std_logic := '1';
 
     -- Registers in the 25MHz clock domain:
     signal field            : std_logic := '1';
     signal vga_hsync1       : std_logic;
     signal vga_hsync2       : std_logic;
-    signal vga_counter      : unsigned(width25 - 1 downto 0) := to_unsigned(HORIZ_DISP + HORIZ_FP, width25);
+    signal vga_counter      : unsigned(CWIDTH - 1 downto 0) := to_unsigned(HORIZ_DISP + HORIZ_FP, CWIDTH);
 
     -- Synchronization
     signal sync_tmp1        : std_logic;
@@ -126,11 +128,11 @@ architecture rtl of rgb2vga_scandoubler is
 
     -- Signals on the write side of the RAM:
     signal writeEn          : std_logic;
-    signal writeAddr        : std_logic_vector(10 downto 0);
+    signal writeAddr        : std_logic_vector(CWIDTH downto 0); -- one extra bit for double buffering
     signal writeData        : std_logic_vector(2 * WIDTH - 1 downto 0);
 
     -- Signals on the read side of the RAM:
-    signal readAddr         : std_logic_vector(10 downto 0);
+    signal readAddr         : std_logic_vector(CWIDTH downto 0); -- one extra bit for double buffering
     signal readData         : std_logic_vector(2 * WIDTH - 1 downto 0);
 
 begin
@@ -147,9 +149,9 @@ begin
                 if pal_hsync1 = '0' and pal_hsync = '1' then
                     -- reload on trailing edge of hsync
                     if mode = '0' then
-                        pal_counter <= to_unsigned(2**10 - SAMPLE_OFFSET0 + 1, 10);
+                        pal_counter <= to_unsigned(2**CWIDTH - SAMPLE_OFFSET0 + 1, CWIDTH);
                     else
-                        pal_counter <= to_unsigned(2**10 - SAMPLE_OFFSET1 + 1, 10);
+                        pal_counter <= to_unsigned(2**CWIDTH - SAMPLE_OFFSET1 + 1, CWIDTH);
                     end if;
                     line <= not line;
                 else
@@ -191,9 +193,6 @@ begin
     -- Note: we don't bother to synchronize line as it never changes during the active part of the line
 
     readAddr  <= not line & std_logic_vector(vga_counter);
-
-    -- Field is low for the first line and high for the second line
-    vga_rgb <= readData(2*WIDTH - 1 downto WIDTH) when field = '0' else readData(WIDTH - 1 downto 0);
 
     process(vga_clk)
     begin
@@ -244,17 +243,23 @@ begin
 
                 vga_hsync2 <= vga_hsync1;
                 if (vga_hsync1 = '1' and vga_hsync2 = '0') or (vga_counter = HORIZ_DISP + HORIZ_FP - 1) then
-                    vga_counter <= to_unsigned(2**width25 - HORIZ_RT - HORIZ_BP, width25);
+                    vga_counter <= to_unsigned(2**CWIDTH - HORIZ_RT - HORIZ_BP, CWIDTH);
                     field <= vga_hsync2;
                 else
                     vga_counter <= vga_counter + 1;
                 end if;
+
                 -- regenerate a line doubled hsync
-                if vga_counter >= to_unsigned(2**width25 - HORIZ_RT - HORIZ_BP, width25) and vga_counter < to_unsigned(2**width25 - HORIZ_BP, width25) then
+                if vga_counter >= to_unsigned(2**CWIDTH - HORIZ_RT - HORIZ_BP, CWIDTH) and vga_counter < to_unsigned(2**CWIDTH - HORIZ_BP, CWIDTH) then
                     vga_hsync <= '0';
                 else
                     vga_hsync <= '1';
                 end if;
+
+                -- Select odd or even line data based on field, which is
+                -- low for the first line and high for the second line
+                vga_rgb <= readData(2*WIDTH - 1 downto WIDTH) when field = '0' else readData(WIDTH - 1 downto 0);
+
             end if;
         end if;
     end process;
