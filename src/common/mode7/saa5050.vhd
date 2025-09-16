@@ -128,9 +128,9 @@ signal rom_addr      :   std_logic_vector(10 downto 0);
 signal rom_addr_this :   std_logic_vector(10 downto 0);
 signal rom_addr_prev :   std_logic_vector(10 downto 0);
 signal rom_addr_next :   std_logic_vector(10 downto 0);
-signal rom_data      :   std_logic_vector(7 downto 0);
-signal rom_data_prev :   std_logic_vector(7 downto 0);
-signal rom_data_next :   std_logic_vector(7 downto 0);
+signal row_data      :   std_logic_vector(7 downto 0);
+signal ref_data_even :   std_logic_vector(7 downto 0);
+signal ref_data_odd :   std_logic_vector(7 downto 0);
 
 -- Delayed display enable derived from LOSE by delaying for one and two characters
 signal disp_enable  :   std_logic;
@@ -505,18 +505,20 @@ begin
 
     hold_active <= '1' when gfx_hold = '1' and code_r(6 downto 5) = "00" else '0';
 
-    rom_char      <= (others => '0') when (double_high = '0' and double_high2 = '1') else
-                       last_gfx when hold_active = '1'                          else
-                       code_r;
+    rom_char <= (others => '0') when (double_high = '0' and double_high2 = '1') else
+                last_gfx when hold_active = '1'                                 else
+                code_r;
 
     rom_addr_this <= rom_char & std_logic_vector(line_addr);
-    rom_addr_prev <= rom_addr_this - 1;
-    rom_addr_next <= rom_addr_this + 1;
+
+    rom_addr_prev <= rom_char & std_logic_vector(line_addr - 1);
+
+    rom_addr_next <= rom_char & std_logic_vector(line_addr + 1);
 
     rom_addr <= char_rom_addr when char_rom_we = '1' and not IncludeTTxtROM else
-                   rom_addr_prev when pixel_counter = 9  else
-                   rom_addr_next when pixel_counter = 10 else
-                   rom_addr_this;
+                rom_addr_prev when pixel_counter = 9  else
+                rom_addr_next when pixel_counter = 10 else
+                rom_addr_this;
 
     -- If IncludeTTxtROM is true then we include the "ROM" version that is
     -- initialized with the mode 7 character set data
@@ -526,7 +528,7 @@ begin
         clock    => CLOCK,
         clken    => CLKEN,
         addressA => rom_addr,
-        QA       => rom_data
+        QA       => row_data
         );
     end generate;
 
@@ -540,20 +542,46 @@ begin
             wea      => char_rom_we,
             addressA => rom_addr,
             dina     => char_rom_data,
-            QA       => rom_data
+            QA       => row_data
             );
     end generate;
 
-    -- Latch reference rows
+    -- Latch reference rows for character rounding...
+
+    -- SAA5050 datasheet: For small characters rounding is always
+    -- referenced in the same direction (i.e. row before in even
+    -- fields and row after in odd fields as determined by the CRS
+    -- signal). For double height characters rounding is always
+    -- referenced alternately up and down changing every line using an
+    -- internally generated signal. (The CRS signal is '0' for the odd
+    -- field and '1' for the even field of an interlaced TV picture).
+
     process(CLOCK)
     begin
         if rising_edge(CLOCK) then
             if CLKEN = '1' then
-                if pixel_counter = 10 then
-                    rom_data_prev <= rom_data;
-                end if;
-                if pixel_counter = 11 then
-                    rom_data_next <= rom_data;
+                if double_high = '0' then
+                    -- normal height, reference is based on even vs odd row
+                    if pixel_counter = 10 then
+                        ref_data_even <= row_data; -- above
+                    end if;
+                    if pixel_counter = 11 then
+                        ref_data_odd  <= row_data; -- below
+                    end if;
+                else
+                    -- double height, reference is based on the LSB of the line counter
+                    if pixel_counter = 10 then
+                        if line_counter(0) = '0' then
+                            ref_data_odd  <= row_data; -- above
+                            ref_data_even <= row_data; -- above
+                        end if;
+                    end if;
+                    if pixel_counter = 11 then
+                        if line_counter(0) = '1' then
+                            ref_data_odd  <= row_data; -- below
+                            ref_data_even <= row_data; -- below
+                        end if;
+                    end if;
                 end if;
             end if;
         end if;
@@ -563,13 +591,13 @@ begin
     -- Shift register
     --------------------------------------------------------------------
     process(CLOCK,nRESET)
-        variable a : std_logic_vector(11 downto 0);
-        variable refp : std_logic_vector(11 downto 0);
-        variable refn : std_logic_vector(11 downto 0);
+        variable row      : std_logic_vector(11 downto 0);
+        variable ref_even : std_logic_vector(11 downto 0);
+        variable ref_odd  : std_logic_vector(11 downto 0);
     begin
         if nRESET = '0' then
-            shift_reg_odd <= (others => '0');
             shift_reg_even <= (others => '0');
+            shift_reg_odd <= (others => '0');
             shift_reg_de <= (others => '0');
         elsif rising_edge(CLOCK) then
             if CLKEN = '1' then
@@ -577,58 +605,60 @@ begin
 
                     if gfx = '1' and rom_char(5) = '1' then
                         if line_addr < 3 then
-                            a := (11 downto 6 => rom_char(0), 5 downto 0 => rom_char(1));
+                            row := (11 downto 6 => rom_char(0), 5 downto 0 => rom_char(1));
                         elsif line_addr < 7 then
-                            a := (11 downto 6 => rom_char(2), 5 downto 0 => rom_char(3));
+                            row := (11 downto 6 => rom_char(2), 5 downto 0 => rom_char(3));
                         else
-                            a := (11 downto 6 => rom_char(4), 5 downto 0 => rom_char(6));
+                            row := (11 downto 6 => rom_char(4), 5 downto 0 => rom_char(6));
                         end if;
                         -- Apply a mask for separated graphics mode
                         if (hold_active = '0' and gfx_sep = '1') or (hold_active = '1' and last_gfx_sep = '1') then
-                            a(10) := '0';
-                            a(11) := '0';
-                            a(4) := '0';
-                            a(5) := '0';
+                            row(10) := '0';
+                            row(11) := '0';
+                            row(4) := '0';
+                            row(5) := '0';
                             if line_addr = 2 or line_addr = 6 or line_addr = 9 then
-                                a := (others => '0');
+                                row := (others => '0');
                             end if;
                         end if;
-                        shift_reg_even <= a;
-                        shift_reg_odd  <= a;
+                        shift_reg_even <= row;
+                        shift_reg_odd  <= row;
                     else
                         -- Character rounding
 
                         -- a is the current row of pixels, doubled up
-                        a := rom_data(5) & rom_data(5) &
-                             rom_data(4) & rom_data(4) &
-                             rom_data(3) & rom_data(3) &
-                             rom_data(2) & rom_data(2) &
-                             rom_data(1) & rom_data(1) &
-                             rom_data(0) & rom_data(0);
+                        row := row_data(5) & row_data(5) &
+                               row_data(4) & row_data(4) &
+                               row_data(3) & row_data(3) &
+                               row_data(2) & row_data(2) &
+                               row_data(1) & row_data(1) &
+                               row_data(0) & row_data(0);
 
-                        -- refn is the below row of pixels, doubled up
-                        refn := rom_data_next(5) & rom_data_next(5) &
-                                rom_data_next(4) & rom_data_next(4) &
-                                rom_data_next(3) & rom_data_next(3) &
-                                rom_data_next(2) & rom_data_next(2) &
-                                rom_data_next(1) & rom_data_next(1) &
-                                rom_data_next(0) & rom_data_next(0);
+                        -- ref even is normally the above row of pixels, doubled up
+                        ref_even := ref_data_even(5) & ref_data_even(5) &
+                                    ref_data_even(4) & ref_data_even(4) &
+                                    ref_data_even(3) & ref_data_even(3) &
+                                    ref_data_even(2) & ref_data_even(2) &
+                                    ref_data_even(1) & ref_data_even(1) &
+                                    ref_data_even(0) & ref_data_even(0);
 
-                        -- refp is the above row of pixels, doubled up
-                        refp := rom_data_prev(5) & rom_data_prev(5) &
-                                rom_data_prev(4) & rom_data_prev(4) &
-                                rom_data_prev(3) & rom_data_prev(3) &
-                                rom_data_prev(2) & rom_data_prev(2) &
-                                rom_data_prev(1) & rom_data_prev(1) &
-                                rom_data_prev(0) & rom_data_prev(0);
+                        -- ref odd is the normally the below row of pixels, doubled up
+                        ref_odd  := ref_data_odd(5) & ref_data_odd(5) &
+                                    ref_data_odd(4) & ref_data_odd(4) &
+                                    ref_data_odd(3) & ref_data_odd(3) &
+                                    ref_data_odd(2) & ref_data_odd(2) &
+                                    ref_data_odd(1) & ref_data_odd(1) &
+                                    ref_data_odd(0) & ref_data_odd(0);
 
-                        -- Perform character rounding on even row
-                        shift_reg_even <= a or (('0' & a(11 downto 1)) and refn and not('0' & refn(11 downto 1))) or
-                                          ((a(10 downto 0) & '0') and refn and not(refn(10 downto 0) & '0'));
+                        -- Perform character rounding on even (upper) row
+                        shift_reg_even <= row or
+                                          (('0' & row(11 downto 1)) and ref_even and not('0' & ref_even(11 downto 1))) or
+                                          ((row(10 downto 0) & '0') and ref_even and not(ref_even(10 downto 0) & '0'));
 
-                        -- Perform character rounding on odd row
-                        shift_reg_odd  <= a or (('0' & a(11 downto 1)) and refp and not('0' & refp(11 downto 1))) or
-                                          ((a(10 downto 0) & '0') and refp and not(refp(10 downto 0) & '0'));
+                        -- Perform character rounding on odd (lower) row
+                        shift_reg_odd  <= row or
+                                          (('0' & row(11 downto 1)) and ref_odd and not('0' & ref_odd(11 downto 1))) or
+                                          ((row(10 downto 0) & '0') and ref_odd and not(ref_odd(10 downto 0) & '0'));
 
                     end if;
 
@@ -660,7 +690,7 @@ begin
                 pixel_even := shift_reg_even(11) and not ((flash and is_flash_r) or conceal_r);
                 pixel_odd  := shift_reg_odd(11)  and not ((flash and is_flash_r) or conceal_r);
 
-                if (double_high = '0' and CRS = '0') or (double_high = '1' and line_counter(0) = '1') then
+                if CRS = '1' then
                     pixel := pixel_even;
                 else
                     pixel := pixel_odd;

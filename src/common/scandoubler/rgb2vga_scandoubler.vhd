@@ -189,7 +189,7 @@ begin
         else '0';
 
     -- Interleave output of dual-port RAMs
-    rgbi_out <= readData(2*WIDTH - 1 downto WIDTH) when field = '1' else readData(WIDTH - 1 downto 0);
+    rgbi_out <= readData(2*WIDTH - 1 downto WIDTH) when field = '0' else readData(WIDTH - 1 downto 0);
 
     -- 25MHz clock domain ---------------------------------------------------------------------------
     process(clk25)
