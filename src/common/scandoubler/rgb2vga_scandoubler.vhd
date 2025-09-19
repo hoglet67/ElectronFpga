@@ -56,9 +56,10 @@ entity rgb2vga_scandoubler is
         WIDTH          : integer;
 
         -- PAL timimg parameters
-        PAL_OFFSET0    : integer := 176;     -- Used when mode=0
-        PAL_OFFSET1    : integer := 32;      -- Used when mode=1
-        PAL_WIDTH      : integer := 656;     -- Active line width
+        -- (increasing moves display to the left)
+        PAL_OFFSET0    : integer := 184;     -- Used when mode=0 (184 = 11.5us @ 16MHz)
+        PAL_OFFSET1    : integer := 72;      -- Used when mode=1 (72  =  6.0us @ 12MHz)
+        PAL_WIDTH      : integer := 656;     -- Active line width (8 px extra at each side @ 16MHz which is just enough overscan)
 
         -- VGA timimg parameters
         VGA_CLK_MHZ    : integer := 27;      -- VGA clock frequency in MHz
@@ -81,15 +82,15 @@ entity rgb2vga_scandoubler is
         pal_clken    : in  std_logic;
         pal_rgb_even : in  std_logic_vector(WIDTH - 1 downto 0); -- even (upper) row
         pal_rgb_odd  : in  std_logic_vector(WIDTH - 1 downto 0); -- odd (lower) row
-        pal_hsync    : in  std_logic;
-        pal_vsync    : in  std_logic;
+        pal_hsync    : in  std_logic; -- NOTE: active high
+        pal_vsync    : in  std_logic; -- NOTE: active high
 
         -- Output 31.250kHz VGA signals (scan doubled)
         vga_clk      : in  std_logic;
         vga_clken    : in  std_logic;
         vga_rgb      : out std_logic_vector(WIDTH - 1 downto 0);
-        vga_hsync    : out std_logic;
-        vga_vsync    : out std_logic
+        vga_hsync    : out std_logic; -- NOTE: active high
+        vga_vsync    : out std_logic  -- NOTE: active high
         );
 end entity;
 
@@ -143,8 +144,8 @@ begin
         if rising_edge(pal_clk) then
             if pal_clken = '1' then
                 pal_hsync1 <= pal_hsync;
-                if pal_hsync1 = '0' and pal_hsync = '1' then
-                    -- reload on trailing edge of hsync
+                if pal_hsync1 = '1' and pal_hsync = '0' then
+                    -- reload on trailing (falling) edge of hsync
                     if mode = '0' then
                         pal_counter <= to_unsigned(2**CWIDTH - PAL_OFFSET0 + 1, CWIDTH);
                     else
@@ -226,9 +227,9 @@ begin
                     sync_counter <= sync_counter + 1;
                 end if;
 
-                -- Synchronise the counter to the trailing edge of hsync, with some hysteresis to avoid continuously hunting
+                -- Synchronise the counter to the trailing (falling) edge of hsync, with some hysteresis to avoid continuously hunting
                 -- (Note: this scheme relies on the nominal line being an integer number of microseconds long, which MODE 7 is)
-                if sync_tmp2 = '0' and sync_tmp1 = '1' then
+                if sync_tmp2 = '1' and sync_tmp1 = '0' then
                     -- The next edge should be time at 26, 0 or 1; outside of this resync
                     if sync_counter > 1 and sync_counter < (VGA_CLK_MHZ - 1) then
                         sync_counter <= to_unsigned(1, sync_counter'length);
@@ -242,24 +243,38 @@ begin
                 end if;
 
                 vga_hsync2 <= vga_hsync1;
+
                 if (vga_hsync1 = '1' and vga_hsync2 = '0') or (vga_counter = VGA_HORIZ_DISP + VGA_HORIZ_FP - 1) then
                     vga_counter <= to_unsigned(2**CWIDTH - VGA_HORIZ_RT - VGA_HORIZ_BP, CWIDTH);
-                    field <= vga_hsync2;
                 else
                     vga_counter <= vga_counter + 1;
                 end if;
 
+                if (vga_hsync1 = '1' and vga_hsync2 = '0') then
+                    field <= '0';
+                elsif (vga_counter = VGA_HORIZ_DISP + VGA_HORIZ_FP - 1) then
+                    field <= '1';
+                end if;
+
                 -- regenerate a line doubled hsync
                 if vga_counter >= to_unsigned(2**CWIDTH - VGA_HORIZ_RT - VGA_HORIZ_BP, CWIDTH) and vga_counter < to_unsigned(2**CWIDTH - VGA_HORIZ_BP, CWIDTH) then
-                    vga_hsync <= '0';
-                else
                     vga_hsync <= '1';
+                else
+                    vga_hsync <= '0';
                 end if;
 
                 -- Select odd or even line data based on field, which is
                 -- low for the first line and high for the second line
-                vga_rgb <= readData(2*WIDTH - 1 downto WIDTH) when field = '0' else readData(WIDTH - 1 downto 0);
+                if field = '0' then
+                    vga_rgb <= readData(2*WIDTH - 1 downto WIDTH);
+                else
+                    vga_rgb <= readData(WIDTH - 1 downto 0);
+                end if;
 
+                -- Debug setting offsets
+                --if vga_counter = 0 or vga_counter = VGA_HORIZ_DISP - 1 then
+                --    vga_rgb(WIDTH / 3 - 1 downto 0) <= (others => '1');
+                --end if;
             end if;
         end if;
     end process;

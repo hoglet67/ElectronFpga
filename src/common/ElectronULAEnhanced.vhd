@@ -127,9 +127,9 @@ architecture behavioral of ElectronULAEnhanced is
     signal ula_red         : std_logic;
     signal ula_green       : std_logic;
     signal ula_blue        : std_logic;
-    signal ula_vsync       : std_logic;
-    signal ula_hsync       : std_logic;
-    signal ula_csync       : std_logic;
+    signal ula_vsync_n     : std_logic;
+    signal ula_hsync_n     : std_logic;
+    signal ula_csync_n     : std_logic;
     signal ula_field       : std_logic;
     signal sound_int       : std_logic;
     signal ula_den         : std_logic;
@@ -207,9 +207,9 @@ begin
             red       => ula_red,
             green     => ula_green,
             blue      => ula_blue,
-            vsync     => ula_vsync,
-            hsync     => ula_hsync,
-            csync     => ula_csync,
+            vsync     => ula_vsync_n,
+            hsync     => ula_hsync_n,
+            csync     => ula_csync_n,
             blank     => open,
             field     => ula_field,
             -- Audio
@@ -386,8 +386,8 @@ begin
         tmp_odd_in   <= jafa_red_odd & jafa_green_odd & jafa_blue_odd when IncludeJafaMode7 and mode7_enable = '1' else
                         ula_red & ula_green & ula_blue;
 
-        tmp_hsync_in <= jafa_hsync when IncludeJafaMode7 and mode7_enable = '1' else ula_hsync;
-        tmp_vsync_in <= jafa_vsync when IncludeJafaMode7 and mode7_enable = '1' else ula_vsync;
+        tmp_hsync_in <= jafa_hsync when IncludeJafaMode7 and mode7_enable = '1' else not ula_hsync_n;
+        tmp_vsync_in <= jafa_vsync when IncludeJafaMode7 and mode7_enable = '1' else not ula_vsync_n;
 
         inst_rgb2vga_scandoubler: entity work.rgb2vga_scandoubler
             generic map (
@@ -473,10 +473,10 @@ begin
                     hdmi_audio <= x"F000";
                 end if;
                 hsync1 <= hd_hsync;
-                if hsync1 = '0' and hd_hsync = '1' then
+                if hsync1 = '1' and hd_hsync = '0' then
                     hcnt <= (others => '0');
                     vsync1 <= hd_vsync;
-                    if vsync1 = '0' and hd_vsync = '1' then
+                    if vsync1 = '1' and hd_vsync = '0' then
                         vcnt <= (others => '0');
                     else
                         vcnt <= vcnt + 1;
@@ -578,8 +578,8 @@ begin
                      (others => ula_green);
         rgb_blue  <= (others => jafa_blue)  when IncludeJafaMode7 and mode7_enable = '1' else
                      (others => ula_blue);
-        rgb_csync <= jafa_csync             when IncludeJafaMode7 and mode7_enable = '1' else
-                     ula_csync;
+        rgb_csync <= not jafa_csync         when IncludeJafaMode7 and mode7_enable = '1' else
+                     ula_csync_n;
     end generate;
 
     SRGBNotIncluded : if not IncludeSRGB generate

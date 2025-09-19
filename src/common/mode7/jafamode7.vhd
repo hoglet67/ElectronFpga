@@ -88,9 +88,7 @@ architecture behavioral of JafaMode7 is
     signal crtc_enable    : std_logic;
     signal crtc_do        : std_logic_vector(7 downto 0);
     signal crtc_vsync     : std_logic;
-    signal crtc_vsync_n   : std_logic;
     signal crtc_hsync     : std_logic;
-    signal crtc_hsync_n   : std_logic;
     signal crtc_de        : std_logic;
     signal crtc_cursor    : std_logic;
     signal crtc_cursor1   : std_logic;
@@ -178,10 +176,7 @@ begin
         RA        => crtc_ra
         );
 
-    crtc_hsync_n <= not crtc_hsync;
-    crtc_vsync_n <= not crtc_vsync;
-
-    ttxt_glr <= crtc_hsync_n;
+    ttxt_glr <= not crtc_hsync;
     ttxt_dew <= crtc_vsync;
     ttxt_crs <= not crtc_ra(0);
     ttxt_lose <= crtc_de;
@@ -231,9 +226,9 @@ begin
     blue       <= ttxt_b      xor crtc_cursor2;
     blue_even  <= ttxt_b_even xor crtc_cursor2;
     blue_odd   <= ttxt_b_odd  xor crtc_cursor2;
-    hsync      <= crtc_hsync_n;
-    vsync      <= crtc_vsync_n;
-    csync      <= crtc_hsync_n and crtc_vsync_n;
+    hsync      <= crtc_hsync;
+    vsync      <= crtc_vsync;
+    csync      <= crtc_hsync or crtc_vsync;
     blank      <= not ttxt_de;
 
     -- enable mode 7

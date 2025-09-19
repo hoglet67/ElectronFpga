@@ -62,7 +62,7 @@ use ieee.numeric_std.all;
 
 entity saa5050 is
 generic (
-    IncludeTTxtROM : boolean -- false if the SAA5050 character ROM needs loading
+    IncludeTTxtROM : boolean := TRUE -- false if the SAA5050 character ROM needs loading
     );
 port (
     CLOCK       :   in  std_logic;
