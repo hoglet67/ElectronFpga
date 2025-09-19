@@ -50,8 +50,8 @@ entity ElectronFpga_TangNano20K is
     generic (
         UseRomSlot9            : boolean := true; -- allow use of ROMs in slot 9 (the keyboard alias)
 
-        IncludeSRGB            : boolean := G_CONFIG_VGA; -- output when jumper(3) on
-        IncludeVGA             : boolean := G_CONFIG_VGA; -- output when jumper(3) off
+        IncludeSRGB            : boolean := G_CONFIG_VGA; -- output when jumper(3) off
+        IncludeVGA             : boolean := G_CONFIG_VGA; -- output when jumper(3) on
         IncludeHDMI            : boolean := true;
         IncludeICEDebugger     : boolean := G_CONFIG_DEBUGGER;
         IncludeABRRegs         : boolean := true;
@@ -390,6 +390,7 @@ architecture rtl of ElectronFpga_TangNano20K is
     signal motor_led       : std_logic;
 
     -- Analog video
+    signal vga_mode        : std_logic;
     signal rgb_red         : std_logic_vector(3 downto 0);
     signal rgb_green       : std_logic_vector(3 downto 0);
     signal rgb_blue        : std_logic_vector(3 downto 0);
@@ -1069,20 +1070,22 @@ begin
 
     -- Mux to select between SRGB and VGA using jumper(3) if both are included
 
-    dac_red   <= vga_red   when IncludeVGA  and (jumper(3) = '1' or not IncludeSRGB) else
-                 rgb_red   when IncludeSRGB and (jumper(3) = '0' or not IncludeVGA)  else
+    vga_mode  <= not jumper(3);
+
+    dac_red   <= vga_red   when IncludeVGA  and (vga_mode = '1' or not IncludeSRGB) else
+                 rgb_red   when IncludeSRGB and (vga_mode = '0' or not IncludeVGA)  else
                  (others => '0');
-    dac_green <= vga_green when IncludeVGA  and (jumper(3) = '1' or not IncludeSRGB) else
-                 rgb_green when IncludeSRGB and (jumper(3) = '0' or not IncludeVGA)  else
+    dac_green <= vga_green when IncludeVGA  and (vga_mode = '1' or not IncludeSRGB) else
+                 rgb_green when IncludeSRGB and (vga_mode = '0' or not IncludeVGA)  else
                  (others => '0');
-    dac_blue  <= vga_blue  when IncludeVGA  and (jumper(3) = '1' or not IncludeSRGB) else
-                 rgb_blue  when IncludeSRGB and (jumper(3) = '0' or not IncludeVGA)  else
+    dac_blue  <= vga_blue  when IncludeVGA  and (vga_mode = '1' or not IncludeSRGB) else
+                 rgb_blue  when IncludeSRGB and (vga_mode = '0' or not IncludeVGA)  else
                  (others => '0');
-    dac_hsync <= vga_hsync when IncludeVGA  and (jumper(3) = '1' or not IncludeSRGB) else
-                 rgb_csync when IncludeSRGB and (jumper(3) = '0' or not IncludeVGA)  else
+    dac_hsync <= vga_hsync when IncludeVGA  and (vga_mode = '1' or not IncludeSRGB) else
+                 rgb_csync when IncludeSRGB and (vga_mode = '0' or not IncludeVGA)  else
                  '0';
-    dac_vsync <= vga_vsync when IncludeVGA  and (jumper(3) = '1' or not IncludeSRGB) else
-                 '1'       when IncludeSRGB and (jumper(3) = '0' or not IncludeVGA)  else
+    dac_vsync <= vga_vsync when IncludeVGA  and (vga_mode = '1' or not IncludeSRGB) else
+                 '1'       when IncludeSRGB and (vga_mode = '0' or not IncludeVGA)  else
                  '0';
 
     vga_1bit_dac : if IncludeVGADAC generate
