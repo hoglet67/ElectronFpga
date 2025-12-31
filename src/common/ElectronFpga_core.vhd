@@ -462,8 +462,8 @@ begin
                ula_data          when ula_enable = '1' else
                serial_data       when serial_enable = '1' else
                mc6522_data       when mc6522_enable = '1' and IncludeUserPort else
-               "000" & (joystick1 xor "11111") when io_fred = '1' and cpu_a(7 downto 4) = x"C" else
-               "000" & (joystick2 xor "11111") when io_fred = '1' and cpu_a(7 downto 4) = x"D" else
+               "000" & (joystick1 xor "11111") when io_fred = '1' and cpu_a(7 downto 0) = x"C0" else
+               "000" & (joystick2 xor "11111") when io_fred = '1' and cpu_a(7 downto 0) = x"D0" else
                ext_1mhz_do       when io_fred = '1' or io_jim = '1' else
                x"F1";
 
