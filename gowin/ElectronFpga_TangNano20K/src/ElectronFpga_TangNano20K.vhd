@@ -61,6 +61,7 @@ entity ElectronFpga_TangNano20K is
         IncludeMRB             : boolean := true;
         IncludeSP64            : boolean := true;
         IncludeJafaMode7       : boolean := true;
+        IncludeI2C             : boolean := true;
 
         IncludeFullRS423       : boolean := false; -- Overrides PiTube
         IncludeTrace           : boolean := false; -- Overrides PiTube/VGA
@@ -358,6 +359,8 @@ architecture rtl of ElectronFpga_TangNano20K is
     signal audio_r_tmp     : std_logic;
     signal audio_l         : std_logic_vector(19 downto 0);
     signal audio_r         : std_logic_vector(19 downto 0);
+    signal pwm_l           : std_logic;
+    signal pwm_r           : std_logic;
 
     -- output used to load sample into SPDIF (spdif clock domain)
     signal spdif_load      : std_logic;
@@ -458,6 +461,10 @@ architecture rtl of ElectronFpga_TangNano20K is
     signal serial_tx       : std_logic;
     signal serial_rts      : std_logic;
     signal serial_cts      : std_logic;
+
+    -- I2C
+    signal reg_fcd6_enable : std_logic;
+    signal reg_fcd6_do     : std_logic_vector(7 downto 0);
 
     -- Test
     signal test            : std_logic_vector(7 downto 0);
@@ -805,7 +812,7 @@ begin
                 clk_i => clock_48,
                 reset => '0',
                 dac_i => dac_l_in,
-                dac_o => audiol
+                dac_o => pwm_l
                 );
 
         dac_r : entity work.pwm_sddac
@@ -816,7 +823,7 @@ begin
                 clk_i => clock_48,
                 reset => '0',
                 dac_i => dac_r_in,
-                dac_o => audior
+                dac_o => pwm_r
                 );
 
     --------------------------------------------------------
@@ -1219,6 +1226,63 @@ begin
         ext_tube_ctrl <= (others => '1');
     end generate;
 
+
+--------------------------------------------------------
+-- I2C
+--------------------------------------------------------
+
+    GenI2C: if IncludeI2C generate
+        signal i2c_scl      : std_logic;
+        signal i2c_sda_i    : std_logic;
+        signal i2c_sda_o    : std_logic := '0';
+        signal i2c_sda_t    : std_logic;
+        signal enable_i2c   : std_logic;
+        signal pur_last     : std_logic;
+    begin
+
+        process(clock_48)
+        begin
+            if rising_edge(clock_48) then
+                if ext_1mhz_nrst = '0' then
+                    i2c_sda_t <= '1';
+                    i2c_scl   <= '1';
+                elsif ext_1mhz_clken = '1' and reg_fcd6_enable = '1' and ext_1mhz_r_nw = '0' then
+                    i2c_sda_t <= ext_1mhz_di(7);
+                    i2c_scl   <= ext_1mhz_di(6);
+                end if;
+                -- detect pwm audio vs i2c based on the presence of i2c pullups at the end of power up reset
+                if pur_last = '0' and powerup_reset_n = '1' then
+                    enable_i2c <= audiol or audior;
+                end if;
+                pur_last <= powerup_reset_n;
+            end if;
+        end process;
+
+        i2c_sda_i <= audior;
+
+        reg_fcd6_do <= i2c_sda_i & "1111111" when enable_i2c = '1' else x"fc";
+
+        audiol    <= 'Z'     when pur_last = '0' else
+                     i2c_scl when enable_i2c = '1' else
+                     pwm_l;
+
+        audior    <= 'Z'       when pur_last = '0' else
+                     'Z'       when enable_i2c = '1' and i2c_sda_t = '1' else
+                     i2c_sda_o when enable_i2c = '1' and i2c_sda_t = '0' else
+                     pwm_r;
+
+    end generate;
+
+    GenNotI2C: if not IncludeI2C generate
+    begin
+        reg_fcd6_do <= x"fc";
+        audiol <= pwm_l;
+        audior <= pwm_r;
+    end generate;
+
+    -- I2C register &FCD6 (bit 7 = SDA; bit 6 = SCL)
+    reg_fcd6_enable <= '1' when ext_1mhz_pgfc_n = '0' and ext_1mhz_addr = x"D6" else '0';
+
 --------------------------------------------------------
 -- External shift register for joysticks / config links
 --------------------------------------------------------
@@ -1332,6 +1396,7 @@ begin
 
     ext_1mhz_do <= ext_tube_do      when ext_tube_ntube  = '0' else
                    version_rom_byte when ext_1mhz_pgfd_n = '0' else
+                   reg_fcd6_do      when reg_fcd6_enable = '1' else
                    x"FF";
 
     ws2812_din <= '0';
