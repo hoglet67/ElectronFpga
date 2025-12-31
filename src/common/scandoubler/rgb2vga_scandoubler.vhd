@@ -168,24 +168,23 @@ begin
     -- line, we're writing to the other. Their roles swap every
     -- incoming 64us scanline.
 
-    ram: entity work.rgb2vga_dpram
+    ram : entity work.RAM_DualPortSimple
         generic map (
+            DEPTH     => 2 ** (CWIDTH + 1),
             DWIDTH    => WIDTH * 2,   -- * 2 to allow different data for odd and even lines
             AWIDTH    => CWIDTH + 1   -- + 1 for double buffering
             )
         port map(
             -- Write port
-            wrclock   => pal_clk,
-            wrclken   => pal_clken,
-            wraddress => writeAddr,
-            wren      => writeEn,
-            data      => writeData,
+            clka   => pal_clk,
+            wea    => writeEn,
+            addra  => writeAddr,
+            dina   => writeData,
 
             -- Read port
-            rdclock   => vga_clk,
-            rdclken   => vga_clken,
-            rdaddress => readAddr,
-            q         => readData
+            clkb   => vga_clk,
+            addrb  => readAddr,
+            doutb  => readData
             );
 
 

@@ -99,6 +99,7 @@ architecture behavioral of ElectronULA is
     signal vsync_int      : std_logic;
 
     signal ram_data       : std_logic_vector(7 downto 0);
+    signal vid_data       : std_logic_vector(7 downto 0);
 
     signal master_irq     : std_logic;
 
@@ -334,9 +335,7 @@ begin
         signal ceb : std_logic;
         signal wea : std_logic;
     begin
-        cea <= sys_clken;
-        ceb <= sys_clken and vid_clken;
-        wea <= '1' when addr(15) = '0' and R_W_n = '0' and cpu_clken = '1' else '0';
+        wea <= '1' when sys_clken = '1' and addr(15) = '0' and R_W_n = '0' and cpu_clken = '1' else '0';
         ram_32k : entity work.RAM_DualPort
             generic map (
                 DEPTH => 32768,
@@ -345,32 +344,27 @@ begin
                 )
             port map (
                 -- Port A is the 6502 port
-                clk   => sys_clk,
-                cea   => cea,
+                clka  => sys_clk,
                 wea   => wea,
                 addra => addr(14 downto 0),
                 dina  => data_in,
                 douta => ram_data,
                 -- Port B is the video port
-                ceb   => ceb,
+                clkb  => sys_clk,
                 addrb => screen_addr,
-                doutb => screen_data_tmp
+                doutb => vid_data
             );
     end generate;
 
     -- Just screen memory (0x3000-0x7fff) is dual port RAM in the ULA
     ram_20k_gen: if not Include32KRAM generate
-        signal cea   : std_logic;
-        signal ceb   : std_logic;
         signal wea   : std_logic;
         signal addra : std_logic_vector(14 downto 0);
         signal addrb : std_logic_vector(14 downto 0);
     begin
-        cea   <= sys_clken;
-        ceb   <= sys_clken and vid_clken;
         addra <= addr(14 downto 0) xor "111000000000000";
         addrb <= screen_addr       xor "111000000000000";
-        wea   <= '1' when (addr(15 downto 12) = "0011" or addr(15 downto 14) = "01") and R_W_n = '0' and cpu_clken = '1' else '0';
+        wea   <= '1' when (addr(15 downto 12) = "0011" or addr(15 downto 14) = "01") and R_W_n = '0' and cpu_clken = '1' and sys_clken = '1' else '0';
         -- xor'ing with 7000 maps 3000-7fff into range 0000-4fff
         ram_20k : entity work.RAM_DualPort
             generic map (
@@ -380,18 +374,26 @@ begin
                 )
             port map (
                 -- Port A is the 6502 port
-                clk   => sys_clk,
-                cea   => cea,
+                clka  => sys_clk,
                 wea   => wea,
                 addra => addra,
                 dina  => data_in,
                 douta => ram_data,
                 -- Port B is the video port
-                ceb   => ceb,
+                clkb  => sys_clk,
                 addrb => addrb,
-                doutb => screen_data_tmp
+                doutb => vid_data
             );
     end generate;
+
+    process(sys_clk)
+    begin
+        if rising_edge(sys_clk) then
+            if sys_clken = '1' and vid_clken = '1' then
+                screen_data_tmp <= vid_data;
+            end if;
+        end if;
+    end process;
 
     sound <= sound_bit when comms_mode = "01" else '0';
 

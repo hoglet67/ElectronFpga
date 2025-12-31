@@ -2,7 +2,7 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.std_logic_unsigned.all;
 
-entity RAM_DualPort is
+entity RAM_DualPortSimple is
     generic (
         DEPTH : integer;
         AWIDTH : integer;
@@ -13,20 +13,18 @@ entity RAM_DualPort is
         wea   : in  std_logic := '0';
         addra : in  std_logic_vector(AWIDTH - 1 downto 0);
         dina  : in  std_logic_vector(DWIDTH - 1 downto 0) := (others => '0');
-        douta : out std_logic_vector(DWIDTH - 1 downto 0);
         clkb  : in  std_logic;
-        web   : in  std_logic := '0';
         addrb : in  std_logic_vector(AWIDTH - 1 downto 0);
-        dinb  : in  std_logic_vector(DWIDTH - 1 downto 0) := (others => '0');
         doutb : out std_logic_vector(DWIDTH - 1 downto 0)
         );
 end;
 
-architecture behavioral of RAM_DualPort is
+architecture behavioral of RAM_DualPortSimple is
 
     type ram_type is array (0 to DEPTH - 1) of std_logic_vector (DWIDTH - 1 downto 0);
     shared variable RAM : ram_type;
 
+    signal addrb_reg : std_logic_vector(AWIDTH - 1 downto 0);
 begin
 
     -- Port A
@@ -36,7 +34,6 @@ begin
             if wea = '1' then
                 RAM(conv_integer(addra)) := dina;
             end if;
-            douta <= RAM(conv_integer(addra));
         end if;
     end process;
 
@@ -44,10 +41,8 @@ begin
     process(clkb)
     begin
         if rising_edge(clkb) then
-            if web = '1' then
-                RAM(conv_integer(addrb)) := dinb;
-            end if;
-            doutb <= RAM(conv_integer(addrb));
+            doutb <= RAM(conv_integer(addrb_reg));
+            addrb_reg <= addrb;
         end if;
     end process;
 

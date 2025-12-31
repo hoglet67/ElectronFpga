@@ -105,7 +105,7 @@ begin
 
     ttxt_ram_we <= '1' when addr(15 downto 10) = "011111" and R_W_n = '0' and cpu_clken = '1' else '0';
 
-    ram_1k : entity work.RAM_DualPort
+    ram_1k : entity work.RAM_DualPortSimple
         generic map (
             DEPTH => 1024,
             AWIDTH => 10,
@@ -113,14 +113,12 @@ begin
             )
         port map (
             -- Port A is the 6502 port
-            clk   => sys_clk,
-            cea   => '1',
+            clka  => sys_clk,
             wea   => ttxt_ram_we,
             addra => addr(9 downto 0),
             dina  => data_in,
-            douta => open,
             -- Port B is the video port
-            ceb   => '1',
+            clkb  => sys_clk,
             addrb => crtc_ma(9 downto 0),
             doutb => ttxt_ram_data
             );
