@@ -1,7 +1,7 @@
 -- megafunction wizard: %ALTPLL%
 -- GENERATION: STANDARD
 -- VERSION: WM1.0
--- MODULE: altpll 
+-- MODULE: altpll
 
 -- ============================================================
 -- File Name: pll1.vhd
@@ -19,17 +19,17 @@
 
 
 --Copyright (C) 1991-2013 Altera Corporation
---Your use of Altera Corporation's design tools, logic functions 
---and other software and tools, and its AMPP partner logic 
---functions, and any output files from any of the foregoing 
---(including device programming or simulation files), and any 
---associated documentation or information are expressly subject 
---to the terms and conditions of the Altera Program License 
---Subscription Agreement, Altera MegaCore Function License 
---Agreement, or other applicable license agreement, including, 
---without limitation, that your use is for the sole purpose of 
---programming logic devices manufactured by Altera and sold by 
---Altera or its authorized distributors.  Please refer to the 
+--Your use of Altera Corporation's design tools, logic functions
+--and other software and tools, and its AMPP partner logic
+--functions, and any output files from any of the foregoing
+--(including device programming or simulation files), and any
+--associated documentation or information are expressly subject
+--to the terms and conditions of the Altera Program License
+--Subscription Agreement, Altera MegaCore Function License
+--Agreement, or other applicable license agreement, including,
+--without limitation, that your use is for the sole purpose of
+--programming logic devices manufactured by Altera and sold by
+--Altera or its authorized distributors.  Please refer to the
 --applicable agreement for further details.
 
 
@@ -47,7 +47,7 @@ ENTITY pll1 IS
 		c0		: OUT STD_LOGIC ;
 		c1		: OUT STD_LOGIC ;
 		c2		: OUT STD_LOGIC ;
-		locked		: OUT STD_LOGIC 
+		locked		: OUT STD_LOGIC
 	);
 END pll1;
 
@@ -135,7 +135,7 @@ ARCHITECTURE SYN OF pll1 IS
 			areset	: IN STD_LOGIC ;
 			clk	: OUT STD_LOGIC_VECTOR (5 DOWNTO 0);
 			inclk	: IN STD_LOGIC_VECTOR (1 DOWNTO 0);
-			locked	: OUT STD_LOGIC 
+			locked	: OUT STD_LOGIC
 	);
 	END COMPONENT;
 
@@ -154,13 +154,13 @@ BEGIN
 
 	altpll_component : altpll
 	GENERIC MAP (
-		clk0_divide_by => 3,
+		clk0_divide_by => 1,
 		clk0_duty_cycle => 50,
 		clk0_multiply_by => 2,
 		clk0_phase_shift => "0",
-		clk1_divide_by => 3,
+		clk1_divide_by => 8,
 		clk1_duty_cycle => 50,
-		clk1_multiply_by => 4,
+		clk1_multiply_by => 9,
 		clk1_phase_shift => "0",
 		clk2_divide_by => 3,
 		clk2_duty_cycle => 50,

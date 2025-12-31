@@ -140,11 +140,9 @@ architecture rtl of ElectronFpga_de1 is
 -- Signals
 -------------
 
-signal clock_16         : std_logic;
 signal clock_24         : std_logic;
-signal clock_32         : std_logic;
-signal clock_33         : std_logic;
-signal clock_40         : std_logic;
+signal clock_27         : std_logic;
+signal clock_48         : std_logic;
 
 signal i2s_lrclk        : std_logic;
 signal audio_l          : std_logic;
@@ -152,8 +150,7 @@ signal audio_r          : std_logic;
 signal hard_reset_n     : std_logic;
 
 signal pll_reset        : std_logic;
-signal pll1_locked      : std_logic;
-signal pll2_locked      : std_logic;
+signal pll_locked       : std_logic;
 
 signal motor_led        : std_logic;
 signal caps_led         : std_logic;
@@ -213,22 +210,14 @@ begin
 -- Clock Generation
 --------------------------------------------------------
 
-    pll1: entity work.pll1
+    pll: entity work.pll1
     port map (
         areset         => pll_reset,
         inclk0         => CLOCK_24_0,
-        c0             => clock_16,
-        c1             => clock_32,
-        c2             => clock_40,
-        locked         => pll1_locked
-    );
-
-    pll2: entity work.pll2
-    port map (
-        areset         => pll_reset,
-        inclk0         => CLOCK_50,
-        c0             => clock_33,
-        locked         => pll2_locked
+        c0             => clock_48,
+        c1             => clock_27,
+        c2             => open,
+        locked         => pll_locked
     );
 
     clock_24 <= CLOCK_24_0;
@@ -237,27 +226,28 @@ begin
 -- Electron Core
 --------------------------------------------------------
 
-
     electron_core : entity work.ElectronFpga_core
     generic map (
+        IncludeVGA         => true,
         IncludeICEDebugger => false,
         IncludeABRRegs     => true,
         IncludeJafaMode7   => true
     )
     port map (
-        clk_16M00         => clock_16,
+        sys_clk           => clock_48,
         clk_24M00         => clock_24,
-        clk_32M00         => clock_32,
-        clk_33M33         => clock_33,
-        clk_40M00         => clock_40,
+        clk_27M00         => clock_27,
+        interlace         => '1',
         hard_reset_n      => hard_reset_n,
         ps2_clk           => PS2_CLK,
         ps2_data          => PS2_DAT,
-        video_red         => VGA_R,
-        video_green       => VGA_G,
-        video_blue        => VGA_B,
-        video_vsync       => VGA_VS,
-        video_hsync       => VGA_HS,
+        ps2_mouse_clk     => GPIO_1(18),
+        ps2_mouse_data    => GPIO_1(19),
+        vga_red           => VGA_R,
+        vga_green         => VGA_G,
+        vga_blue          => VGA_B,
+        vga_vsync         => VGA_VS,
+        vga_hsync         => VGA_HS,
         audio_l           => audio_l,
         audio_r           => audio_r,
         ext_nOE           => ext_nOE,
@@ -274,7 +264,6 @@ begin
         motor_led         => motor_led,
         cassette_in       => cas_in,
         cassette_out      => cas_out,
-        vid_mode          => SW(8 downto 7),
         test              => open,
         avr_RxD           => UART_RXD,
         avr_TxD           => UART_TXD,
@@ -289,7 +278,7 @@ begin
     -- PLL is reset by external reset switch
     pll_reset <= not KEY(0);
 
-    hard_reset_n <= not (pll_reset or not pll1_locked or not pll2_locked);
+    hard_reset_n <= not (pll_reset or not pll_locked);
 
 --------------------------------------------------------
 -- Audio DACs
@@ -303,7 +292,7 @@ begin
 
     i2s : entity work.i2s_intf
     port map (
-        CLK         => clock_32,
+        CLK         => clock_48,
         nRESET      => hard_reset_n,
         PCM_INL     => pcm_inl,
         PCM_INR     => pcm_inr,
@@ -323,7 +312,7 @@ begin
         log2_divider => 7
     )
     port map (
-        CLK         => clock_32,
+        CLK         => clock_48,
         nRESET      => hard_reset_n,
         I2C_SCL     => I2C_SCLK,
         I2C_SDA     => I2C_SDAT,
@@ -407,7 +396,7 @@ begin
     SRAM_OE_N <= ext_nOE;
 
     -- Gate the WE with clock to provide more address/data hold time
-    SRAM_WE_N <= ext_nWE or not clock_16;
+    SRAM_WE_N <= ext_nWE or not clock_48;
 
     SRAM_ADDR <= ext_a(17 downto 0);
     SRAM_DQ(15 downto 8) <= (others => 'Z');

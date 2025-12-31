@@ -791,6 +791,22 @@ set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to AUD_DACDAT
 set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to AUD_BCLK
 set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to AUD_ADCLRCK
 set_instance_assignment -name CURRENT_STRENGTH_NEW 12MA -to AUD_ADCDAT
+set_global_assignment -name VHDL_FILE ../src/common/mouse/quadrature_fsm.vhd
+set_global_assignment -name VHDL_FILE ../src/common/mouse/quadrature_controller.vhd
+set_global_assignment -name VHDL_FILE ../src/common/mouse/ps2interface.vhd
+set_global_assignment -name VHDL_FILE ../src/common/hdmi/hdmidelay.vhd
+set_global_assignment -name VERILOG_FILE ../src/common/hdmi/hdmidataencoder.v
+set_global_assignment -name VHDL_FILE ../src/common/hdmi/hdmi.vhd
+set_global_assignment -name VHDL_FILE ../src/common/hdmi/encoder.vhd
+set_global_assignment -name VHDL_FILE ../src/common/scandoubler/rgb2vga_scandoubler.vhd
+set_global_assignment -name VHDL_FILE ../src/common/scandoubler/linedelay.vhd
+set_global_assignment -name VHDL_FILE ../src/common/RAM/RAM_DualPort.vhd
+set_global_assignment -name VHDL_FILE ../src/common/RAM/RAM_DualPortSimple.vhd
+set_global_assignment -name VHDL_FILE ../src/common/mode7/saa5050_rom_uninitialized.vhd
+set_global_assignment -name VHDL_FILE ../src/common/mode7/saa5050_rom.vhd
+set_global_assignment -name VHDL_FILE ../src/common/mode7/jafamode7.vhd
+set_global_assignment -name VHDL_FILE ../src/common/spi.vhd
+set_global_assignment -name VHDL_FILE ../src/common/ElectronULAEnhanced.vhd
 set_global_assignment -name VHDL_FILE ../src/altera/ElectronFpga_de1.vhd
 set_global_assignment -name VHDL_FILE ../src/altera/pll1.vhd
 set_global_assignment -name VHDL_FILE ../src/altera/pll2.vhd
@@ -800,15 +816,11 @@ set_global_assignment -name VHDL_FILE ../src/altera/WatchEvents.vhd
 set_global_assignment -name VHDL_FILE ../src/common/ElectronFpga_core.vhd
 set_global_assignment -name VHDL_FILE ../src/common/ElectronULA.vhd
 set_global_assignment -name VHDL_FILE ../src/common/MC6522/m6522.vhd
-set_global_assignment -name VHDL_FILE ../src/common/mist_scandoubler.vhd
 set_global_assignment -name VHDL_FILE ../src/common/mode7/mc6845.vhd
 set_global_assignment -name VHDL_FILE ../src/common/AlanD/R65Cx2.vhd
-set_global_assignment -name VHDL_FILE ../src/common/mode7/saa5050_rom_dual_port.vhd
 set_global_assignment -name VHDL_FILE ../src/common/mode7/saa5050.vhd
 set_global_assignment -name VHDL_FILE ../src/common/ps2kybrd/keyboard.vhd
 set_global_assignment -name VHDL_FILE ../src/common/ps2kybrd/ps2_intf.vhd
-set_global_assignment -name VHDL_FILE ../src/common/RAM/RAM_20K_DualPort.vhd
-set_global_assignment -name VHDL_FILE ../src/common/RAM/RAM_32K_DualPort.vhd
 set_global_assignment -name VHDL_FILE ../src/common/T6502/T65_ALU.vhd
 set_global_assignment -name VHDL_FILE ../src/common/T6502/T65_MCode.vhd
 set_global_assignment -name VHDL_FILE ../src/common/T6502/T65_Pack.vhd
