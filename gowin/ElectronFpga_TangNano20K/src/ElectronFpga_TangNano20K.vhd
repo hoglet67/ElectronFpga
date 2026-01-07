@@ -61,7 +61,8 @@ entity ElectronFpga_TangNano20K is
         IncludeMRB             : boolean := true;
         IncludeSP64            : boolean := true;
         IncludeJafaMode7       : boolean := true;
-        IncludeI2C             : boolean := true;
+        IncludeI2C             : boolean := false; -- conflicts with IncludeAnalogJS
+        IncludeAnalogJS        : boolean := true;  -- conflicts with IncludeI2C
 
         IncludeFullRS423       : boolean := false; -- Overrides PiTube
         IncludeTrace           : boolean := false; -- Overrides PiTube/VGA
@@ -371,7 +372,7 @@ architecture rtl of ElectronFpga_TangNano20K is
 
     signal powerup_reset_n : std_logic := '0';
     signal hard_reset_n    : std_logic;
-    signal reset_counter   : std_logic_vector(RESETBITS downto 0);
+    signal reset_counter   : unsigned(RESETBITS downto 0);
     signal config_counter  : std_logic_vector(20 downto 0) := (others => '0'); -- 16ms debounce
     signal config_last     : std_logic := '0';
 
@@ -462,6 +463,14 @@ architecture rtl of ElectronFpga_TangNano20K is
     -- I2C
     signal reg_fcd6_enable : std_logic;
     signal reg_fcd6_do     : std_logic_vector(7 downto 0);
+
+    -- ADC
+    signal fire1_n         : std_logic;
+    signal fire2_n         : std_logic;
+    signal reg_fc70_enable : std_logic;
+    signal reg_fc72_enable : std_logic;
+    signal reg_fc70_do     : std_logic_vector(7 downto 0);
+    signal reg_fc72_do     : std_logic_vector(7 downto 0);
 
     -- Test
     signal test            : std_logic_vector(7 downto 0);
@@ -822,6 +831,12 @@ begin
                 dac_i => dac_r_in,
                 dac_o => pwm_r
                 );
+
+    GenPWM: if not IncludeI2C and not IncludeAnalogJS generate
+    begin
+        audiol <= pwm_l;
+        audior <= pwm_r;
+    end generate;
 
     --------------------------------------------------------
     -- HDMI Output
@@ -1235,6 +1250,149 @@ begin
 
 
 --------------------------------------------------------
+-- Analog Joystick via I2C
+--------------------------------------------------------
+
+    analog_js : if IncludeAnalogJS generate
+        constant CLK_DIVIDE   : std_logic_vector(9 downto 0) := std_logic_vector(to_unsigned(480, 10)); -- 48MHz / 100KHz
+        signal inst_address   : std_logic_vector(9 downto 0);
+        signal inst_data      : std_logic_vector(8 downto 0);
+        signal reg_write      : std_logic;
+        signal reg_addr       : std_logic_vector(4 downto 0);
+        signal reg_data       : std_logic_vector(7 downto 0);
+        signal msb            : std_logic_vector(6 downto 0);
+        signal adc_channel    : std_logic_vector(1 downto 0);
+        signal adc_start      : std_logic;
+        signal adc_busy       : std_logic;
+        signal adc_result     : std_logic_vector(7 downto 0);
+        signal i2c_scl        : std_logic;
+        signal i2c_sda_i      : std_logic;
+        signal i2c_sda_o      : std_logic;
+        signal i2c_sda_t      : std_logic;
+        signal enable_i2c     : std_logic;
+        signal reset_i2c      : std_logic := '0';
+
+        signal i3c2_inputs    : std_logic_vector(23 downto 0);
+        signal i3c2_outputs   : std_logic_vector(15 downto 0);
+
+        signal ads1115_found  : std_logic;
+    begin
+
+        -- I2C reset generation
+        process(clock_48)
+        begin
+            if rising_edge(clock_48) then
+                if reset_counter = 0 then
+                    reset_i2c <= '1';
+                end if;
+                -- detect pwm audio vs i2c based on the presence of i2c pullups at the end of power up reset
+                if reset_counter = to_unsigned(48, RESETBITS) then
+                    enable_i2c <= audiol or audior;
+                end if;
+                if reset_counter = to_unsigned(96, RESETBITS) then
+                    reset_i2c <= '0';
+                end if;
+                -- logic for triggering conversions
+                if ext_1mhz_nrst = '0' then
+                    adc_start <= '0';
+                elsif ext_1mhz_clken = '1' and reg_fc70_enable = '1' and ext_1mhz_r_nw = '0' then
+                    -- Writing 04-07 starts a conversion
+                    case ext_1mhz_di(3 downto 0) is
+                        -- Only single ended mode is supported, channels reversed on PCB
+                        when "0100" =>
+                            adc_channel <= "11";
+                            adc_start <= '1';
+                        when "0101" =>
+                            adc_channel <= "10";
+                            adc_start <= '1';
+                        when "0110" =>
+                            adc_channel <= "01";
+                            adc_start <= '1';
+                        when "0111" =>
+                            adc_channel <= "00";
+                            adc_start <= '1';
+                        when others =>
+                            null;
+                    end case;
+                end if;
+                -- don't allow a conversion to be started when busy
+                if adc_busy = '1' then
+                    adc_start <= '0';
+                end if;
+                -- capture ADC result
+                if reg_write = '1' then
+                    if reg_addr <= "00000" then
+                        msb <= reg_data(6 downto 0);
+                    elsif reg_addr <= "00001" then
+                        adc_result <= msb & reg_data(7);
+                    end if;
+                end if;
+            end if;
+        end process;
+
+        -- I3C2 source and assembler to generate this program is in ../tools
+        inst_electronfpga_i2c_program : entity work.electronfpga_i2c_program
+            port map (
+                clk => clock_48,
+                address => inst_address,
+                data => inst_data
+            );
+
+        -- Hamsterworks I3C2 Controller
+        -- https://web.archive.org/web/20190816172702/http://hamsterworks.co.nz/mediawiki/index.php/I3C2
+        inst_i3c2 : entity work.i3c2
+            generic map (
+                CLK_DIVIDE   => CLK_DIVIDE
+                )
+            port map (
+                clk          => clock_48,
+                reset        => reset_i2c,
+                inst_address => inst_address,
+                inst_data    => inst_data,
+                i2c_scl      => i2c_scl,
+                i2c_sda_i    => i2c_sda_i,
+                i2c_sda_o    => i2c_sda_o,
+                i2c_sda_t    => i2c_sda_t,
+                inputs       => i3c2_inputs,
+                outputs      => i3c2_outputs,
+                reg_addr     => reg_addr,
+                reg_data     => reg_data,
+                reg_write    => reg_write,
+                debug_scl    => open,
+                debug_sda    => open,
+                error        => open
+                );
+
+        i3c2_inputs <= x"00" & "11" & adc_channel & "0101" & "0000000" & adc_start;
+
+        adc_busy <= i3c2_outputs(0);
+
+        audiol    <= 'Z'     when reset_i2c = '1' else
+                     i2c_scl when enable_i2c = '1' else
+                     pwm_l;
+
+        audior    <= 'Z'       when reset_i2c = '1' else
+                     'Z'       when enable_i2c = '1' and i2c_sda_t = '1' else
+                     i2c_sda_o when enable_i2c = '1' and i2c_sda_t = '0' else
+                     pwm_r;
+
+        i2c_sda_i <= audior when enable_i2c = '1' else '1';
+
+        -- result of last ADC conversion
+        reg_fc70_do <= adc_result;
+        reg_fc72_do <= "0" & adc_busy & fire2_n & fire1_n & "1111";
+
+    end generate;
+
+    not_analog_js : if not IncludeAnalogJS generate
+        reg_fc70_do <= x"FF";
+        reg_fc72_do <= x"FF";
+    end generate;
+
+    reg_fc70_enable <= '1' when ext_1mhz_pgfc_n = '0' and ext_1mhz_addr = x"70" else '0';
+    reg_fc72_enable <= '1' when ext_1mhz_pgfc_n = '0' and ext_1mhz_addr = x"72" else '0';
+
+--------------------------------------------------------
 -- I2C
 --------------------------------------------------------
 
@@ -1283,12 +1441,11 @@ begin
     GenNotI2C: if not IncludeI2C generate
     begin
         reg_fcd6_do <= x"fc";
-        audiol <= pwm_l;
-        audior <= pwm_r;
     end generate;
 
     -- I2C register &FCD6 (bit 7 = SDA; bit 6 = SCL)
     reg_fcd6_enable <= '1' when ext_1mhz_pgfc_n = '0' and ext_1mhz_addr = x"D6" else '0';
+
 
 --------------------------------------------------------
 -- External shift register for joysticks / config links
@@ -1300,8 +1457,8 @@ begin
             js_clk        => phi2,
             js_data       => js_data,
             js_load_n     => js_load_n,
-            fire1_n       => open,
-            fire2_n       => open,
+            fire1_n       => fire1_n,
+            fire2_n       => fire2_n,
             lpstb_n       => open,
             joystick1     => joystick1,
             joystick2     => joystick2,
@@ -1393,6 +1550,8 @@ begin
 
     ext_1mhz_do <= ext_tube_do      when ext_tube_ntube  = '0' else
                    version_rom_byte when ext_1mhz_pgfd_n = '0' else
+                   reg_fc70_do      when reg_fc70_enable = '1' else
+                   reg_fc72_do      when reg_fc72_enable = '1' else
                    reg_fcd6_do      when reg_fcd6_enable = '1' else
                    x"FF";
 

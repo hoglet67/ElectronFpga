@@ -12,6 +12,8 @@
         <File path="../../../src/common/serial/uart_tx.v" type="file.verilog" enable="1"/>
         <File path="../src/ElectronFpga_TangNano20K.vhd" type="file.vhdl" enable="1"/>
         <File path="../src/shift_register.vhd" type="file.vhdl" enable="1"/>
+        <File path="../src/i3c2.vhd" type="file.vhdl" enable="1"/>
+        <File path="../tools/electronfpga_i2c_program.vhd" type="file.vhdl" enable="1"/>
         <File path="../src/dac1_oser.vhd" type="file.vhdl" enable="1"/>
         <File path="../src/i2s_simple.vhd" type="file.vhdl" enable="1"/>
         <File path="../src/mem_tang_20k.vhd" type="file.vhdl" enable="1"/>
