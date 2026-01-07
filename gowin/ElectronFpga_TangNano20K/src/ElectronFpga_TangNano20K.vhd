@@ -365,12 +365,9 @@ architecture rtl of ElectronFpga_TangNano20K is
     -- output used to load sample into SPDIF (spdif clock domain)
     signal spdif_load      : std_logic;
 
-    signal joystick1       : std_logic_vector(4 downto 0) := (others => '1');
-    signal joystick2       : std_logic_vector(4 downto 0) := (others => '1');
-    signal jumper          : std_logic_vector(5 downto 0) := (others => '0');
-    signal last_phi2       : std_logic := '0';
-    signal sr_counter      : unsigned(3 downto 0) := (others => '0');
-    signal sr_mirror       : std_logic_vector(15 downto 0) := (others => '0');
+    signal joystick1       : std_logic_vector(4 downto 0);
+    signal joystick2       : std_logic_vector(4 downto 0);
+    signal jumper          : std_logic_vector(7 downto 0);
 
     signal powerup_reset_n : std_logic := '0';
     signal hard_reset_n    : std_logic;
@@ -736,7 +733,7 @@ begin
             btn1            => btn1,
             btn2            => btn2,
             btn3            => key_conf,
-            jumper          => jumper,
+            jumper          => jumper(5 downto 0),
             led             => multiboot_leds,
             pa_en_dout      => pa_en_dout,
             reconfig        => reconfig
@@ -1023,6 +1020,16 @@ begin
     -- SDRAM Memory Controller
     --------------------------------------------------------
 
+    process(clock_48)
+        variable last_phi2 : std_logic;
+    begin
+        if rising_edge(clock_48) then
+            mem_strobe  <= phi2 and not last_phi2; -- on the rising edge (middle of the cyle)
+            mem_refresh <= last_phi2 and not phi2; -- on the falling edge
+            last_phi2 := phi2;
+        end if;
+    end process;
+
     e_mem: entity work.mem_tang_20k
         generic map (
             IncludeMonitor => IncludeMonitor,
@@ -1287,29 +1294,19 @@ begin
 -- External shift register for joysticks / config links
 --------------------------------------------------------
 
-    process(clock_48)
-    begin
-        if rising_edge(clock_48) then
-            -- external 74LV165A clocked on rising edge, so work here on falling edge
-            if phi2 = '0' and last_phi2 = '1' then
-                if sr_counter = "1111" then
-                    js_load_n <= '0';
-                else
-                    js_load_n <= '1';
-                end if;
-                if sr_counter = "0000" then
-                    joystick1 <= sr_mirror(12 downto 8);
-                    joystick2 <= sr_mirror(4 downto 0);
-                    jumper    <= sr_mirror(7 downto 5) & sr_mirror(15 downto 13);
-                end if;
-                sr_mirror  <= sr_mirror(14 downto 0) & js_data;
-                sr_counter <= sr_counter + 1;
-            end if;
-            mem_strobe  <= phi2 and not last_phi2; -- on the rising edge (middle of the cyle)
-            mem_refresh <= last_phi2 and not phi2; -- on the falling edge
-            last_phi2 <= phi2;
-        end if;
-    end process;
+    sr : entity work.shift_register
+        port map (
+            clock         => clock_48,
+            js_clk        => phi2,
+            js_data       => js_data,
+            js_load_n     => js_load_n,
+            fire1_n       => open,
+            fire2_n       => open,
+            lpstb_n       => open,
+            joystick1     => joystick1,
+            joystick2     => joystick2,
+            jumper        => jumper
+        );
 
     --------------------------------------------------------
     -- 6502 Instruction Tracing via the debug connector
