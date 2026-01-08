@@ -24,6 +24,8 @@ entity i3c2 is
         reset        : in  std_logic;
         inst_address : out std_logic_vector (9 downto 0);
         inst_data    : in  std_logic_vector (8 downto 0);
+        i2c_bus_req  : in  std_logic;
+        i2c_bus_ack  : out std_logic := '0';
         i2c_scl      : out std_logic := '1';
         i2c_sda_i    : in  std_logic;
         i2c_sda_o    : out std_logic := '0';
@@ -87,6 +89,9 @@ architecture Behavioral of i3c2 is
     -- Input/output data
     signal i2c_data  : std_logic_vector( 8 downto 0);
 
+    -- I2C Bus Request/Ack state (granted = 1 means the other controller can use it)
+    signal granted : std_logic := '0';
+
 begin
 
 -- |Opcode   | Instruction | Action
@@ -129,6 +134,8 @@ begin
 
     debug_sda <= i2c_sda_i;
     i2c_sda_o <= '0';
+    i2c_bus_ack <= granted;
+
     cpu: process(clk)
     begin
         if rising_edge(clk) then
@@ -139,7 +146,17 @@ begin
                 ackflag <= NACK;
                 i2c_scl <= '1';
                 i2c_sda_t <= '1';
+                granted <= '0';
                 pcnext <= (others => '0');
+
+            elsif i2c_started = '0' and i2c_bus_req = '1' then
+                granted <= '1';
+
+            elsif granted = '1' then
+                if i2c_bus_req = '0' then
+                    granted <= '0';
+                end if;
+
             else
                 reg_write <= '0';
                 case state is
@@ -205,7 +222,6 @@ begin
 
                     when STATE_I2C_STOP =>
                         -- clock stays high, and data goes high half way through a bit
-                        i2c_started <= '0';
                         if bitcount = unsigned(CLK_DIVIDE) - unsigned("00" & CLK_DIVIDE(CLK_DIVIDE'high downto 2)) then
                             i2c_sda_t      <= '0';
                         end if;
@@ -219,6 +235,7 @@ begin
                             i2c_sda_t      <= '1';
                         end if;
                         if bitcount = 0 then
+                            i2c_started <= '0';
                             state    <= STATE_RUN;
                             pcnext   <= pcnext+1;
                         else

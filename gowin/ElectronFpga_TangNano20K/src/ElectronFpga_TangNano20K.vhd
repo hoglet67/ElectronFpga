@@ -465,9 +465,12 @@ architecture rtl of ElectronFpga_TangNano20K is
     signal reset_i2c       : std_logic := '0';
     signal i2c_scl_a       : std_logic;
     signal i2c_scl_b       : std_logic;
+    signal i2c_scl_i       : std_logic;
     signal i2c_sda_a       : std_logic;
     signal i2c_sda_b       : std_logic;
     signal i2c_sda_i       : std_logic;
+    signal i2c_bus_req     : std_logic;
+    signal i2c_bus_ack     : std_logic;
     signal reg_fcd6_enable : std_logic;
     signal reg_fcd6_do     : std_logic_vector(7 downto 0);
 
@@ -1277,6 +1280,8 @@ begin
         end process;
     end generate;
 
+    i2c_scl_i <= audiol when enable_i2c = '1' else '1';
+
     i2c_sda_i <= audior when enable_i2c = '1' else '1';
 
     audiol    <= 'Z'    when reset_i2c = '1'                    else
@@ -1370,6 +1375,8 @@ begin
                 reset        => reset_i2c,
                 inst_address => inst_address,
                 inst_data    => inst_data,
+                i2c_bus_req  => i2c_bus_req,
+                i2c_bus_ack  => i2c_bus_ack,
                 i2c_scl      => i2c_scl_a,
                 i2c_sda_i    => i2c_sda_i,
                 i2c_sda_o    => open, -- this is just a fixed '0'
@@ -1399,6 +1406,7 @@ begin
         reg_fc72_do <= x"FF";
         i2c_scl_a   <= '1';
         i2c_sda_a   <= '1';
+        i2c_bus_ack <= '1';
     end generate;
 
     reg_fc70_enable <= '1' when ext_1mhz_pgfc_n = '0' and ext_1mhz_addr = x"70" else '0';
@@ -1414,15 +1422,17 @@ begin
         begin
             if rising_edge(clock_48) then
                 if ext_1mhz_nrst = '0' then
-                    i2c_sda_b <= '1';
-                    i2c_scl_b <= '1';
+                    i2c_sda_b   <= '1';
+                    i2c_scl_b   <= '1';
+                    i2c_bus_req <= '0';
                 elsif ext_1mhz_clken = '1' and reg_fcd6_enable = '1' and ext_1mhz_r_nw = '0' then
-                    i2c_sda_b <= ext_1mhz_di(7);
-                    i2c_scl_b <= ext_1mhz_di(6);
+                    i2c_sda_b   <= ext_1mhz_di(7);
+                    i2c_scl_b   <= ext_1mhz_di(6);
+                    i2c_bus_req <= ext_1mhz_di(5);
                 end if;
             end if;
         end process;
-        reg_fcd6_do <= i2c_sda_i & "1111111" when enable_i2c = '1' else x"fc";
+        reg_fcd6_do <= i2c_sda_i & i2c_scl_i & i2c_bus_ack & "11111" when enable_i2c = '1' else x"ff";
     end generate;
 
     GenNotI2C: if not IncludeI2C generate
@@ -1430,6 +1440,7 @@ begin
         reg_fcd6_do <= x"fc";
         i2c_scl_b   <= '1';
         i2c_sda_b   <= '1';
+        i2c_bus_req <= '0';
     end generate;
 
     -- I2C register &FCD6 (bit 7 = SDA; bit 6 = SCL)
