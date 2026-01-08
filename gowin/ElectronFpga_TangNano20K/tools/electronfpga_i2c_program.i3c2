@@ -3,10 +3,10 @@
 ;============================================================
 
 ; INPUTS
-; 0 = start conversion (active high)
+; 0 = adc_start (active high)
 
 ; OUTPUTS
-; 0 = conversion in progress (active high)
+; 0 = adc_busy in progress (active high)
 
 ; This program does the following:
 ;
@@ -18,7 +18,7 @@
 ;
 ; }
 
-; I2C clock rate is 100MHz, so DELAYs are in 10us units
+; I2C clock rate is 100KHz, so DELAYs are in 10us units
 
 ;============================================================
 ; Notes for the ADS1115
@@ -47,30 +47,28 @@ runloop:
 
         NOP
         NOP
-
-        CLEAR 0
+        CLEAR 0        ; adc_busy = 0
 
 waitloop:
-        SKIPSET 0
-        JUMP waitloop
+        SKIPSET 0      ; test adc_start
+        JUMP waitloop  ; if not asserted jump back to waitloop
 
-        SET 0
+        SET 0          ; adc_busy = 1
 
-        WRITE 0x90 ; Device address + write
-        WRITE 0x01 ; Select config register
-        WRITELOW   ; Config MSB C5/D5/E5/F5
-        WRITE 0xE3 ; Config LSB
-        STOP       ; End tx
+        WRITE 0x90     ; Device address + write
+        WRITE 0x01     ; Select config register
+        WRITELOW       ; Config MSB C5/D5/E5/F5
+        WRITE 0xE3     ; Config LSB
+        STOP           ; End tx
 
-        DELAY 256  ; wait ~2.5ms for conversion
+        DELAY 256      ; wait ~2.5ms for conversion
 
-        WRITE 0x90 ; Device address + write
-        WRITE 0x00 ; Select conversion register
+        WRITE 0x90     ; Device address + write
+        WRITE 0x00     ; Select conversion register
         STOP
-        WRITE 0x91 ; Device address + read
+        WRITE 0x91     ; Device address + read
         MASTERACK
         READ  0
         READ  1
         STOP
-
         JUMP runloop
