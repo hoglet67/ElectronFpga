@@ -71,9 +71,6 @@ port (
     -- Async reset
     nRESET      :   in  std_logic;
 
-    -- Indicates special VGA Mode 7 (720x576p)
-    VGA         :   in  std_logic;
-
     -- Character data input (in the bus clock domain)
     DI_CLOCK    :   in  std_logic;
     DI_CLKEN    :   in  std_logic;
@@ -299,7 +296,7 @@ begin
                     double_high2 <= '0';
                 else
                     -- Count lines on end of active video (falling edge of disp_enable)
-                    if disp_enable = '0' and disp_enable_latch = '1' and (VGA = '0' or CRS = '0') then
+                    if disp_enable = '0' and disp_enable_latch = '1' then
                         if line_counter = 9 then
                             line_counter <= (others => '0');
 
@@ -401,6 +398,7 @@ begin
                     end if;
                     if alpha_next = '1' then
                         gfx <= '0';
+                        last_gfx <= (others => '0');
                     end if;
                     if is_flash_next = '1' then
                         is_flash <= '1';
@@ -432,7 +430,6 @@ begin
                                     gfx_next <= '1';
                                 else
                                     alpha_next <= '1';
-                                    gfx_release_next <= '1';
                                 end if;
                             end if;
                         else
